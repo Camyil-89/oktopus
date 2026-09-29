@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Доступ заблокирован — Oktopus</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --ink: #08090a;
+      --line: rgba(255, 255, 255, .06);
+      --text: #d4d4d8;
+      --text-dim: #a1a1aa;
+      --text-mute: #71717a;
+      --text-faint: #52525b;
+      --teal: #5eead4;
+      --teal-dim: #2dd4bf;
+      --amber: #fbbf24;
+      --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+    }
+
+    html,
+    body {
+      background: var(--ink);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100%;
+    }
+
+    ::selection {
+      background: rgba(94, 234, 212, .2);
+      color: #ccfbf1;
+    }
+
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    /* ── фон ── */
+    .grid-bg {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, .035) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, .035) 1px, transparent 1px);
+      background-size: 56px 56px;
+      -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 100%);
+      mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .glow {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 700px;
+      height: 500px;
+      transform: translate(-50%, -50%);
+      background: rgba(94, 234, 212, .08);
+      border-radius: 999px;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── контент ── */
+    .wrap {
+      position: relative;
+      z-index: 1;
+      padding: 40px;
+      text-align: center;
+      max-width: 700px;
+    }
+
+    /* ══════════════ СХЕМА ══════════════ */
+    .diagram {
+      width: 100%;
+      max-width: 640px;
+      height: auto;
+      display: block;
+      margin: 0 auto 4px;
+      overflow: visible;
+    }
+
+    /* щит */
+    .shield-body {
+      fill: rgba(94, 234, 212, .08);
+      stroke: var(--teal);
+      stroke-width: 2;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 0 20px rgba(94, 234, 212, .4));
+    }
+
+    .shield-inner {
+      fill: none;
+      stroke: rgba(94, 234, 212, .4);
+      stroke-width: 1.2;
+      stroke-linejoin: round;
+    }
+
+    .check {
+      fill: none;
+      stroke: var(--teal);
+      stroke-width: 4.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 90;
+      stroke-dashoffset: 90;
+      filter: drop-shadow(0 0 8px rgba(94, 234, 212, .8));
+      animation: check-draw 3s ease-in-out infinite;
+    }
+
+    @keyframes check-draw {
+
+      0%,
+      10% {
+        stroke-dashoffset: 90;
+        opacity: 1;
+      }
+
+      40%,
+      80% {
+        stroke-dashoffset: 0;
+        opacity: 1;
+      }
+
+      95%,
+      100% {
+        stroke-dashoffset: 0;
+        opacity: 0;
+      }
+    }
+
+    /* пульсирующие волны */
+    .pulse {
+      fill: none;
+      stroke: rgba(94, 234, 212, .55);
+      stroke-width: 1.6;
+      transform-origin: center;
+      transform-box: fill-box;
+      opacity: 0;
+      /* both = backwards + forwards: до старта (во время delay)
+         к кругу применяется состояние 0% кадра, т.е. opacity 0 */
+      animation: pulse 3s ease-out infinite both;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(.75);
+        opacity: 0;
+      }
+
+      12% {
+        opacity: .85;
+      }
+
+      70% {
+        opacity: .3;
+      }
+
+      100% {
+        transform: scale(1.85);
+        opacity: 0;
+      }
+    }
+
+    /* атакующие частицы */
+    .attacker {
+      fill: var(--amber);
+      filter: drop-shadow(0 0 6px rgba(251, 191, 36, .9));
+      animation: attacker-v1 2.6s cubic-bezier(.55, 0, .55, 1) infinite;
+    }
+
+    @keyframes attacker-v1 {
+      0% {
+        transform: translateX(0);
+        opacity: 0;
+      }
+
+      8% {
+        opacity: 1;
+      }
+
+      62% {
+        transform: translateX(-200px);
+        opacity: 1;
+      }
+
+      72% {
+        transform: translateX(-172px);
+        opacity: 1;
+      }
+
+      100% {
+        transform: translateX(-40px);
+        opacity: 0;
+      }
+    }
+
+    /* искры отражения */
+    .spark {
+      fill: var(--teal);
+      filter: drop-shadow(0 0 8px rgba(94, 234, 212, 1));
+      transform-origin: center;
+      transform-box: fill-box;
+      animation: spark 2.6s ease-out infinite;
+      opacity: 0;
+    }
+
+    @keyframes spark {
+
+      0%,
+      55%,
+      100% {
+        opacity: 0;
+        transform: scale(.3);
+      }
+
+      62% {
+        opacity: 1;
+        transform: scale(1.4);
+      }
+
+      78% {
+        opacity: 0;
+        transform: scale(.5);
+      }
+    }
+
+    /* ── код ── */
+    .big-code {
+      font-family: var(--font-mono);
+      font-size: clamp(80px, 13vw, 160px);
+      font-weight: 500;
+      line-height: .9;
+      letter-spacing: -0.05em;
+      color: transparent;
+      background: linear-gradient(180deg, #fafafa 0%, rgba(250, 250, 250, .15) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      margin-bottom: 26px;
+      position: relative;
+      display: inline-block;
+    }
+
+    .big-code::after {
+      content: '';
+      position: absolute;
+      inset: -20% -10%;
+      background: radial-gradient(ellipse at center, rgba(94, 234, 212, .16), transparent 65%);
+      filter: blur(40px);
+      z-index: -1;
+    }
+
+    .status-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--teal-dim);
+      margin-bottom: 24px;
+    }
+
+    .status-line::before,
+    .status-line::after {
+      content: '';
+      width: 24px;
+      height: 1px;
+      background: rgba(94, 234, 212, .45);
+    }
+
+    h2 {
+      font-size: clamp(20px, 2.4vw, 26px);
+      font-weight: 500;
+      letter-spacing: -0.015em;
+      color: #fafafa;
+      margin-bottom: 14px;
+    }
+
+    p {
+      color: var(--text-mute);
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 480px;
+      margin: 0 auto 32px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--text-faint);
+      padding: 8px 16px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+    }
+
+    .brand svg {
+      width: 14px;
+      height: 14px;
+      color: var(--teal-dim);
+    }
+
+    .brand b {
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="grid-bg"></div>
+  <div class="glow"></div>
+
+  <div class="wrap">
+
+    <!-- СХЕМА: ЩИТ-БАРЬЕР -->
+    <svg class="diagram" viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+
+      <!-- пульсирующие волны вокруг щита: появляются поэтапно -->
+      <circle cx="300" cy="150" r="88" class="pulse" />
+      <circle cx="300" cy="150" r="88" class="pulse" style="animation-delay: 1s" />
+      <circle cx="300" cy="150" r="88" class="pulse" style="animation-delay: 2s" />
+
+      <!-- щит (увеличенный) -->
+      <g transform="translate(300 150) scale(1.45)">
+        <path class="shield-body" d="M 0 -55 L 44 -34 L 44 8 Q 44 44 0 62 Q -44 44 -44 8 L -44 -34 Z" />
+        <path class="shield-inner" d="M 0 -44 L 34 -26 L 34 6 Q 34 34 0 48 Q -34 34 -34 6 L -34 -26 Z" />
+        <path class="check" d="M -16 0 L -4 12 L 18 -14" />
+      </g>
+
+      <!-- атакующие частицы (справа) -->
+      <circle cx="580" cy="150" r="4" class="attacker" />
+      <circle cx="580" cy="110" r="3" class="attacker" style="animation-delay: .85s" />
+      <circle cx="580" cy="192" r="3.5" class="attacker" style="animation-delay: 1.7s" />
+
+      <!-- искры отражения у кромки щита -->
+      <circle cx="378" cy="150" r="3.2" class="spark" />
+      <circle cx="370" cy="136" r="2.2" class="spark" style="animation-delay: .1s" />
+      <circle cx="380" cy="164" r="2.2" class="spark" style="animation-delay: .18s" />
+      <circle cx="368" cy="152" r="2" class="spark" style="animation-delay: .25s" />
+    </svg>
+
+    <div class="big-code">403</div>
+    <div class="status-line">доступ заблокирован</div>
+    <h2>Oktopus защитил Вас</h2>
+    <p>Запрос был отклонён системой контроля доступа. Это штатная работа защиты — если это ошибка, сообщите
+      администратору.</p>
+
+    <div class="brand">
+      <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+        stroke-linejoin="round">
+        <circle cx="60" cy="40" r="20" />
+        <circle cx="53" cy="38" r="3" fill="currentColor" stroke="none" />
+        <circle cx="67" cy="38" r="3" fill="currentColor" stroke="none" />
+        <path d="M 78.8 46.8 L 90 46.8 L 90 70 L 98 70" />
+        <path d="M 70 57.3 L 76 57.3 L 76 96 L 80 96" />
+        <path d="M 56.5 59.7 L 54 59.7 L 54 104 L 56 104" />
+        <path d="M 44.7 52.9 L 36 52.9 L 36 84 L 28 84" />
+      </svg>
+      защищено <b>Oktopus</b>
+    </div>
+
+  </div>
+
+</body>
+
+</html>

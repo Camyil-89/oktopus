@@ -1,0 +1,68 @@
+---
+description: Как писать PoC-атаки на прокси в attack-and-tests/ (lab + control/bypass)
+globs: attack-and-tests/**
+alwaysApply: false
+---
+
+# attack-and-tests/ — лабораторные PoC
+
+Эталон: **`attack-and-tests/mitm-host-mismatch/`**.
+
+## Когда добавлять PoC
+
+- Есть гипотеза обхода ACL/auth/MITM/tunnel с **воспроизводимым** сценарием.
+- В **`internal/proxy/.../test/`** уже есть или нужен **регрессионный** тест на политику (PoC — ручная проверка, не замена `go test`).
+
+## Структура одной атаки
+
+Одна папка — всё для сценария:
+
+```
+attack-and-tests/<kebab-name>/
+  main.go           # подкоманды: all | lab | run; флаги без подкоманды → all
+  all.go            # lab + setup через API + mitm/tunnel + RESULT OK/FAIL
+  lab.go            # фоновые origin (TLS/HTTP), константы listen-адресов
+  run.go            # control + bypass
+  flags.go          # -api, -skip-setup, -proxy, …
+  proxyclient.go    # CONNECT, GET через прокси (без импорта internal/proxy)
+  cert.go           # при необходимости — dev-сертификаты
+  acl.example.squid # минимальная политика (публикуется через API)
+  README.md
+```
+
+Общий пакет **`attack-and-tests/setup`**: login, PATCH settings, PUT ACL, скачать CA, proxy-auth `attack-poc`.
+
+- **`package main`**, модуль **`oktopus`**, запуск: `go run ./attack-and-tests/<name> all`.
+- **`all`**: lab → для **mitm** и **tunnel** настроить прокси → control + bypass → **`RESULT: OK`** (атака не удалась) / **`FAIL`** (удалась).
+- Индекс: **`attack-and-tests/README.md`**.
+
+## Сценарий control / bypass
+
+| Шаг | Назначение |
+|-----|------------|
+| **control** | Запрещённый ресурс без трюка — **deny/403**. |
+| **bypass** | Обход — при уязвимости доступ; после фикса — deny как control. |
+
+## Прокси и окружение
+
+- Пользователь запускает `go run ./cmd serve`; PoC ходит в API `http://127.0.0.1:8000` (admin/admin по умолчанию).
+- Разрешённый origin в MITM PoC — **`localhost`** (без правки `hosts`).
+- Ручной режим: `-skip-setup`.
+
+## Код и границы
+
+- PoC **не** тянет `internal/proxy` в сценарии атаки; API — только `attack-and-tests/setup`.
+- Исправление — в **`internal/proxy`** + тест в **`internal/proxy/.../test/`**.
+
+## ACL / http_access (интеграция через API)
+
+- Отдельная папка `attack-and-tests/<kebab-name>/` с `policy.squid` + `main.go`.
+- Раннер `aclrun.RunEvaluateSuite` или `RunCompileSuite` для `ssl_verify` / `delay_*`.
+- Список в `attack-and-tests/README.md`, агрегатор `run-all-acl`.
+
+## Чеклист новой атаки
+
+1. Папка `attack-and-tests/<name>/`, README + `acl.example.squid`.
+2. `all` с mitm/tunnel и RESULT OK/FAIL.
+3. Запись в `attack-and-tests/README.md`.
+4. Регрессия в `internal/.../test/`.

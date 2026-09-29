@@ -1,0 +1,5 @@
+# Порядок http_access: первая совпавшая строка
+acl blocked dstdomain neverssl.com
+acl all all
+http_access deny blocked
+http_access allow all

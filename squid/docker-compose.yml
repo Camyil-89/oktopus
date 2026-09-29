@@ -1,0 +1,16 @@
+services:
+  squid:
+    image: ubuntu/squid:latest
+    container_name: squid-proxy
+    restart: unless-stopped
+    ports:
+      - "3128:3128" # Стандартный порт для HTTP-прокси
+      - "3129:3129" # Дополнительный порт (например, для SSL Bump, см. примечание ниже)
+    volumes:
+      - ./squid.conf:/etc/squid/squid.conf:ro
+      - squid_cache:/var/spool/squid
+      - squid_logs:/var/log/squid
+
+volumes:
+  squid_cache:
+  squid_logs:

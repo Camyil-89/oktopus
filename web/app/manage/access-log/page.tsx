@@ -1,0 +1,604 @@
+"use client";
+
+import { ApiError } from "@/api/base";
+import {
+  deleteProxyAccessLogByPeriod,
+  listProxyAccessLog,
+  listProxyInspectRules,
+  patchProxySettings,
+} from "@/api/proxy";
+import { AccessLogDecisionRuleCell } from "@/assets/components/AccessLogDecisionRuleCell";
+import { AccessLogRuleNameCell } from "@/assets/components/AccessLogRuleNameCell";
+import { AccessLogDeletePeriodModal } from "@/assets/modals/AccessLogDeletePeriodModal";
+import { AccessLogDetailModal } from "@/assets/modals/AccessLogDetailModal";
+import {
+  ACCESS_LOG_EMPTY_FILTERS,
+  AccessLogFiltersModal,
+  type AccessLogFiltersValues,
+} from "@/assets/modals/AccessLogFiltersModal";
+import { AccessLogRetentionModal } from "@/assets/modals/AccessLogRetentionModal";
+import type { ProxyAccessLogRow } from "@/types/accessLog";
+import {
+  accessLogAclDecisionLabel,
+  isAccessLogRecordId,
+  parseAccessLogExtra,
+  searchEngineLabel,
+} from "@/utils/accessLogExtra";
+import { AccessLogActionTag } from "@/utils/accessLogAction";
+import type { AccessLogActionCode } from "@/utils/accessLogAction";
+import {
+  accessLogActionToListParams,
+  migrateAccessLogFiltersFromStorage,
+  parseAccessLogActionFilter,
+} from "@/utils/accessLogFilters";
+import {
+  normalizeAccessLogRow,
+} from "@/utils/accessLogRow";
+import {
+  FilterOutlined,
+  ReloadOutlined,
+  SettingOutlined,
+  TableOutlined,
+} from "@ant-design/icons";
+import {
+  App,
+  Button,
+  Checkbox,
+  Dropdown,
+  Input,
+  Space,
+  Table,
+} from "antd";
+import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
+
+type ColumnKey =
+  | "created_at"
+  | "source_address"
+  | "destination_address"
+  | "user"
+  | "action"
+  | "acl_rule"
+  | "inspect_rule"
+  | "decision_rule"
+  | "decide_duration_us"
+  | "full_url"
+  | "search_engine"
+  | "search_query";
+
+const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = [
+  "created_at",
+  "source_address",
+  "destination_address",
+  "user",
+  "action",
+  "acl_rule",
+  "inspect_rule",
+  "decision_rule",
+];
+
+const COLUMN_LABELS: Record<ColumnKey, string> = {
+  created_at: "Время",
+  source_address: "Источник",
+  destination_address: "Назначение",
+  user: "Пользователь",
+  action: "Действие",
+  acl_rule: "Правило ACL",
+  inspect_rule: "Инспекция",
+  decision_rule: "Решающее правило",
+  decide_duration_us: "ACL, мкс",
+  full_url: "URL",
+  search_engine: "Поисковая система",
+  search_query: "Поисковый запрос",
+};
+
+const ALL_COLUMN_KEYS = Object.keys(COLUMN_LABELS) as ColumnKey[];
+const VISIBLE_COLUMNS_STORAGE_KEY = "oktopus.manage.access-log.visible-columns";
+const FILTERS_STORAGE_KEY = "oktopus.manage.access-log.filters";
+
+function loadFiltersFromStorage(): AccessLogFiltersValues {
+  if (typeof window === "undefined") {
+    return ACCESS_LOG_EMPTY_FILTERS;
+  }
+  try {
+    const raw = localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (!raw) {
+      return ACCESS_LOG_EMPTY_FILTERS;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return ACCESS_LOG_EMPTY_FILTERS;
+    }
+    const p = parsed as Partial<AccessLogFiltersValues> & {
+      error_kind?: string;
+    };
+    return {
+      id: typeof p.id === "string" ? p.id : "",
+      user: typeof p.user === "string" ? p.user : "",
+      source: typeof p.source === "string" ? p.source : "",
+      destination: typeof p.destination === "string" ? p.destination : "",
+      url: typeof p.url === "string" ? p.url : "",
+      search_only: Boolean(p.search_only),
+      from: typeof p.from === "string" ? p.from : "",
+      to: typeof p.to === "string" ? p.to : "",
+      action: migrateAccessLogFiltersFromStorage(
+        p as Record<string, unknown>,
+      ),
+      decision_rule_ref:
+        typeof p.decision_rule_ref === "string" ? p.decision_rule_ref : "",
+      inspect_rule_id:
+        typeof p.inspect_rule_id === "string" ? p.inspect_rule_id : "",
+    };
+  } catch {
+    return ACCESS_LOG_EMPTY_FILTERS;
+  }
+}
+
+function loadVisibleColumnsFromStorage(): ColumnKey[] {
+  if (typeof window === "undefined") {
+    return DEFAULT_VISIBLE_COLUMNS;
+  }
+  try {
+    const raw = localStorage.getItem(VISIBLE_COLUMNS_STORAGE_KEY);
+    if (!raw) {
+      return DEFAULT_VISIBLE_COLUMNS;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return DEFAULT_VISIBLE_COLUMNS;
+    }
+    const valid = parsed.filter(
+      (k): k is ColumnKey =>
+        typeof k === "string" && ALL_COLUMN_KEYS.includes(k as ColumnKey),
+    );
+    return valid.length > 0 ? valid : DEFAULT_VISIBLE_COLUMNS;
+  } catch {
+    return DEFAULT_VISIBLE_COLUMNS;
+  }
+}
+
+function accessLogListParams(
+  page: number,
+  pageSize: number,
+  filters: AccessLogFiltersValues,
+) {
+  return {
+    page,
+    page_size: pageSize,
+    id: filters.id || undefined,
+    user: filters.user || undefined,
+    source: filters.source || undefined,
+    destination: filters.destination || undefined,
+    url: filters.url || undefined,
+    search_only: filters.search_only || undefined,
+    from: filters.from || undefined,
+    to: filters.to || undefined,
+    ...accessLogActionToListParams(parseAccessLogActionFilter(filters.action)),
+    decision_rule_ref: filters.decision_rule_ref || undefined,
+    inspect_rule_id: filters.inspect_rule_id || undefined,
+  };
+}
+
+export default function ManageAccessLogPage() {
+  const { message, modal } = App.useApp();
+  const [data, setData] = useState<ProxyAccessLogRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [loading, setLoading] = useState(false);
+
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [appliedFilters, setAppliedFilters] =
+    useState<AccessLogFiltersValues>(ACCESS_LOG_EMPTY_FILTERS);
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
+  const [searchNonce, setSearchNonce] = useState(0);
+  const [idSearchDraft, setIdSearchDraft] = useState("");
+
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(
+    DEFAULT_VISIBLE_COLUMNS,
+  );
+
+  useEffect(() => {
+    const stored = loadFiltersFromStorage();
+    setAppliedFilters(stored);
+    setIdSearchDraft(stored.id);
+    setFiltersHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    setIdSearchDraft(appliedFilters.id);
+  }, [appliedFilters.id]);
+
+  useEffect(() => {
+    setVisibleColumns(loadVisibleColumnsFromStorage());
+  }, []);
+
+  const onVisibleColumnsChange = (keys: ColumnKey[]) => {
+    setVisibleColumns(keys);
+    try {
+      localStorage.setItem(
+        VISIBLE_COLUMNS_STORAGE_KEY,
+        JSON.stringify(keys),
+      );
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const [detailRow, setDetailRow] = useState<ProxyAccessLogRow | null>(null);
+  const [ruleNames, setRuleNames] = useState<Map<string, string>>(
+    () => new Map(),
+  );
+
+  useEffect(() => {
+    void listProxyInspectRules()
+      .then((inspect) => {
+        const m = new Map<string, string>();
+        for (const r of inspect) {
+          m.set(r.id, r.name);
+        }
+        setRuleNames(m);
+      })
+      .catch(() => {
+        /* имена правил необязательны для списка */
+      });
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await listProxyAccessLog(
+        accessLogListParams(page, pageSize, appliedFilters),
+      );
+      setData(res.results.map(normalizeAccessLogRow));
+      setTotal(res.count);
+    } catch (e) {
+      const msg =
+        e instanceof ApiError ? e.message : "Не удалось загрузить журнал";
+      message.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [appliedFilters, message, page, pageSize, searchNonce]);
+
+  useEffect(() => {
+    if (!filtersHydrated) {
+      return;
+    }
+    void load();
+  }, [load, filtersHydrated]);
+
+  const applyFilters = (values: AccessLogFiltersValues) => {
+    setAppliedFilters(values);
+    try {
+      localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(values));
+    } catch {
+      /* ignore */
+    }
+    setPage(1);
+    setSearchNonce((n) => n + 1);
+    setFiltersOpen(false);
+  };
+
+  const filtersActive =
+    appliedFilters.id !== "" ||
+    appliedFilters.user !== "" ||
+    appliedFilters.source !== "" ||
+    appliedFilters.destination !== "" ||
+    appliedFilters.url !== "" ||
+    appliedFilters.search_only ||
+    appliedFilters.from !== "" ||
+    appliedFilters.to !== "" ||
+    appliedFilters.action !== "" ||
+    appliedFilters.decision_rule_ref !== "" ||
+    appliedFilters.inspect_rule_id !== "";
+
+  const refreshList = () => {
+    setSearchNonce((n) => n + 1);
+  };
+
+  const searchByRecordId = (raw: string) => {
+    const id = raw.trim();
+    if (id && !isAccessLogRecordId(id)) {
+      message.error("Укажите корректный UUID записи");
+      return;
+    }
+    applyFilters({ ...appliedFilters, id });
+  };
+
+  const confirmDeletePeriod = (range: { from: string; to: string }) => {
+    const fromLabel = new Date(range.from).toLocaleString();
+    const toLabel = new Date(range.to).toLocaleString();
+    modal.confirm({
+      title: "Удалить записи за период?",
+      content: `${fromLabel} — ${toLabel}`,
+      okText: "Удалить",
+      okType: "danger",
+      cancelText: "Отмена",
+      onOk: async () => {
+        setDeleteLoading(true);
+        try {
+          const res = await deleteProxyAccessLogByPeriod(range);
+          message.success(`Удалено записей: ${res.deleted}`);
+          setDeleteOpen(false);
+          setPage(1);
+          const list = await listProxyAccessLog(
+            accessLogListParams(1, pageSize, appliedFilters),
+          );
+          setData(list.results.map(normalizeAccessLogRow));
+          setTotal(list.count);
+        } catch (e) {
+          const msg =
+            e instanceof ApiError ? e.message : "Не удалось удалить";
+          message.error(msg);
+        } finally {
+          setDeleteLoading(false);
+        }
+      },
+    });
+  };
+
+  const saveRetention = async (body: { access_log_retention_days: number }) => {
+    setSettingsSaving(true);
+    try {
+      await patchProxySettings(body);
+      message.success("Сохранено");
+      setSettingsOpen(false);
+    } catch (e) {
+      const msg =
+        e instanceof ApiError ? e.message : "Не удалось сохранить";
+      message.error(msg);
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  const allColumns: ColumnsType<ProxyAccessLogRow> = useMemo(
+    () => [
+      {
+        key: "created_at",
+        title: COLUMN_LABELS.created_at,
+        dataIndex: "created_at",
+        width: 190,
+        render: (v: string) => new Date(v).toLocaleString(),
+      },
+      {
+        key: "source_address",
+        title: COLUMN_LABELS.source_address,
+        dataIndex: "source_address",
+        ellipsis: true,
+      },
+      {
+        key: "destination_address",
+        title: COLUMN_LABELS.destination_address,
+        dataIndex: "destination_address",
+        ellipsis: true,
+      },
+      {
+        key: "user",
+        title: COLUMN_LABELS.user,
+        dataIndex: "user",
+        width: 140,
+        render: (v: string | null) => v ?? "—",
+      },
+      {
+        key: "action",
+        title: COLUMN_LABELS.action,
+        dataIndex: "action",
+        width: 100,
+        render: (_: AccessLogActionCode, row: ProxyAccessLogRow) => (
+          <AccessLogActionTag
+            action={row.action}
+            decisionRuleRef={row.decision_rule_ref}
+            deniedBy={row.denied_by}
+          />
+        ),
+      },
+      {
+        key: "acl_rule",
+        title: COLUMN_LABELS.acl_rule,
+        width: 160,
+        ellipsis: true,
+        render: (_: unknown, row: ProxyAccessLogRow) =>
+          accessLogAclDecisionLabel(row.decision_rule_ref),
+      },
+      {
+        key: "inspect_rule",
+        title: COLUMN_LABELS.inspect_rule,
+        width: 160,
+        ellipsis: true,
+        render: (_: unknown, row: ProxyAccessLogRow) => (
+          <AccessLogRuleNameCell
+            ruleId={row.inspect_rule_id}
+            ruleNames={ruleNames}
+          />
+        ),
+      },
+      {
+        key: "decision_rule",
+        title: COLUMN_LABELS.decision_rule,
+        width: 180,
+        ellipsis: true,
+        render: (_: unknown, row: ProxyAccessLogRow) => (
+          <AccessLogDecisionRuleCell
+            decisionRuleRef={row.decision_rule_ref}
+            ruleNames={ruleNames}
+          />
+        ),
+      },
+      {
+        key: "decide_duration_us",
+        title: COLUMN_LABELS.decide_duration_us,
+        dataIndex: "decide_duration_us",
+        width: 100,
+      },
+      {
+        key: "full_url",
+        title: COLUMN_LABELS.full_url,
+        dataIndex: "full_url",
+        ellipsis: true,
+      },
+      {
+        key: "search_engine",
+        title: COLUMN_LABELS.search_engine,
+        width: 140,
+        render: (_: unknown, row: ProxyAccessLogRow) =>
+          searchEngineLabel(parseAccessLogExtra(row.extra).search?.engine),
+      },
+      {
+        key: "search_query",
+        title: COLUMN_LABELS.search_query,
+        ellipsis: true,
+        render: (_: unknown, row: ProxyAccessLogRow) => {
+          const q = parseAccessLogExtra(row.extra).search?.query;
+          return q ?? "—";
+        },
+      },
+    ],
+    [ruleNames],
+  );
+
+  const tableColumns = useMemo(
+    () =>
+      allColumns.filter((col) =>
+        visibleColumns.includes(col.key as ColumnKey),
+      ),
+    [allColumns, visibleColumns],
+  );
+
+  const onTableChange = (pagination: TablePaginationConfig) => {
+    setPage(pagination.current ?? 1);
+    const size = pagination.pageSize ?? DEFAULT_PAGE_SIZE;
+    setPageSize(Math.min(size, MAX_PAGE_SIZE));
+  };
+
+  const columnPicker = (
+    <div className="flex flex-col gap-2 rounded-lg border border-white/8 bg-[#141416] p-3 shadow-lg">
+      <Checkbox.Group
+        className="flex flex-col gap-1"
+        value={visibleColumns}
+        onChange={(keys) => onVisibleColumnsChange(keys as ColumnKey[])}
+        options={ALL_COLUMN_KEYS.map((key) => ({
+          label: COLUMN_LABELS[key],
+          value: key,
+        }))}
+      />
+    </div>
+  );
+
+  return (
+    <div className="flex w-full flex-col gap-4">
+      <header className="flex flex-row flex-wrap items-center justify-between gap-3">
+        <Link
+          href="/manage/access-log/reports"
+          className="text-[12px] text-zinc-500 transition hover:text-teal-300"
+        >
+          Отчёты →
+        </Link>
+        <Space wrap>
+          <Button danger onClick={() => setDeleteOpen(true)}>
+            Удалить за период
+          </Button>
+          <Button
+            icon={<SettingOutlined />}
+            onClick={() => setSettingsOpen(true)}
+          >
+            Настройки
+          </Button>
+        </Space>
+      </header>
+
+      <AccessLogDeletePeriodModal
+        open={deleteOpen}
+        loading={deleteLoading}
+        onCancel={() => setDeleteOpen(false)}
+        onSubmit={(range) => confirmDeletePeriod(range)}
+      />
+
+      <AccessLogRetentionModal
+        open={settingsOpen}
+        saving={settingsSaving}
+        onCancel={() => setSettingsOpen(false)}
+        onSubmit={(values) => void saveRetention(values)}
+      />
+
+      <AccessLogDetailModal
+        row={detailRow}
+        open={detailRow !== null}
+        onClose={() => setDetailRow(null)}
+        ruleNames={ruleNames}
+      />
+
+      <AccessLogFiltersModal
+        open={filtersOpen}
+        initialValues={appliedFilters}
+        onCancel={() => setFiltersOpen(false)}
+        onApply={applyFilters}
+      />
+
+      <div className="panel-table overflow-hidden rounded-xl border border-white/10 bg-white/[0.05]">
+        <div className="flex flex-row flex-wrap items-center gap-2 border-b border-white/8 px-5 py-4">
+          <Space wrap className="flex-1">
+            <Input.Search
+              allowClear
+              placeholder="ID записи (UUID)"
+              value={idSearchDraft}
+              onChange={(e) => setIdSearchDraft(e.target.value)}
+              onSearch={searchByRecordId}
+              className="w-full min-w-[220px] max-w-sm"
+              enterButton="Найти"
+            />
+            <Button
+              icon={<ReloadOutlined />}
+              loading={loading}
+              onClick={refreshList}
+            >
+              Обновить
+            </Button>
+            <Button
+              type={filtersActive ? "primary" : "default"}
+              icon={<FilterOutlined />}
+              onClick={() => setFiltersOpen(true)}
+            >
+              Фильтры
+            </Button>
+            <Dropdown dropdownRender={() => columnPicker} trigger={["click"]}>
+              <Button icon={<TableOutlined />}>Колонки</Button>
+            </Dropdown>
+          </Space>
+        </div>
+        <Table<ProxyAccessLogRow>
+            rowKey="id"
+            loading={loading}
+            columns={tableColumns}
+            dataSource={data}
+            pagination={{
+              current: page,
+              pageSize,
+              total,
+              showSizeChanger: true,
+              pageSizeOptions: ["20", "50", "100"],
+              showTotal: (c) => `Всего: ${c}`,
+            }}
+            onChange={onTableChange}
+            scroll={{ x: true }}
+          rowClassName={() => "row-hover"}
+          onRow={(record) => ({
+            onClick: () => setDetailRow(record),
+            style: { cursor: "pointer" },
+          })}
+        />
+      </div>
+    </div>
+  );
+}

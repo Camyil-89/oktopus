@@ -1,0 +1,324 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"log"
+	"net"
+	stdhttp "net/http"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"oktopus/internal/proxy/accesslog"
+	"oktopus/internal/proxy/acl"
+	"oktopus/internal/proxy/auth"
+	"oktopus/internal/proxy/config"
+	"oktopus/internal/proxy/hooks"
+	"oktopus/internal/proxy/inspect"
+	"oktopus/internal/proxy/metrics"
+	"oktopus/internal/startup"
+)
+
+// Manager запускает прокси и поддерживает hot reload конфигурации.
+type Manager struct {
+	hooks     *hooks.Hooks
+	log       *log.Logger
+	accessRec accesslog.Recorder
+
+	mu        sync.Mutex
+	listen    string
+	httpSrv   *stdhttp.Server
+	holder    atomic.Pointer[Server]
+	listening atomic.Bool
+	lastStartErr atomic.Value // string
+	authCache *auth.AuthCache
+	conns         activeConns
+	accessBatcher *accesslog.Batcher
+}
+
+const proxyListenRetryInterval = 10 * time.Second
+
+type activeConns struct {
+	mu    sync.Mutex
+	conns map[net.Conn]struct{}
+}
+
+func (a *activeConns) track(conn net.Conn, state stdhttp.ConnState) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.conns == nil {
+		a.conns = make(map[net.Conn]struct{})
+	}
+	switch state {
+	case stdhttp.StateNew:
+		a.conns[conn] = struct{}{}
+	case stdhttp.StateClosed:
+		delete(a.conns, conn)
+	}
+}
+
+func (a *activeConns) count() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return len(a.conns)
+}
+
+func (a *activeConns) closeAll() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for c := range a.conns {
+		_ = c.Close()
+	}
+	a.conns = make(map[net.Conn]struct{})
+}
+
+// NewManager создаёт менеджер прокси.
+func NewManager(h *hooks.Hooks, logger *log.Logger) *Manager {
+	return &Manager{
+		hooks: h,
+		log:   logger,
+	}
+}
+
+// SetAccessRecorder задаёт логгер ACL-решений (например accesslog.Batcher).
+func (m *Manager) SetAccessRecorder(rec accesslog.Recorder) {
+	m.accessRec = rec
+	if b, ok := rec.(*accesslog.Batcher); ok {
+		m.accessBatcher = b
+	}
+}
+
+type reloadableHandler struct {
+	m *Manager
+}
+
+func (h reloadableHandler) ServeHTTP(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+	s := h.m.holder.Load()
+	if s == nil {
+		stdhttp.Error(w, "proxy not ready", stdhttp.StatusServiceUnavailable)
+		return
+	}
+	s.ServeHTTP(w, r)
+}
+
+// Apply пересобирает прокси и применяет конфиг (hot reload).
+func (m *Manager) Apply(ctx context.Context, cfg config.Config, aclEngine *acl.Engine, inspectRunner *inspect.Runner) error {
+	cfg = cfg.WithDefaults()
+
+	authCache := m.prepareAuthCache(cfg.Auth)
+	newSrv, err := New(cfg, aclEngine, inspectRunner, m.hooks, m.accessRec, m.log, authCache)
+	if err != nil {
+		m.setStartError(err)
+		return err
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.httpSrv == nil || m.listen != cfg.Listen {
+		ln, err := net.Listen("tcp", cfg.Listen)
+		if err != nil {
+			m.setStartError(err)
+			return err
+		}
+		if m.httpSrv != nil {
+			_ = m.httpSrv.Shutdown(context.Background())
+			m.httpSrv = nil
+			m.listening.Store(false)
+		}
+		m.listen = cfg.Listen
+		m.holder.Store(newSrv)
+		m.conns.closeAll()
+		m.logListen(newSrv)
+		srv := &stdhttp.Server{
+			Handler:           reloadableHandler{m: m},
+			ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+			IdleTimeout:       cfg.IdleTimeout,
+			ConnState:         m.conns.track,
+		}
+		m.httpSrv = srv
+		m.markListeningReady()
+		m.clearStartError()
+		go m.runServe(ln, srv)
+		return nil
+	}
+
+	m.holder.Store(newSrv)
+	m.conns.closeAll()
+	m.logListen(newSrv)
+	m.log.Printf("proxy: configuration reloaded")
+	if m.listening.Load() {
+		m.clearStartError()
+	}
+	return nil
+}
+
+func (m *Manager) runServe(ln net.Listener, srv *stdhttp.Server) {
+	err := srv.Serve(ln)
+	m.listening.Store(false)
+	if err != nil && err != stdhttp.ErrServerClosed {
+		m.setStartError(err)
+		m.log.Printf("proxy listen: %v", err)
+	}
+}
+
+func (m *Manager) prepareAuthCache(a config.AuthConfig) *auth.AuthCache {
+	ttl := a.CacheTTL
+	if ttl <= 0 {
+		if m.authCache != nil {
+			m.authCache.Clear()
+		}
+		return nil
+	}
+	if m.authCache == nil {
+		m.authCache = auth.NewAuthCache(ttl)
+	} else {
+		m.authCache.Reconfigure(ttl)
+	}
+	return m.authCache
+}
+
+func (m *Manager) logListen(s *Server) {
+	m.log.Printf("listening on %s (connect=%s)", s.cfg.Listen, s.cfg.Connect)
+	if s.cfg.Connect == config.ConnectMITM {
+		m.log.Printf("MITM CA: %s", s.cfg.CACertPath)
+	}
+	if s.auth != nil {
+		m.log.Printf("proxy auth: Basic realm=%q backend=%s", s.cfg.Auth.Realm, authBackendLabel(s.cfg.Auth))
+		if s.auth.Cache != nil {
+			m.log.Printf("proxy auth cache: ttl=%s", s.auth.Cache.TTL())
+		}
+	}
+	if s.aclSource == "database" {
+		m.log.Printf("acl: database")
+	}
+}
+
+// ProxyActive сообщает, слушает ли прокси настроенный адрес.
+func (m *Manager) ProxyActive() bool {
+	return m.listening.Load()
+}
+
+// ProxyListen возвращает адрес прослушивания активного прокси.
+func (m *Manager) ProxyListen() string {
+	s := m.holder.Load()
+	if s == nil {
+		return ""
+	}
+	return s.cfg.Listen
+}
+
+// ProxyLastStartError — текст последней ошибки запуска (пусто, если прокси слушает или ошибки не было).
+func (m *Manager) ProxyLastStartError() string {
+	v, _ := m.lastStartErr.Load().(string)
+	return v
+}
+
+func (m *Manager) setStartError(err error) {
+	if err == nil {
+		m.clearStartError()
+		return
+	}
+	m.lastStartErr.Store(err.Error())
+}
+
+func (m *Manager) clearStartError() {
+	m.lastStartErr.Store("")
+}
+
+func (m *Manager) markListeningReady() {
+	m.listening.Store(true)
+	startup.MarkProxyReady()
+}
+
+// ProxyTraffic возвращает метрики нагрузки для API.
+func (m *Manager) ProxyTraffic() metrics.Snapshot {
+	snap := metrics.SnapshotTraffic()
+	snap.ActiveConnections = m.conns.count()
+	snap.ActiveWebSocketConnections = metrics.ActiveWebSocketConnections()
+	if m.accessBatcher != nil {
+		snap.AccessLogQueuePending = m.accessBatcher.QueueDepth()
+	}
+	return snap
+}
+
+// RunContext запускает прокси с начальным конфигом до отмены ctx.
+// Если порт занят, пишет в лог и повторяет попытку каждые 10 секунд.
+func (m *Manager) RunContext(ctx context.Context, cfg config.Config, aclEngine *acl.Engine, inspectRunner *inspect.Runner) error {
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil
+		}
+
+		err := m.Apply(ctx, cfg, aclEngine, inspectRunner)
+		switch {
+		case err != nil && !isListenBindError(err):
+			return err
+		case err != nil:
+			m.log.Printf("proxy: не удалось запустить: %v", err)
+		case m.listening.Load():
+			m.waitUntilNotListening(ctx)
+			m.shutdownProxy()
+			if ctx.Err() != nil {
+				return nil
+			}
+			m.log.Printf("proxy: повтор запуска...")
+		}
+
+		if !waitFor(ctx, proxyListenRetryInterval) {
+			m.shutdownProxy()
+			return nil
+		}
+	}
+}
+
+// Stop останавливает прокси (слушатель и активные соединения).
+func (m *Manager) Stop() {
+	m.shutdownProxy()
+	m.clearStartError()
+}
+
+func (m *Manager) shutdownProxy() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.httpSrv != nil {
+		_ = m.httpSrv.Shutdown(context.Background())
+		m.httpSrv = nil
+	}
+	m.listening.Store(false)
+}
+
+func (m *Manager) waitUntilNotListening(ctx context.Context) {
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		if !m.listening.Load() {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+	}
+}
+
+func waitFor(ctx context.Context, d time.Duration) bool {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+func isListenBindError(err error) bool {
+	var op *net.OpError
+	return errors.As(err, &op) && op.Op == "listen"
+}

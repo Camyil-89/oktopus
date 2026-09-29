@@ -1,0 +1,45 @@
+---
+description: Ant Design Form — поля во вкладках Tabs (forceRender)
+globs: web/**/*
+alwaysApply: false
+---
+
+# Form + Tabs: не терять поля при submit
+
+У `antd` `Tabs` содержимое **неактивной** вкладки по умолчанию не монтируется. `Form.Item` внутри неё не регистрируется в форме: `setFieldsValue` может заполнить store, но `validateFields()` / `validateFields(['script'])` даёт «empty» / required, пока пользователь не откроет вкладку.
+
+## Обязательно
+
+- Любая вкладка с `Form.Item` (шаблон, script, pattern, большие textarea), с которой сохраняют **без** обязательного перехода на вкладку — помечать `forceRender: true` в элементе `items`.
+- После правки проверять сценарий: открыть модалку → **не** переключать вкладку → OK / «Проверить код» / сохранить.
+
+## Альтернатива (редко)
+
+- Вынести обязательные поля из Tabs на первую вкладку или в общий блок формы.
+- Не полагаться только на `getFieldValue` при submit вместо регистрации поля — это обходит валидацию и правила на `Form.Item`.
+
+## Пример
+
+```tsx
+// ✅ шаблон/script монтируется сразу, submit работает с вкладки «Настройки»
+<Tabs
+  items={[
+    { key: "settings", label: "Настройки", children: <SettingsFields /> },
+    {
+      key: "template",
+      label: "Шаблон",
+      forceRender: true,
+      children: (
+        <Form.Item name="script" rules={[{ required: true }]}>
+          <Input.TextArea />
+        </Form.Item>
+      ),
+    },
+  ]}
+/>
+```
+
+```tsx
+// ❌ script только после клика «Шаблон»
+{ key: "template", label: "Шаблон", children: <Form.Item name="script" ... /> }
+```

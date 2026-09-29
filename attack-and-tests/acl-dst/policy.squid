@@ -1,0 +1,6 @@
+acl bad dst 203.0.113.0/24
+acl ok dstdomain example.com
+acl all all
+http_access deny bad
+http_access allow ok
+http_access deny all

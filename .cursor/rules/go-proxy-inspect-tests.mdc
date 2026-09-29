@@ -1,0 +1,14 @@
+---
+description: Тесты proxy inspect — каталог test/ (см. go-internal-tests)
+globs: internal/proxy/inspect/**
+alwaysApply: false
+---
+
+# Proxy inspect — тесты
+
+См. **`.cursor/rules/go-internal-tests.mdc`** (общие правила для `internal/`).
+
+- Тесты и бенчмарки — **`internal/proxy/inspect/test/`**, пакет **`inspect_test`**, импорт `oktopus/internal/proxy/inspect`.
+- Запуск: `go test ./internal/proxy/inspect/test/`.
+
+При смене контракта обновлять тесты в `test/` и **`web/assets/inspect/inspectAgentPrompt.ts`**.

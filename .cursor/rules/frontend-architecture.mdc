@@ -1,0 +1,153 @@
+---
+description: Web — структура папок, API, store, types, routing, antd + Tailwind
+globs: web/**/*
+alwaysApply: false
+---
+
+# Frontend: архитектура проекта
+
+## API — только через `web/api/`
+
+- Весь HTTP к бэкенду — в папке `web/api/`.
+- Запросы отправлять через `fetchApi` / `fetchApiForm` из `web/api/base.ts` (токены, CSRF, refresh, ошибки).
+- На каждую сущность бэка — отдельный файл, например `web/api/user.ts`, `web/api/order.ts`.
+- Не вызывать `fetch` напрямую из компонентов, store или utils — только через модули `api/`.
+
+```ts
+// ✅ web/api/user.ts
+import { fetchApi } from "./base";
+import type { User } from "@/types/user";
+
+export async function getMe() {
+  return fetchApi("users/me/", "GET");
+}
+```
+
+```tsx
+// ❌ fetch в компоненте или store
+const res = await fetch("/api/users/me/");
+```
+
+## Store — MobX, одна сущность = один файл
+
+- Состояние и действия для сущностей бэка — в `web/store/`.
+- На каждую сущность (или тесно связанную группу) — отдельный store: `web/store/userStore.ts`.
+- Store вызывает функции из `web/api/`, не `fetchApi` напрямую из UI.
+
+## UI — Ant Design + Tailwind
+
+- **Интерактив и UI** — готовые компоненты `antd` и иконки `@ant-design/icons` (кнопки, формы, таблицы, модалки, меню, уведомления и т.д.).
+- **Разметка** — семантический HTML (`main`, `section`, `header`, `nav`, `article`, …) и utility-классы Tailwind для сетки и отступов (`flex`, `grid`, `gap-*`, `p-*`). В ЛК (`app/(app)/`) каркас страницы без `max-w-*` — см. `frontend-crm-full-width.mdc`.
+- Не подключать другие UI-kit вместо antd. Не верстать с нуля то, что уже есть в antd.
+- Стилизация antd — через их API (`className`, `styles`, `theme`), без лишних обёрток.
+
+## Тексты в интерфейсе
+
+- Не добавлять поясняющие подписи, которые объясняют реализованную логику или «как это работает» после задачи пользователя.
+- Не дублировать в UI то, что уже видно из кнопок, таблиц, статусов и полей формы.
+- `Typography.Text type="secondary"`, `extra`, подзаголовки и empty-state — только если текст нужен пользователю для действия (ошибка, пустой список, подсказка к полю).
+- Описание фичи — в коде, PR или документации; не в интерфейсе личного кабинета.
+
+```tsx
+// ❌ пояснение реализованной логики
+<Typography.Text type="secondary">
+  С одним арендатором можно заключать несколько договоров — история сохраняется
+</Typography.Text>
+
+// ✅ достаточно кнопки и данных
+<Button type="primary">Новый договор</Button>
+```
+
+```tsx
+// ✅ Семантика + Tailwind снаружи; antd внутри
+export default function ProfilePage() {
+  return (
+    <main className="flex w-full flex-col gap-6 p-4 md:p-6">
+      <header>
+        <Typography.Title level={2}>Профиль</Typography.Title>
+      </header>
+      <section className="flex flex-col gap-4">
+        <Card>
+          <Form layout="vertical">{/* поля antd */}</Form>
+        </Card>
+      </section>
+    </main>
+  );
+}
+```
+
+```tsx
+// ❌ Кастомная кнопка/div вместо antd; другой UI-kit
+<button className="rounded bg-blue-500 px-4 py-2">Сохранить</button>
+```
+
+## `web/assets/` — переиспользуемые UI
+
+- Переиспользуемые UI на базе antd — в `web/assets/`, не в корне `assets/`.
+- **Компоненты** — `web/assets/components/` (sidebar, loading, layout-блоки и т.п.).
+- **Таблицы списков** — только `DataTable` (`frontend-data-table.mdc`), не голый `Table` из antd.
+- **Модалки** — `web/assets/modals/` (Modal, Drawer и обёртки над ними).
+- Страничная разметка и одноразовые блоки — в `app/`, не в `assets/`.
+
+## Модалки — скролл внутри, не на странице
+
+- Длинный контент модалки прокручивается **только в `body` модалки**, страница за ней не скроллится.
+- Использовать общий конфиг `scrollableModalProps` из `web/assets/modals/modalConfig.ts` (`{...scrollableModalProps}` на `Modal`).
+- Не задавать высоту всей модалки так, чтобы скроллился `document` / layout страницы.
+
+```tsx
+// ✅ web/assets/modals/SomeModal.tsx
+import { scrollableModalProps } from '@/assets/modals/modalConfig';
+
+<Modal title="..." open={open} {...scrollableModalProps}>
+  <Form>...</Form>
+</Modal>
+```
+
+```tsx
+// ❌ длинная форма без ограничения body — скролл уезжает на страницу
+<Modal title="..."><Form>...</Form></Modal>
+```
+
+```
+web/assets/
+  components/
+    AppSidebar.tsx
+    AuthLoadingScreen.tsx
+  modals/
+    ...Modal.tsx
+```
+
+```tsx
+// ✅ web/assets/components/AppSidebar.tsx
+import AppSidebar from '@/assets/components/AppSidebar';
+
+// ✅ web/assets/modals/ConfirmDeleteModal.tsx
+import ConfirmDeleteModal from '@/assets/modals/ConfirmDeleteModal';
+```
+
+```tsx
+// ❌ компоненты напрямую в web/assets/AppSidebar.tsx
+// ❌ модалки в web/assets/components/
+```
+
+## `web/types/` и `web/utils/`
+
+- **types** — типы с бэка; один файл = одна сущность или связанные типы (`user.ts`, `order.ts`).
+- **utils** — общая логика (форматирование, валидация, хелперы); UI-утилиты тоже здесь, если переиспользуются.
+
+## Routing — `(app)` и `(marketing)`
+
+- `web/app/(marketing)/` — лендинги и публичные страницы (лёгкий бандл).
+- `web/app/(app)/` — личный кабинет, маршруты под `/me` и связанный функционал.
+- Route groups не меняют URL; разделение нужно для code splitting и оптимизации загрузки.
+
+```
+web/app/
+  (marketing)/          # лендинги
+    page.tsx
+  (app)/                # ЛК
+    me/
+      page.tsx
+  layout.tsx
+```

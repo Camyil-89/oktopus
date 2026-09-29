@@ -1,0 +1,9 @@
+# Dev-структура для oktopus (base: dc=oktopus,dc=dev)
+
+dn: ou=people,dc=oktopus,dc=dev
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=oktopus,dc=dev
+objectClass: organizationalUnit
+ou: groups

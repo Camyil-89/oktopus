@@ -1,0 +1,13 @@
+# Пример для публикации в oktopus (режим connect=mitm).
+# При необходимости добавьте свои acl localnet src ... выше.
+
+acl public dstdomain localhost
+acl loopback dst 127.0.0.0/8
+acl all all
+http_access deny loopback
+http_access allow public
+http_access deny all
+
+# Для lab (самоподписанный TLS на :9443/:9555) при SNI localhost:
+ssl_verify skip public
+ssl_verify require all

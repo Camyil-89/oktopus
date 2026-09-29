@@ -1,0 +1,55 @@
+---
+description: Web — списки только постранично, поиск и фильтр через query на бэке
+globs: web/**/*
+alwaysApply: false
+---
+
+# API: пагинация и поиск списков
+
+## Запрещено
+
+- Обход **всех страниц** в цикле (`while` / `for` по `next`, `listAll*`, «догрузить всё») ради полного каталога в памяти.
+- Клиентский **поиск и фильтрация** по полному списку (`optionFilterProp`, `filterOption` по загруженным данным, `array.filter` по всей выборке с бэка) — если бэк отдаёт пагинированный list.
+- Дублировать на фронте логику поиска, которая уже есть на бэке (`search`, `q` и т.п. в query).
+
+```ts
+// ❌
+for (let page = 1; ; page++) {
+  const data = await listClients({ page });
+  all.push(...data.results);
+  if (!data.next) break;
+}
+```
+
+```tsx
+// ❌ Select с локальной фильтрацией большого списка
+<Select showSearch optionFilterProp="label" options={allClientsFromManyPages} />
+```
+
+## Обязательно
+
+- List-методы в `web/api/*` возвращают **ответ пагинации** (`count`, `next`, `previous`, `results`) и принимают `page` / `page_size` (или принятые в проекте имена).
+- **Поиск** — query-параметр на бэкенд (`search`, …), как в API сущности.
+- UI запрашивает **одну страницу** за раз; следующие — по действию пользователя (скролл выпадающего списка, «Ещё», номер страницы), без автоматического сбора всех страниц.
+- После create/update одной записи — **GET по id** (или тело ответа create), а не полный list.
+
+```ts
+// ✅
+export async function listClients(params: ListClientsParams): Promise<ClientListResponse> {
+  return fetchApi(buildListQuery(params), "GET", undefined, "clients");
+}
+```
+
+```tsx
+// ✅ серверный поиск
+<Select
+  showSearch
+  filterOption={false}
+  onSearch={(q) => void loadClients({ search: q, page: 1 })}
+  onPopupScroll={loadNextPageIfNeeded}
+/>
+```
+
+## Бэкенд
+
+- Поиск и фильтры списка реализуются в queryset / view, не на фронте после выгрузки всего набора.

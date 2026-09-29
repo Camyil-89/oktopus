@@ -1,0 +1,111 @@
+# Dev LDAP для будущей auth/ACL в oktopus + PostgreSQL.
+#
+# Запуск:
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# PostgreSQL (хост):
+#   DATABASE_URL=postgres://oktopus:oktopus@127.0.0.1:5434/oktopus?sslmode=disable
+#
+# ClickHouse (native +54 к 9000/8123):
+#   CLICKHOUSE_ADDR=127.0.0.1:9054
+#   CLICKHOUSE_DATABASE=oktopus
+#   CLICKHOUSE_USER=oktopus
+#   CLICKHOUSE_PASSWORD=oktopus
+#
+# Проверка (ldapsearch в PATH, напр. WSL):
+#   ldapsearch -x -H ldap://127.0.0.1:1389 -D "uid=user,ou=people,dc=oktopus,dc=dev" -w user \
+#     -b "cn=allow_all,ou=groups,dc=oktopus,dc=dev" -LLL member
+#   ldapsearch -x -H ldap://127.0.0.1:1389 -D "uid=user2,ou=people,dc=oktopus,dc=dev" -w user2 \
+#     -b "cn=deny_all,ou=groups,dc=oktopus,dc=dev" -LLL member
+#
+# Учётки:
+#   user / user   → группа allow_all
+#   user2 / user2 → группа deny_all
+# Admin:
+#   cn=admin,dc=oktopus,dc=dev / admin_dev
+#
+# Origin для нагрузочных тестов (nginx):
+#   curl http://127.0.0.1:53002/load
+#   go run ./cmd load -url=http://127.0.0.1:53002/load -workers=100
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: oktopus-postgres-dev
+    environment:
+      POSTGRES_USER: oktopus
+      POSTGRES_PASSWORD: oktopus
+      POSTGRES_DB: oktopus
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - ./docker_data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U oktopus -d oktopus" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  openldap:
+    # :latest ломает seed/restart; см. osixia/container-openldap#538 #660
+    image: osixia/openldap:1.5.0
+    container_name: oktopus-openldap-dev
+    command: --copy-service
+    environment:
+      LDAP_ORGANISATION: "Oktopus Dev"
+      LDAP_DOMAIN: oktopus.dev
+      LDAP_ADMIN_PASSWORD: admin_dev
+      LDAP_TLS: "false"
+      LDAP_TLS_VERIFY_CLIENT: "never"
+      # true удаляет bootstrap под /container/run — рестарт падает на cp в .../ldif/custom
+      LDAP_REMOVE_CONFIG_AFTER_SETUP: "false"
+      # LDIF с хоста только для чтения: не монтировать в bootstrap/custom — slapd делает chown и падает.
+      LDAP_SEED_INTERNAL_LDIF_PATH: /seed-ldif
+    ports:
+      - "127.0.0.1:1389:389"
+    volumes:
+      - ./deploy/openldap/ldif:/seed-ldif:ro
+      - oktopus_openldap_data:/var/lib/ldap
+      - oktopus_openldap_config:/etc/ldap/slapd.d
+    healthcheck:
+      test: [ "CMD", "ldapsearch", "-x", "-H", "ldap://localhost", "-b", "dc=oktopus,dc=dev", "-D", "cn=admin,dc=oktopus,dc=dev", "-w", "admin_dev", "(uid=user)", "dn" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
+
+  loadtest-nginx:
+    image: nginx:1.27-alpine
+    container_name: oktopus-loadtest-nginx-dev
+    ports:
+      - "127.0.0.1:53002:53002"
+    volumes:
+      - ./deploy/docker/nginx/dev-loadtest.conf:/etc/nginx/conf.d/default.conf:ro
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    container_name: oktopus-clickhouse-dev
+    environment:
+      CLICKHOUSE_DB: oktopus
+      CLICKHOUSE_USER: oktopus
+      CLICKHOUSE_PASSWORD: oktopus
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "127.0.0.1:8177:8123"
+      - "127.0.0.1:9054:9000"
+    volumes:
+      # Named volume: bind-mount ./docker_data/clickhouse на Windows даёт Permission denied на insert.
+      - oktopus_clickhouse_data:/var/lib/clickhouse
+      - ./deploy/clickhouse/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q -O- http://127.0.0.1:8123/ping | grep -q Ok" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+volumes:
+  oktopus_clickhouse_data:
+  oktopus_openldap_data:
+  oktopus_openldap_config:

@@ -1,0 +1,7 @@
+acl bank dstdomain example.com
+acl devs ldap_group Developers
+acl all all
+http_access allow all
+ssl_verify skip bank
+ssl_verify skip devs
+ssl_verify require all

@@ -1,0 +1,8 @@
+acl exact dstdomain neverssl.com
+acl suffix dstdomain .example.com
+acl wild dstdomain *.wordpress.com
+acl all all
+http_access deny exact
+http_access deny suffix
+http_access deny wild
+http_access allow all

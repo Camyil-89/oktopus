@@ -1,0 +1,46 @@
+---
+description: Web — Ant Design для UI, Tailwind для разметки страниц
+globs: web/**/*
+alwaysApply: false
+---
+
+# Frontend: Ant Design + Tailwind
+
+## UI-компоненты — только Ant Design
+
+- Кнопки, формы, таблицы, модалки, уведомления, меню, иконки и т.п. — из `antd` и `@ant-design/icons`.
+- Не подключать другие UI-kit (MUI, Chakra, shadcn/ui как замена antd и т.д.).
+- Стилизацию antd-компонентов — через их API (`className`, `styles`, `theme`), не дублировать кастомными обёртками без нужды.
+- **Tooltip** — только `AppTooltip`, см. `frontend-app-tooltip.mdc`.
+
+## Модалки (`Modal`, `Drawer`)
+
+- Скролл длинного содержимого — **внутри body модалки** (`overflowY: auto`, `maxHeight`), не на странице.
+- Модалки в `web/assets/modals/` — через `BaseModal` (скролл body уже внутри; см. `base-modal.mdc`).
+
+## Разметка страниц — HTML + Tailwind
+
+- Каркас страницы: семантический HTML (`main`, `section`, `header`, …) и utility-классы Tailwind (`flex`, `grid`, `gap-*`, `p-*`, …).
+- Страницы в `app/**/page.tsx` и layout-обёртки — в первую очередь Tailwind для сетки и отступов; внутрь — antd-компоненты.
+- Личный кабинет `app/(app)/` — **на всю ширину**, без `max-w-*` на `<main>` (см. `frontend-crm-full-width.mdc`).
+
+## Пример
+
+```tsx
+// ✅ Каркас — Tailwind; интерактив — antd
+export default function FinancePage() {
+  return (
+    <main className="flex w-full flex-col gap-6 p-4 md:p-6">
+      <Typography.Title level={2}>Финансы</Typography.Title>
+      <Card>
+        <Tabs items={[{ key: "1", label: "Сводка", children: <Summary /> }]} />
+      </Card>
+    </main>
+  );
+}
+```
+
+```tsx
+// ❌ Другой UI-kit вместо antd
+import { Button } from "@mui/material";
+```

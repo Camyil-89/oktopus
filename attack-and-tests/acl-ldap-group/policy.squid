@@ -1,0 +1,6 @@
+acl allow_all ldap_group allow_all
+acl deny_all ldap_group deny_all
+acl all all
+http_access allow allow_all
+http_access deny deny_all
+http_access deny all

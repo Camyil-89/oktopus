@@ -1,0 +1,23 @@
+---
+description: При изменениях proxy inspect синхронизировать справку для ИИ на фронте
+globs: internal/proxy/inspect/**
+alwaysApply: false
+---
+
+# Proxy inspect — документация для ИИ
+
+Источник правды по поведению и Lua API для пользователей и агентов: **`web/assets/inspect/inspectAgentPrompt.ts`** (`buildInspectAgentPrompt`, `INSPECT_AGENT_REFERENCE`). Краткий API в UI: **`web/assets/inspect/luaExamples.ts`**.
+
+## Обязательно в одном PR/задаче
+
+При любом изменении в `internal/proxy/inspect/` (новый файл, публичная функция, поле `RequestContext`, лимиты, семантика `Eval` / `inspectReturnMatched`, `ctx:log`, `AttachBodyMeta`, `HTTPMiddleware`):
+
+1. Обновить **`inspectAgentPrompt.ts`** (и при необходимости `INSPECT_LUA_API_REFERENCE` в `luaExamples.ts`).
+2. **Тесты** — только в `internal/proxy/inspect/test/` (см. `.cursor/rules/go-proxy-inspect-tests.mdc`).
+
+## Смежные файлы
+
+- `internal/proxy/accesslog`, `internal/db/proxyaccesslog` — `RuleLogs` / поля журнала.
+- `internal/db/proxyinspect`, API inspect — `RuleInput`, action, reload.
+
+`internal/proxy/inspect/AGENTS.md` — только чеклист для разработчиков, без дублирования полной справки.

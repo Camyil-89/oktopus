@@ -1,0 +1,254 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #121418;
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
+}
+
+body {
+  background-color: #121418;
+  color: #e4e4e7;
+}
+
+::selection {
+  background: rgba(94, 234, 212, 0.2);
+  color: #ccfbf1;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 6px;
+  border: 2px solid #121418;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+.row-hover:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #b4b4bb;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+
+.nav-item:hover {
+  color: #fafafa;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-item-active {
+  color: #fafafa;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.nav-item-active .nav-item-icon {
+  color: #5eead4;
+}
+
+.ant-card-head-title {
+  font-size: 11px !important;
+  font-family: var(--font-mono), ui-monospace, monospace !important;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #b4b4bb !important;
+  font-weight: 400 !important;
+}
+
+.manage-main-inner .ant-typography,
+.manage-main-inner .ant-card .ant-typography {
+  color: #e4e4e7;
+}
+
+.manage-main-inner .ant-typography.ant-typography-secondary,
+.manage-main-inner .ant-typography .ant-typography-secondary {
+  color: #b4b4bb !important;
+}
+
+.manage-main-inner .ant-table-tbody>tr>td {
+  color: #e4e4e7;
+}
+
+.manage-main-inner .ant-table-thead>tr>th {
+  color: #b4b4bb !important;
+}
+
+.ant-card {
+  border-radius: 12px !important;
+}
+
+.panel-table .ant-table-wrapper .ant-table {
+  background: transparent;
+}
+
+.panel-table .ant-table-wrapper .ant-table-container {
+  border-inline-start: none !important;
+}
+
+.panel-table .ant-table-wrapper table {
+  border-radius: 0;
+}
+
+.panel-table .ant-table-wrapper .ant-table-thead>tr>th {
+  font-size: 10.5px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 400;
+  color: #b4b4bb !important;
+}
+
+.panel-table .ant-table-wrapper .ant-table-tbody>tr>td {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  color: #e4e4e7;
+}
+
+.panel-table .ant-table-wrapper .ant-pagination {
+  padding: 12px 20px;
+  margin: 0 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.manage-main-inner .ant-typography h2.ant-typography,
+.manage-main-inner .ant-typography h4.ant-typography {
+  color: #f4f4f5 !important;
+  font-size: 15px !important;
+  font-weight: 500 !important;
+}
+
+.manage-main-inner .ant-input,
+.manage-main-inner .ant-input-affix-wrapper,
+.manage-main-inner .ant-select-selector,
+.manage-main-inner .ant-input-number {
+  font-family: var(--font-mono), ui-monospace, monospace !important;
+  font-size: 13px !important;
+}
+
+.login-panel .ant-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.traffic-bar-allow {
+  background: linear-gradient(to top,
+      rgba(45, 212, 191, 0.25),
+      rgba(94, 234, 212, 0.75));
+  border-radius: 3px 3px 0 0;
+  transition: opacity 0.15s;
+}
+
+.traffic-bar-deny {
+  background: rgba(248, 113, 113, 0.45);
+  border-radius: 3px 3px 0 0;
+  transition: opacity 0.15s;
+}
+
+.traffic-bar-allow:hover,
+.traffic-bar-deny:hover {
+  opacity: 0.75;
+}
+
+.oktopus-loading .tent {
+  transform-box: view-box;
+}
+
+.oktopus-loading .base {
+  opacity: 0.22;
+}
+
+.oktopus-loading .flow {
+  stroke-width: 2.4;
+  stroke-dasharray: 0.1 18;
+  stroke-dashoffset: 0;
+  stroke-linecap: round;
+  animation: oktopus-dots-flow 1.8s linear infinite;
+  animation-play-state: running;
+}
+
+@keyframes oktopus-dots-flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+
+  to {
+    stroke-dashoffset: 18.1;
+  }
+}
+
+.oktopus-loading .t1 .flow {
+  animation-delay: 0s;
+}
+
+.oktopus-loading .t2 .flow {
+  animation-delay: -0.1s;
+}
+
+.oktopus-loading .t3 .flow {
+  animation-delay: -0.2s;
+}
+
+.oktopus-loading .t4 .flow {
+  animation-delay: -0.3s;
+}
+
+.oktopus-loading .t5 .flow {
+  animation-delay: -0.4s;
+}
+
+.oktopus-loading .t6 .flow {
+  animation-delay: -0.5s;
+}
+
+.oktopus-loading .t7 .flow {
+  animation-delay: -0.6s;
+}
+
+.oktopus-loading .t8 .flow {
+  animation-delay: -0.7s;
+}
+
+/* antd Spin не должен крутить весь SVG — только dash-анимация щупалец */
+.ant-spin .ant-spin-dot,
+.ant-spin .ant-spin-dot-spin {
+  animation: none !important;
+  transform: none !important;
+}
+
+/* primary: фон teal — индикатор тоже teal, не виден (см. oktopusTheme Button.primaryColor) */
+.ant-btn-primary.ant-btn-loading:not(.ant-btn-dangerous) .oktopus-loading {
+  color: #0c0d10;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oktopus-loading .flow {
+    animation: none;
+  }
+}

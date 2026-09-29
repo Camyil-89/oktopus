@@ -1,0 +1,13 @@
+# allow_all — user; deny_all — user2 (для будущего ACL в прокси)
+
+dn: cn=allow_all,ou=groups,dc=oktopus,dc=dev
+objectClass: groupOfNames
+cn: allow_all
+description: Dev group: proxy allow
+member: uid=user,ou=people,dc=oktopus,dc=dev
+
+dn: cn=deny_all,ou=groups,dc=oktopus,dc=dev
+objectClass: groupOfNames
+cn: deny_all
+description: Dev group: proxy deny
+member: uid=user2,ou=people,dc=oktopus,dc=dev

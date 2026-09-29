@@ -1,0 +1,4 @@
+acl secret url_regex /secret
+acl all all
+http_access deny secret
+http_access allow all

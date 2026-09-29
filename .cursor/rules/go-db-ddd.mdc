@@ -1,0 +1,27 @@
+---
+description: internal/db — слои DDD (domain, repository, service)
+globs: internal/db/**/*
+alwaysApply: false
+---
+
+# DDD в internal/db
+
+## Структура по bounded context
+
+Для каждой сущности (сейчас `user/`):
+
+- `domain/` — модели и доменные ошибки (`ErrNotFound`), без SQL и bcrypt.
+- `repository/` — интерфейсы персистентности.
+- `repository/postgres/` — реализация через sqlc (`infrastructure/postgres/store`).
+- `service/` — сценарии и инварианты (хеш пароля, UUID v7, bootstrap).
+
+## Корень `internal/db`
+
+- `config.go`, `migrate.go`, `open.go` — подключение, goose, сборка `Runtime`.
+- `infrastructure/postgres/store/` — только сгенерированный sqlc, не вызывать из handlers напрямую.
+
+## Новые таблицы
+
+1. Миграция + schema + queries → `sqlc generate`.
+2. Новый каталог `internal/db/<context>/` с domain → repository → service.
+3. Подключить репозиторий в `db.Open` и положить сервис в `Runtime`.

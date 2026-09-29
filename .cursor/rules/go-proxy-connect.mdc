@@ -1,0 +1,62 @@
+---
+description: Единый ACL-пайплайн — CONNECT, HTTP, HTTPS MITM, WebSocket
+globs: internal/proxy/https/**,internal/proxy/acl/**,internal/proxy/http/forward.go,internal/proxy/observe/policy_host.go
+alwaysApply: false
+---
+
+# Политика прокси — один пайплайн
+
+Цель: **нет вторых путей** для `http_access` / `dst` / `dstdomain` — иначе снова расходятся tunnel vs mitm vs WS (как host-mismatch и tunnel-dst-resolve).
+
+## Единый сервис ACL
+
+Вся проверка политики идёт через **`acl.Engine.EvaluatePolicy`** (`internal/proxy/acl/policy.go`):
+
+1. Собрать **`PolicyRequest`** (канонические поля).
+2. При необходимости **`EnrichRequestFieldsDst`** (hostname → IP для `acl dst`).
+3. **`decideWithRuleRef`** с опциональным `skip` (PORT-only на CONNECT).
+
+| Транспорт | Сборщик `PolicyRequest` | Как вызывается |
+|-----------|---------------------------|----------------|
+| **CONNECT** (tunnel / mitm) | `PolicyRequestFromConnect(ctx, hostPort)` | `Hooks.RunConnect` → `connectMiddleware` → `EvaluatePolicy` + `ConnectSkipFromContext` |
+| **Plain HTTP** | `PolicyRequestFromHTTP(ctx, req)` | `http.Forward` → `RunHTTPRequest` |
+| **HTTPS MITM** (запрос в TLS) | тот же `PolicyRequestFromHTTP` | `applyMITMHTTPPolicy` → `prepareMITMOutboundRequest` → `RunHTTPRequest` |
+| **WebSocket** (upgrade в MITM) | **тот же**, что HTTPS MITM | `serveWebSocketUpgrade` → **`applyMITMHTTPPolicy`** — не дублировать поля вручную |
+
+CONNECT — **урезанный** запрос (host + port + src, path `/`). HTTP/WS — **тот же пайплайн**, но богаче данными (`observe.PolicyHostFromRequest`: URL.Host → Host → ctx SNI, path, порт из URL).
+
+**Запрещено:** собирать `RequestFields` / вызывать `decideWithRuleRef` / `EnrichRequestFieldsDst` вне `EvaluatePolicy` (кроме тестов и `Explain`).
+
+## CONNECT после ACL
+
+Общий шлюз только для установки туннеля: **`serveConnectAfterACL`** (`connect_acl.go`):
+
+- `NormalizeHostPort` → `RunConnect` (полный `EvaluatePolicy`) → `finishConnectDecision`.
+
+Дальше режим-специфично:
+
+| Режим | После allow |
+|-------|-------------|
+| **tunnel** | второй `RunConnect` с `observe.WithConnectPortOnlyACL` (только PORT) |
+| **mitm** | `serveConnectEstablished` |
+
+Не дублировать `RunConnect` / `finishConnectDecision` в `tunnel.go` / `mitm.go`.
+
+## MITM HTTP и WS
+
+- **`applyMITMHTTPPolicy`** — единственная точка «подготовить origin + ACL» для MITM.
+- `prepareMITMOutboundRequest` выставляет URL/SNI согласованно с `PolicyHostFromRequest`.
+- Новый код в MITM (в т.ч. WS) **обязан** идти через `applyMITMHTTPPolicy` или `RunHTTPRequest` с уже нормализованным `*http.Request`.
+
+## Контекст CONNECT (`observe/acl_connect.go`)
+
+- `WithDeferPortACLAtConnect` — PORT на первом HTTP в TLS, не на CONNECT.
+- `WithConnectPortOnlyACL` — повторный проход только PORT в tunnel.
+
+## Регрессии
+
+- `internal/proxy/acl/test/dst_resolve_test.go` — dst + DNS.
+- `internal/proxy/acl/test/http_policy_host_test.go` — HTTP host vs SNI.
+- PoC: `attack-and-tests/tunnel-dst-resolve/`, `attack-and-tests/mitm-host-mismatch/`.
+
+При новой фиче в политике: один PR в `policy.go` + тест; прогнать оба PoC и тесты ACL.

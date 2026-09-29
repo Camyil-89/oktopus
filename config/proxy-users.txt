@@ -1,0 +1,3 @@
+# HTTP Proxy Authentication (Basic): login:password
+# Браузер/клиент: пользователь proxy, пароль proxy
+proxy:proxy

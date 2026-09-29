@@ -1,0 +1,19 @@
+dn: uid=user,ou=people,dc=oktopus,dc=dev
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+uid: user
+sn: User
+cn: Dev User One
+mail: user@dev.oktopus
+userPassword: user
+
+dn: uid=user2,ou=people,dc=oktopus,dc=dev
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+uid: user2
+sn: User2
+cn: Dev User Two
+mail: user2@dev.oktopus
+userPassword: user2

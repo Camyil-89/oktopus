@@ -1,0 +1,6 @@
+acl bad_port port 22 3389
+acl bad_range port 8000-8010
+acl all all
+http_access deny bad_port
+http_access deny bad_range
+http_access allow all

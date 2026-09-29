@@ -1,0 +1,56 @@
+---
+description: Tailwind — отступы между детьми только через flex + gap, не space-x/space-y
+globs: web/**/*
+alwaysApply: false
+---
+
+# Tailwind: flex + gap вместо space-x / space-y
+
+## Запрещено
+
+- Не использовать `space-x-*` и `space-y-*` для отступов между дочерними элементами.
+- Не добавлять такие классы в новом коде и не оставлять при правках соседних участков.
+
+## Используй вместо этого
+
+| Было | Стало |
+|------|-------|
+| `space-y-4` | `flex flex-col gap-4` |
+| `space-y-6` | `flex flex-col gap-6` |
+| `space-x-2` | `flex flex-row gap-2` |
+| `space-x-4` | `flex flex-row gap-4` |
+
+## Примеры
+
+```tsx
+// ❌ BAD
+<div className="space-y-4">
+  <Title />
+  <Card />
+</div>
+
+// ✅ GOOD
+<div className="flex flex-col gap-4">
+  <Title />
+  <Card />
+</div>
+```
+
+```tsx
+// ❌ BAD
+<div className="flex space-x-2">
+  <Button />
+  <Button />
+</div>
+
+// ✅ GOOD
+<div className="flex flex-row gap-2">
+  <Button />
+  <Button />
+</div>
+```
+
+## Примечания
+
+- Если контейнер уже `flex`, достаточно добавить `flex-col` или `flex-row` и `gap-*` — не дублировать `flex`.
+- Для одиночных внешних отступов (`mt-*`, `mb-*`, `p-*`) правило не применяется — только замена `space-x` / `space-y`.

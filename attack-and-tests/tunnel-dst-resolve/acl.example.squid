@@ -1,0 +1,9 @@
+# Прокси: connect=tunnel
+# bypass: CONNECT localhost:9666 (резолв в 127.0.0.1 без правки hosts)
+
+acl public dstdomain localhost
+acl loopback dst 127.0.0.0/8
+acl all all
+http_access deny loopback
+http_access allow public
+http_access deny all

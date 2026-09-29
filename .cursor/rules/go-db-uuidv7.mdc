@@ -1,0 +1,23 @@
+---
+description: Go/PostgreSQL — идентификаторы только UUID v7 (timestamp-first)
+globs: "**/*.go,db/**,sqlc.yaml"
+alwaysApply: false
+---
+
+# Идентификаторы: UUID v7
+
+## Обязательно
+
+- Первичные ключи и внешние ссылки в PostgreSQL — тип `UUID`, значение **UUID version 7** (RFC 9562): **48-битная Unix-ms метка времени в начале** сортируемого идентификатора.
+- Генерация в Go — `oktopus/internal/id` (`id.New()` / `id.MustNew()`), не `uuid.New()` (v4) и не serial/bigserial для сущностей домена.
+- В SQL-миграциях и `db/schema` для PK использовать `UUID PRIMARY KEY` без `DEFAULT gen_random_uuid()` (v4).
+
+## Запрещено
+
+- `uuid.New()` / `gen_random_uuid()` / `SERIAL` для id пользователей и новых доменных таблиц.
+- Строковые id без версии (ulid-only без политики проекта) — для нового кода придерживаться UUID v7.
+
+## sqlc / INSERT
+
+- Явно передавать `id` в `INSERT` из Go после `id.New()`.
+- После изменения схемы или запросов: `sqlc generate`.

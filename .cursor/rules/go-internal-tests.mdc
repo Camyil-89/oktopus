@@ -1,0 +1,17 @@
+---
+description: Тесты internal — только в каталогах test/ рядом с пакетом
+globs: internal/**
+alwaysApply: false
+---
+
+# internal — тесты
+
+- Не добавлять `*_test.go` рядом с production-кодом под **`internal/`** (в корне пакета).
+- Все тесты и бенчмарки — в **`internal/.../<pkg>/test/`**, пакет **`{pkg}_test`**, импорт `oktopus/internal/.../<pkg>`.
+- Вложенные пакеты — свой каталог `test/` (например `internal/proxy/acl/squid/test/`, пакет `squid_test`).
+- Исключение: **`export_test.go`** в корне пакета — только для проброса неэкспортируемых символов во внешние тесты (идиома Go); по возможности тестировать через публичный API и не добавлять `export_test.go`.
+- Запуск: `go test ./internal/.../<pkg>/test/`; бенчмарки: `go test -bench=Benchmark -benchmem ./internal/.../<pkg>/test/` или `go run ./cmd bench ./internal/.../<pkg>/test/`.
+
+Примеры: `internal/proxy/inspect/test/`, `internal/proxy/https/test/`, `internal/proxy/http/test/`, `internal/proxy/acl/test/`, `internal/proxy/acl/squid/test/`, `internal/proxy/auth/test/`, `internal/proxy/accesslog/test/`, `internal/proxy/observe/test/`, `internal/proxy/server/test/`, `internal/proxy/metrics/test/`.
+
+При смене публичного контракта пакета обновлять тесты в `test/` и связанную документацию (например **`AGENTS.md`** у inspect).

@@ -1,0 +1,10 @@
+acl staff src 10.10.0.0/16
+acl all all
+http_access allow all
+delay_pools 2
+delay_class 1 1
+delay_class 2 2
+delay_parameters 1 8000/16000
+delay_parameters 2 64000/64000
+delay_access 2 allow staff
+delay_access 1 allow all

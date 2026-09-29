@@ -1,0 +1,2 @@
+acl all all
+http_access allow all

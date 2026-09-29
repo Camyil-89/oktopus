@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Доступ заблокирован — Oktopus</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink:        #08090a;
+    --line:       rgba(255,255,255,.06);
+    --text:       #d4d4d8;
+    --text-dim:   #a1a1aa;
+    --text-mute:  #71717a;
+    --text-faint: #52525b;
+    --teal:       #5eead4;
+    --teal-dim:   #2dd4bf;
+    --red:        #fca5a5;
+    --red-dim:    #f87171;
+    --font-sans:  'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono:  'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 300 600;
+    font-display: swap;
+    src: url(https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiA.woff2) format('woff2');
+  }
+  @font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 400 500;
+    font-display: swap;
+    src: url(https://fonts.gstatic.com/s/jetbrainsmono/v18/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxTOlOV.woff2) format('woff2');
+  }
+
+  html, body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100%;
+  }
+
+  ::selection { background: rgba(94,234,212,.2); color: #ccfbf1; }
+
+  body {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+
+  /* ── фон ── */
+  .grid-bg {
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.035) 1px, transparent 1px);
+    background-size: 56px 56px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 100%);
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 100%);
+    pointer-events: none;
+    opacity: .5;
+  }
+
+  .glow {
+    position: fixed;
+    top: 20%;
+    left: 50%;
+    width: 420px;
+    height: 320px;
+    margin-left: -210px;
+    background: rgba(248,113,113,.14);
+    border-radius: 999px;
+    filter: blur(120px);
+    pointer-events: none;
+  }
+
+  /* ── контент ── */
+  .wrap {
+    position: relative;
+    padding: 40px;
+    text-align: center;
+    max-width: 560px;
+  }
+
+  .octo {
+    display: block;
+    width: 56px;
+    height: 56px;
+    color: var(--red-dim);
+    margin: 0 auto 32px;
+  }
+
+  .code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--red-dim);
+    margin-bottom: 16px;
+  }
+
+  h2 {
+    font-size: clamp(26px, 3vw, 34px);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #fafafa;
+    margin-bottom: 14px;
+  }
+
+  p {
+    color: var(--text-mute);
+    font-size: 14.5px;
+    line-height: 1.6;
+    max-width: 420px;
+    margin: 0 auto 32px;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-faint);
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+  }
+  .brand svg {
+    width: 14px;
+    height: 14px;
+    color: var(--text-mute);
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="glow"></div>
+
+<div class="wrap">
+  <svg class="octo" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+    <circle cx="60" cy="40" r="20"/>
+    <circle cx="53" cy="38" r="2" fill="currentColor" stroke="none"/>
+    <circle cx="67" cy="38" r="2" fill="currentColor" stroke="none"/>
+    <path d="M 78.8 46.8 L 90 46.8 L 90 70 L 98 70"/>
+    <path d="M 75.3 52.9 L 84 52.9 L 84 84 L 92 84"/>
+    <path d="M 70 57.3 L 76 57.3 L 76 96 L 80 96"/>
+    <path d="M 63.5 59.7 L 66 59.7 L 66 104 L 64 104"/>
+    <path d="M 56.5 59.7 L 54 59.7 L 54 104 L 56 104"/>
+    <path d="M 50 57.3 L 44 57.3 L 44 96 L 40 96"/>
+    <path d="M 44.7 52.9 L 36 52.9 L 36 84 L 28 84"/>
+    <path d="M 41.2 46.8 L 30 46.8 L 30 70 L 22 70"/>
+    <circle cx="98" cy="70"  r="2.6" fill="currentColor" stroke="none"/>
+    <circle cx="92" cy="84"  r="2.6" fill="currentColor" stroke="none"/>
+    <circle cx="80" cy="96"  r="2.6" fill="currentColor" stroke="none"/>
+    <circle cx="64" cy="104" r="2.6" fill="currentColor" stroke="none"/>
+    <circle cx="56" cy="104" r="2.6" fill="currentColor" stroke="none"/>
+    <circle cx="40" cy="96"  r="2.6" fill="currentColor" stroke="none"/>
+    <circle cx="28" cy="84"  r="2.6" fill="currentColor" stroke="none"/>
+    <circle cx="22" cy="70"  r="2.6" fill="currentColor" stroke="none"/>
+  </svg>
+
+  <div class="code">403 · Forbidden</div>
+  <h2>Доступ заблокирован</h2>
+  <p>Запрос отклонён политикой безопасности. Обратитесь к администратору, если считаете это ошибкой.</p>
+
+  <div class="brand">
+    <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="60" cy="40" r="20"/>
+      <circle cx="53" cy="38" r="3" fill="currentColor" stroke="none"/>
+      <circle cx="67" cy="38" r="3" fill="currentColor" stroke="none"/>
+      <path d="M 78.8 46.8 L 90 46.8 L 90 70 L 98 70"/>
+      <path d="M 70 57.3 L 76 57.3 L 76 96 L 80 96"/>
+      <path d="M 56.5 59.7 L 54 59.7 L 54 104 L 56 104"/>
+      <path d="M 44.7 52.9 L 36 52.9 L 36 84 L 28 84"/>
+    </svg>
+    заблокировано Oktopus
+  </div>
+</div>
+
+</body>
+</html>
