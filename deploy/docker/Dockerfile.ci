@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1
+# CI: unit-тесты и сборка бэка; target integration — attack-and-tests (стек снаружи, network host).
+
+FROM golang:1.24-bookworm AS base
+WORKDIR /src
+
+ENV GOTOOLCHAIN=auto
+ENV CGO_ENABLED=0
+
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends ca-certificates curl \
+	&& rm -rf /var/lib/apt/lists/*
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY cmd ./cmd
+COPY internal ./internal
+COPY db ./db
+COPY config ./config
+COPY attack-and-tests ./attack-and-tests
+
+FROM base AS test
+RUN go test ./...
+RUN go build -trimpath -o /out/oktopus ./cmd
+
+FROM base AS integration
+COPY --from=test /out/oktopus /out/oktopus
+COPY scripts/ci-backend-integration.sh /ci/ci-backend-integration.sh
+RUN chmod +x /ci/ci-backend-integration.sh
+ENV OKTOPUS_BIN=/out/oktopus
+ENV CI_SKIP_COMPOSE=1
+WORKDIR /src
+ENTRYPOINT ["/ci/ci-backend-integration.sh"]

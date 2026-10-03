@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend build, tests, attack-and-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dev stack (postgres, openldap, clickhouse)
+        run: |
+          docker compose -f docker-compose.dev.yml up -d postgres openldap clickhouse
+          docker compose -f docker-compose.dev.yml wait postgres openldap clickhouse --timeout 300
+
+      - name: Go test and build (Dockerfile.ci target test)
+        run: docker build -f deploy/docker/Dockerfile.ci --target test .
+
+      - name: attack-and-tests (Dockerfile.ci target integration, host network)
+        run: docker build -f deploy/docker/Dockerfile.ci --target integration -t oktopus-ci:integration . && docker run --rm --network host oktopus-ci:integration
+
+      - name: Tear down stack
+        if: always()
+        run: docker compose -f docker-compose.dev.yml down -v --remove-orphans
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (Dockerfile.web)
+        run: docker build -f deploy/docker/Dockerfile.web --target build .
