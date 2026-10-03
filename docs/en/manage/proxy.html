@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oktopus — Proxy settings</title>
+  <link rel="icon" href="../../assets/icon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="ru" href="../ru/manage/proxy.html">
+  <link rel="alternate" hreflang="en" href="../en/manage/proxy.html">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        },
+        colors: { ink: '#08090a' }
+      }
+    }
+  }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../assets/docs.css">
+  <link rel="stylesheet" href="../../assets/ui-mock.css">
+</head>
+<body class="bg-ink text-zinc-400 font-sans antialiased overflow-hidden" data-copy="Copy" data-copied="Copied">
+
+<div class="flex h-screen">
+
+  <aside class="w-[262px] flex-shrink-0 border-r border-white/5 flex flex-col bg-ink/50">
+    <div class="h-14 flex items-center gap-2.5 px-5 border-b border-white/5">
+      <img src="../../assets/icon.svg" alt="" class="w-7 h-7 rounded-md border border-teal-400/25 bg-teal-400/10 p-0.5" width="28" height="28">
+      <span class="text-zinc-200 text-sm font-medium tracking-tight">Oktopus</span>
+      <span class="ml-auto text-[10px] font-mono text-zinc-600 border border-white/10 rounded px-1.5 py-0.5">docs</span>
+    </div>
+
+    <div class="px-3 pt-3 pb-1">
+      <div class="flex items-center gap-2 border border-white/8 rounded-lg px-3 py-2 bg-white/[0.02] focus-within:border-teal-400/30 transition">
+        <svg class="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+        <input id="nav-search" type="search" placeholder="Search sections…" class="bg-transparent text-[12.5px] text-zinc-300 w-full placeholder:text-zinc-600 font-mono outline-none">
+      </div>
+    </div>
+
+    <nav id="nav" class="flex-1 px-3 py-3 overflow-y-auto flex flex-col gap-4">
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Deployment</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="../quickstart.html" class="nav-item"><span class="dot"></span>Deployment</a>
+        </div>
+      </div>
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Development</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="../index.html" class="nav-item"><span class="dot"></span>Developers</a>
+        </div>
+      </div>
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Sign in</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="../login.html" class="nav-item"><span class="dot"></span>Sign in</a>
+        </div>
+      </div>
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Control panel</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="./index.html" class="nav-item"><span class="dot"></span>Home</a>
+<a href="./rules.html" class="nav-item"><span class="dot"></span>Proxy rules</a>
+<a href="./access-log.html" class="nav-item"><span class="dot"></span>Access log</a>
+<a href="./access-log/reports.html" class="nav-item"><span class="dot"></span>Access log reports</a>
+<a href="./proxy.html" class="nav-item active"><span class="dot"></span>Proxy settings</a>
+<a href="./users.html" class="nav-item"><span class="dot"></span>Users</a>
+        </div>
+      </div>
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Reference</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="./rules-acl-syntax.html" class="nav-item"><span class="dot"></span>ACL syntax</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="border-t border-white/5 p-3">
+      <a href="https://github.com/Camyil-89/oktopus" target="_blank" rel="noopener noreferrer"
+         class="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-white/[0.03] transition group">
+        <svg class="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        <div class="min-w-0">
+          <p class="text-[12px] text-zinc-400 group-hover:text-zinc-200 transition leading-tight">Camyil-89/oktopus</p>
+          <p class="text-[10.5px] font-mono text-zinc-600">source code</p>
+        </div>
+      </a>
+    </div>
+  </aside>
+
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="h-14 flex-shrink-0 border-b border-white/5 flex items-center px-7 gap-3 bg-ink/40 backdrop-blur">
+      <nav class="flex items-center gap-2 text-[12.5px] font-mono text-zinc-600 min-w-0" aria-label="Breadcrumb">
+        <span class="text-zinc-700">docs</span>
+        <span class="text-zinc-700">/</span>
+        <span class="text-zinc-600">en</span>
+        <span class="text-zinc-700">/</span>
+        <span class="text-zinc-600">Control panel</span>
+        <span class="text-zinc-700">/</span>
+        <span class="text-zinc-300 truncate">Proxy settings</span>
+      </nav>
+      <div class="ml-auto flex items-center gap-3">
+        <div class="flex items-center gap-1 text-[12px] font-mono"><a href="../ru/manage/proxy.html" class="text-zinc-500 border border-white/8 rounded px-2 py-0.5 hover:text-zinc-200 hover:bg-white/5 transition">RU</a>
+          <span class="text-zinc-500 border border-teal-400/30 text-teal-300 rounded px-2 py-0.5">EN</span></div>
+        <a href="https://github.com/Camyil-89/oktopus" target="_blank" rel="noopener noreferrer"
+           class="hidden sm:inline-flex items-center gap-1.5 text-[12px] text-zinc-400 border border-white/8 rounded-lg px-3 py-1.5 hover:bg-white/5 hover:text-zinc-200 transition">GitHub</a>
+      </div>
+    </header>
+
+    <main id="main" class="flex-1 overflow-y-auto grid-bg">
+      <div class="max-w-[1180px] mx-auto px-7 py-9 flex gap-12">
+        <div class="min-w-0 flex-1 max-w-[740px]">
+
+          <article class="doc doc-page">
+            <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Control panel</p>
+            <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Proxy settings</h1>
+            <p class="lead">Route <code>/manage/proxy</code> — listen address, tunnel vs MITM, CA certificate, block pages.</p>
+
+            <h2 id="mp-tour">Interface</h2>
+            <div class="ui-mock-wrap">
+              <div class="ui-mock ui-mock--tall" aria-hidden="true">
+                <aside class="ui-mock-aside">
+                  <div class="ui-mock-brand">
+                    <img src="../../assets/icon.svg" alt="">
+                    <span class="ui-mock-brand-text">Oktopus</span>
+                  </div>
+                  <nav class="ui-mock-nav tour-zone" tabindex="0"
+                    data-tour-title="Sidebar"
+                    data-tour-body="Console navigation: home, rules, access log, reports, proxy settings, users. Sign out is at the bottom.">
+                    <div class="ui-mock-nav-item">Home</div>
+                    <div class="ui-mock-nav-item">Proxy rules</div>
+                    <div class="ui-mock-nav-item">Access log</div>
+                    <div class="ui-mock-nav-item">Access log reports</div>
+                    <div class="ui-mock-nav-item is-active">Proxy settings</div>
+                    <div class="ui-mock-nav-item">Users</div>
+                  </nav>
+                </aside>
+                <div class="ui-mock-main">
+                  <header class="ui-mock-top">
+                    <h2 class="tour-zone" tabindex="0" data-tour-title="Title" data-tour-body="/manage/proxy settings page.">Proxy settings</h2>
+                    <span class="ui-mock-lang">EN ▾</span>
+                  </header>
+                  <div class="ui-mock-content ui-mock-scroll">
+                    <div class="ui-mock-panel tour-zone" tabindex="0" data-tour-title="Listen & mode" data-tour-body="Listen port, bind address, tunnel or mitm; saved via PATCH /api/proxy/settings.">
+                      <p class="ui-mock-panel-title">Proxy</p>
+                      <div class="ui-mock-form-row"><span class="k">Port</span><span class="v">8080</span></div>
+                      <div class="ui-mock-form-row"><span class="k">Mode</span><span class="v" style="color:#5eead4">tunnel</span></div>
+                    </div>
+                    <div class="ui-mock-panel tour-zone" tabindex="0" data-tour-title="MITM CA" data-tour-body="Generate or upload root CA; download for clients in MITM mode.">
+                      <p class="ui-mock-panel-title">CA certificate</p>
+                      <span class="ui-mock-btn">Download CA</span>
+                    </div>
+                    <div class="ui-mock-panel tour-zone" tabindex="0" data-tour-title="Block pages" data-tour-body="HTML shown on ACL deny and gateway errors.">
+                      <p class="ui-mock-panel-title">User-facing pages</p>
+                      <div class="ui-mock-form-row"><span class="k">Forbidden</span><span class="v">configured</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="ui-tour-hint">
+                <p class="ui-tour-hint-label">Hint</p>
+                <p id="ui-tour-title" class="ui-tour-hint-title" data-default-title="Hover a block">Hover a block</p>
+                <p id="ui-tour-body" class="ui-tour-hint-body" data-default-body="Mock of /manage/proxy.">Mock of /manage/proxy.</p>
+              </div>
+            </div>
+
+            <p>After changes, confirm RUNNING on Home. MITM requires distributing your CA to clients.</p>
+
+          </article>
+
+<div class="flex items-center justify-between gap-3 mt-14 pt-6 border-t border-white/5"><a href="./access-log/reports.html" class="pager-link group text-left">
+        <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+        <span class="min-w-0">
+          <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Back</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Access log reports</span>
+        </span>
+      </a><a href="./users.html" class="pager-link group text-right ml-auto">
+        <span class="min-w-0">
+          <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Next</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Users</span>
+        </span>
+        <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+      </a></div>
+
+          <footer class="mt-10 pb-4 flex items-center justify-between text-[11px] font-mono text-zinc-700">
+            <span>© 2026 Oktopus</span>
+            <span>docs / en</span>
+          </footer>
+        </div>
+
+        <aside class="hidden xl:block w-[196px] flex-shrink-0">
+          <div class="sticky top-2">
+            <p class="text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700 mb-3">On this page</p>
+            <ul id="toc-list" class="flex flex-col gap-0.5"></ul>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../assets/docs-page.js"></script>
+<script src="../../assets/ui-tour.js"></script>
+</body>
+</html>

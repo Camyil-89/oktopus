@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oktopus — Главная</title>
+  <link rel="icon" href="../../assets/icon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="ru" href="../ru/manage/index.html">
+  <link rel="alternate" hreflang="en" href="../en/manage/index.html">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        },
+        colors: { ink: '#08090a' }
+      }
+    }
+  }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../assets/docs.css">
+  <link rel="stylesheet" href="../../assets/ui-mock.css">
+</head>
+<body class="bg-ink text-zinc-400 font-sans antialiased overflow-hidden" data-copy="Копировать" data-copied="Скопировано">
+
+<div class="flex h-screen">
+
+  <aside class="w-[262px] flex-shrink-0 border-r border-white/5 flex flex-col bg-ink/50">
+    <div class="h-14 flex items-center gap-2.5 px-5 border-b border-white/5">
+      <img src="../../assets/icon.svg" alt="" class="w-7 h-7 rounded-md border border-teal-400/25 bg-teal-400/10 p-0.5" width="28" height="28">
+      <span class="text-zinc-200 text-sm font-medium tracking-tight">Oktopus</span>
+      <span class="ml-auto text-[10px] font-mono text-zinc-600 border border-white/10 rounded px-1.5 py-0.5">docs</span>
+    </div>
+
+    <div class="px-3 pt-3 pb-1">
+      <div class="flex items-center gap-2 border border-white/8 rounded-lg px-3 py-2 bg-white/[0.02] focus-within:border-teal-400/30 transition">
+        <svg class="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+        <input id="nav-search" type="search" placeholder="Поиск по разделам…" class="bg-transparent text-[12.5px] text-zinc-300 w-full placeholder:text-zinc-600 font-mono outline-none">
+      </div>
+    </div>
+
+    <nav id="nav" class="flex-1 px-3 py-3 overflow-y-auto flex flex-col gap-4">
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Развёртывание</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="../quickstart.html" class="nav-item"><span class="dot"></span>Развёртывание</a>
+        </div>
+      </div>
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Разработка</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="../index.html" class="nav-item"><span class="dot"></span>Разработчикам</a>
+        </div>
+      </div>
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Вход</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="../login.html" class="nav-item"><span class="dot"></span>Вход</a>
+        </div>
+      </div>
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Панель управления</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="./index.html" class="nav-item active"><span class="dot"></span>Главная</a>
+<a href="./rules.html" class="nav-item"><span class="dot"></span>Правила прокси</a>
+<a href="./access-log.html" class="nav-item"><span class="dot"></span>Журнал доступа</a>
+<a href="./access-log/reports.html" class="nav-item"><span class="dot"></span>Отчёты журнала</a>
+<a href="./proxy.html" class="nav-item"><span class="dot"></span>Настройки прокси</a>
+<a href="./users.html" class="nav-item"><span class="dot"></span>Пользователи</a>
+        </div>
+      </div>
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Справочник</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="./rules-acl-syntax.html" class="nav-item"><span class="dot"></span>Синтаксис ACL</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="border-t border-white/5 p-3">
+      <a href="https://github.com/Camyil-89/oktopus" target="_blank" rel="noopener noreferrer"
+         class="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-white/[0.03] transition group">
+        <svg class="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        <div class="min-w-0">
+          <p class="text-[12px] text-zinc-400 group-hover:text-zinc-200 transition leading-tight">Camyil-89/oktopus</p>
+          <p class="text-[10.5px] font-mono text-zinc-600">исходный код</p>
+        </div>
+      </a>
+    </div>
+  </aside>
+
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="h-14 flex-shrink-0 border-b border-white/5 flex items-center px-7 gap-3 bg-ink/40 backdrop-blur">
+      <nav class="flex items-center gap-2 text-[12.5px] font-mono text-zinc-600 min-w-0" aria-label="Breadcrumb">
+        <span class="text-zinc-700">docs</span>
+        <span class="text-zinc-700">/</span>
+        <span class="text-zinc-600">ru</span>
+        <span class="text-zinc-700">/</span>
+        <span class="text-zinc-600">Панель управления</span>
+        <span class="text-zinc-700">/</span>
+        <span class="text-zinc-300 truncate">Главная</span>
+      </nav>
+      <div class="ml-auto flex items-center gap-3">
+        <div class="flex items-center gap-1 text-[12px] font-mono"><span class="text-zinc-500 border border-teal-400/30 text-teal-300 rounded px-2 py-0.5">RU</span>
+          <a href="../en/manage/index.html" class="text-zinc-500 border border-white/8 rounded px-2 py-0.5 hover:text-zinc-200 hover:bg-white/5 transition">EN</a></div>
+        <a href="https://github.com/Camyil-89/oktopus" target="_blank" rel="noopener noreferrer"
+           class="hidden sm:inline-flex items-center gap-1.5 text-[12px] text-zinc-400 border border-white/8 rounded-lg px-3 py-1.5 hover:bg-white/5 hover:text-zinc-200 transition">GitHub</a>
+      </div>
+    </header>
+
+    <main id="main" class="flex-1 overflow-y-auto grid-bg">
+      <div class="max-w-[1180px] mx-auto px-7 py-9 flex gap-12">
+        <div class="min-w-0 flex-1 max-w-[740px]">
+
+          <article class="doc doc-page">
+            <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Панель управления</p>
+            <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Главная</h1>
+            <p class="lead">Маршрут <code>/manage</code> — дашборд состояния прокси. Ниже упрощённый вид страницы; наведите курсор на блок, чтобы увидеть описание.</p>
+
+            <h2 id="mh-tour">Интерфейс</h2>
+            <div class="ui-mock-wrap">
+              <div class="ui-mock ui-mock--dashboard" aria-hidden="true">
+                <aside class="ui-mock-aside">
+                  <div class="ui-mock-brand">
+                    <img src="../../assets/icon.svg" alt="">
+                    <span class="ui-mock-brand-text">Oktopus</span>
+                  </div>
+                  <nav class="ui-mock-nav tour-zone" tabindex="0"
+                    data-tour-title="Боковое меню"
+                    data-tour-body="Навигация по панели управления: главная, правила, журнал, отчёты, настройки прокси, пользователи. Внизу — выход из учётной записи.">
+                    <div class="ui-mock-nav-item is-active">Главная</div>
+                    <div class="ui-mock-nav-item">Правила прокси</div>
+                    <div class="ui-mock-nav-item">Журнал доступа</div>
+                    <div class="ui-mock-nav-item">Отчёты журнала</div>
+                    <div class="ui-mock-nav-item">Настройки прокси</div>
+                    <div class="ui-mock-nav-item">Пользователи</div>
+                  </nav>
+                </aside>
+                <div class="ui-mock-main">
+                  <header class="ui-mock-top">
+                    <h2 class="tour-zone" tabindex="0"
+                      data-tour-title="Заголовок страницы"
+                      data-tour-body="Название текущего раздела (для главной — «Главная»). Берётся из managePageTitle по pathname.">Главная</h2>
+                    <span class="ui-mock-lang tour-zone" tabindex="0"
+                      data-tour-title="Язык интерфейса"
+                      data-tour-body="Переключатель локали кабинета (ru / en). Влияет на подписи и формат дат; сохраняется в localStorage.">RU ▾</span>
+                  </header>
+                  <div class="ui-mock-content">
+                    <div class="ui-mock-stats">
+                      <div class="ui-mock-stat is-success tour-zone" tabindex="0"
+                        data-tour-title="Прокси"
+                        data-tour-body="RUNNING / STOPPED и адрес listen. Данные из GET /api/proxy/status (proxy_active, listen). Обновление каждые ~3 с.">
+                        <div class="ui-mock-stat-label">Прокси</div>
+                        <div class="ui-mock-stat-value">RUNNING</div>
+                        <div class="ui-mock-stat-hint">:8080</div>
+                      </div>
+                      <div class="ui-mock-stat is-success tour-zone" tabindex="0"
+                        data-tour-title="Сборка ACL"
+                        data-tour-body="Статус компиляции правил: OK, СБОРКА, ОШИБКА, ОЖИДАНИЕ. Подпись — число активных правил и паттернов SNI. При ошибке ниже может появиться Alert с текстом build_error.">
+                        <div class="ui-mock-stat-label">Сборка ACL</div>
+                        <div class="ui-mock-stat-value">OK</div>
+                        <div class="ui-mock-stat-hint">12 правил · 48 паттернов</div>
+                      </div>
+                      <div class="ui-mock-stat tour-zone" tabindex="0"
+                        data-tour-title="За 1 мин"
+                        data-tour-body="Скользящее число запросов в минуту (requests_1m). Подсказка: запросы за последние 5 с и среднее за 5 мин. Показывается, когда прокси запущен.">
+                        <div class="ui-mock-stat-label">За 1 мин</div>
+                        <div class="ui-mock-stat-value" style="color:#fafafa">1 240</div>
+                        <div class="ui-mock-stat-hint">скольз. · 5с / ср.</div>
+                      </div>
+                      <div class="ui-mock-stat tour-zone" tabindex="0"
+                        data-tour-title="Allow / Deny"
+                        data-tour-body="Счётчики решений за 5 минут: разрешено (teal) и запрещено (красный). В подсказке — доли allow/deny от суммы за окно.">
+                        <div class="ui-mock-stat-label">Allow / Deny <span style="color:#5eead470">5m</span></div>
+                        <div class="ui-mock-stat-value"><span style="color:#5eead4">892</span><span style="color:#52525b"> / </span><span style="color:#fca5a5">41</span></div>
+                      </div>
+                    </div>
+
+                    <div class="ui-mock-panel tour-zone" tabindex="0"
+                      data-tour-title="Запуск процесса"
+                      data-tour-body="Три этапа старта: момент запуска serve, когда прокси начал принимать соединения (задержка от serve), длительность последней компиляции ACL и время готовности.">
+                      <p class="ui-mock-panel-title">Запуск процесса</p>
+                      <p class="ui-mock-panel-sub">отсчёт от запуска serve</p>
+                      <div class="ui-mock-startup-grid">
+                        <div class="ui-mock-startup-cell"><span style="color:#71717a;font-size:8px">Старт serve</span><br><span style="font-family:monospace;color:#e4e4e7">03.10 22:15:01</span></div>
+                        <div class="ui-mock-startup-cell"><span style="color:#71717a;font-size:8px">Прокси готов</span><br><span style="color:#99f6e4">через 120 ms</span></div>
+                        <div class="ui-mock-startup-cell"><span style="color:#71717a;font-size:8px">Компиляция ACL</span><br><span style="color:#99f6e4">84 ms</span></div>
+                      </div>
+                    </div>
+
+                    <div class="ui-mock-row2">
+                      <div class="ui-mock-panel ui-mock-charts">
+                        <div class="tour-zone" tabindex="0" style="flex:1;display:flex;flex-direction:column;min-height:0"
+                          data-tour-title="Трафик"
+                          data-tour-body="График allow/deny по 10-секундным корзинам за последние 5 минут. Если прокси остановлен — текст «Прокси не запущен».">
+                          <p class="ui-mock-panel-title">Трафик</p>
+                          <p class="ui-mock-panel-sub">запросы · 5 мин · 10 с</p>
+                          <div class="ui-mock-chart"><span class="ui-mock-chart-label">allow / deny</span></div>
+                        </div>
+                        <div class="tour-zone" tabindex="0" style="flex:1;display:flex;flex-direction:column;min-height:0"
+                          data-tour-title="Пропускная способность"
+                          data-tour-body="Исходящий и входящий трафик (байты) за то же окно. Легенда: исх (amber), вх (sky).">
+                          <p class="ui-mock-panel-title">Пропускная способность</p>
+                          <p class="ui-mock-panel-sub">исх / вх · 5 мин</p>
+                          <div class="ui-mock-chart" style="background:linear-gradient(180deg,rgba(251,191,36,.1),transparent 50%),repeating-linear-gradient(90deg,rgba(255,255,255,.04) 0,rgba(255,255,255,.04) 1px,transparent 1px,transparent 12px)"><span class="ui-mock-chart-label">исх / вх</span></div>
+                        </div>
+                      </div>
+                      <div class="ui-mock-panel ui-mock-runtime tour-zone" tabindex="0"
+                        data-tour-title="Runtime"
+                        data-tour-body="Текущая нагрузка: активные соединения, WebSocket MITM, синхронность правил с БД, индексы SNI, уникальные пользователи и источники за 5 мин, очередь журнала, суммарный трафик. Ниже — задержки ACL, inspect и политики (avg / p95 / p99). Ссылка ведёт в журнал доступа.">
+                        <p class="ui-mock-panel-title">Runtime</p>
+                        <p class="ui-mock-panel-sub">нагрузка и ACL</p>
+                        <ul>
+                          <li><span class="k">соединения</span><span class="v">34</span></li>
+                          <li><span class="k">правила в прокси</span><span class="v" style="color:#5eead4">актуальные</span></li>
+                          <li><span class="k">пользователи / источники</span><span class="v">18 / 42</span></li>
+                          <li><span class="k">ACL avg / p95 / p99</span><span class="v">0.4 / 1.2 / 2.1 ms</span></li>
+                        </ul>
+                        <p style="margin:8px 0 0;font-size:9px;color:#52525b;border-top:1px solid rgba(255,255,255,.06);padding-top:6px">→ Журнал доступа</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="ui-tour-hint">
+                <p class="ui-tour-hint-label">Подсказка</p>
+                <p id="ui-tour-title" class="ui-tour-hint-title" data-default-title="Наведите на элемент">Наведите на элемент</p>
+                <p id="ui-tour-body" class="ui-tour-hint-body" data-default-body="Курсор над блоком интерфейса покажет здесь, за что отвечает этот участок экрана на реальной странице /manage.">Курсор над блоком интерфейса покажет здесь, за что отвечает этот участок экрана на реальной странице /manage.</p>
+              </div>
+            </div>
+
+            <h2 id="mh-use">Как пользоваться</h2>
+            <p>Открывайте главную после входа в кабинет: здесь видно, жив ли прокси, собрались ли правила ACL и есть ли отклонения в трафике. Данные обновляются автоматически каждые несколько секунд. Если прокси STOPPED — проверьте «Настройки прокси» и логи сервера.</p>
+
+          </article>
+
+<div class="flex items-center justify-between gap-3 mt-14 pt-6 border-t border-white/5"><a href="../login.html" class="pager-link group text-left">
+        <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+        <span class="min-w-0">
+          <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Назад</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Вход</span>
+        </span>
+      </a><a href="./rules.html" class="pager-link group text-right ml-auto">
+        <span class="min-w-0">
+          <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Далее</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Правила прокси</span>
+        </span>
+        <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+      </a></div>
+
+          <footer class="mt-10 pb-4 flex items-center justify-between text-[11px] font-mono text-zinc-700">
+            <span>© 2026 Oktopus</span>
+            <span>docs / ru</span>
+          </footer>
+        </div>
+
+        <aside class="hidden xl:block w-[196px] flex-shrink-0">
+          <div class="sticky top-2">
+            <p class="text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700 mb-3">На этой странице</p>
+            <ul id="toc-list" class="flex flex-col gap-0.5"></ul>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../assets/docs-page.js"></script>
+<script src="../../assets/ui-tour.js"></script>
+</body>
+</html>

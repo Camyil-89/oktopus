@@ -1,0 +1,40 @@
+            <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Панель управления</p>
+            <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Пользователи</h1>
+            <p class="lead">Раздел <code>/manage/users</code> — учётные записи для входа в кабинет (не путать с пользователями прокси-auth, если они настроены отдельно).</p>
+
+            <h2 id="mu-tour">Интерфейс</h2>
+            <div class="ui-mock-wrap">
+              <div class="ui-mock ui-mock--tall" aria-hidden="true">
+                __MANAGE_ASIDE__
+                <div class="ui-mock-main">
+                  <header class="ui-mock-top">
+                    <h2>Пользователи</h2>
+                    <span class="ui-mock-lang">RU ▾</span>
+                  </header>
+                  <div class="ui-mock-content">
+                    <div class="ui-mock-toolbar tour-zone" tabindex="0" data-tour-title="Действия" data-tour-body="Создать пользователя кабинета, обновить список.">
+                      <span class="ui-mock-btn ui-mock-btn-accent">Создать</span>
+                      <span class="ui-mock-btn">Обновить</span>
+                    </div>
+                    <div class="ui-mock-table-wrap tour-zone" tabindex="0" data-tour-title="Список" data-tour-body="Имя, включён/выключен, роли. Редактирование пароля и удаление — в карточке пользователя.">
+                      <div class="ui-mock-table-head"><span>Имя</span><span>Статус</span><span>Роль</span></div>
+                      <div class="ui-mock-table-row"><span>admin</span><span class="ui-mock-tag-allow">вкл</span><span>admin</span></div>
+                      <div class="ui-mock-table-row"><span>operator</span><span class="ui-mock-tag-allow">вкл</span><span>user</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="ui-tour-hint">
+                <p class="ui-tour-hint-label">Подсказка</p>
+                <p id="ui-tour-title" class="ui-tour-hint-title" data-default-title="Наведите на элемент">Наведите на элемент</p>
+                <p id="ui-tour-body" class="ui-tour-hint-body" data-default-body="Макет /manage/users.">Макет /manage/users.</p>
+              </div>
+            </div>
+
+            <h2 id="mu-use">Как пользоваться</h2>
+            <ol>
+              <li>Создайте пользователя: имя, пароль, при необходимости отключите доступ флажком «включён».</li>
+              <li>Выдайте логин и пароль администратору или оператору — они входят через <code>/login</code>.</li>
+              <li>Для смены пароля откройте пользователя и задайте новый пароль.</li>
+              <li>Удаление отключает доступ к кабинету; активные сессии завершатся после выхода или истечения токена.</li>
+            </ol>

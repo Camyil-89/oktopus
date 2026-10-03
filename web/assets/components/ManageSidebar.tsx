@@ -16,6 +16,7 @@ import {
   manageNavLabel,
   type ManageNavPath,
 } from "@/assets/components/manageNav";
+import { AppVersion } from "@/assets/components/AppVersion";
 import { useTranslation } from "@/contexts/LocaleContext";
 
 const navItems: { href: ManageNavPath; icon: typeof HomeOutlined }[] = [
@@ -108,6 +109,9 @@ export function ManageSidebar({ user, onLogout }: ManageSidebarProps) {
           </div>
           <LogoutIcon className="ml-auto h-4 w-4 text-zinc-500" />
         </button>
+        <AppVersion
+          className="mt-2 px-2 text-center font-mono text-[10px] tabular-nums text-zinc-600"
+        />
       </div>
     </aside>
   );

@@ -1,0 +1,47 @@
+---
+description: Сверка и обновление docs/ при изменениях (ru + en, отдельные страницы)
+alwaysApply: true
+---
+
+# Документация: сверка при изменениях
+
+Если менялся продуктовый код, API, UI панели управления, развёртывание (`scripts/stack-up.*`, compose) или локальная разработка (`docker-compose.dev.yml`) — сверься с docs и обнови при расхождении.
+
+## Где что лежит
+
+- **`docs/DOC_MAP.md`**, **`docs/manifest.json`** — `id` ↔ путь HTML ↔ `webRoute` ↔ файлы кода (`sources`).
+- **Текст страницы** — `docs/content/ru/<id>.html` и `docs/content/en/<id>.html` (оба языка).
+- **Промпт для ИИ (только ACL)** — `docs/content/prompts/<locale>/rules-acl-syntax.txt` (блок на странице «Синтаксис ACL»).
+- **Собранный сайт** — `docs/ru/…`, `docs/en/…` (не править вручную).
+- **Оболочка и сборка** — `docs/build.mjs` (`PAGES`, `META`, `NAV`, подстановка `__MANAGE_ASIDE__`, `__ASSETS__`).
+- **Стили и макеты** — `docs/assets/` (`docs.css`, `ui-mock.css`, `ui-tour.js`, `docs-page.js`).
+
+После правок **content** или **build.mjs**: **`node docs/build.mjs`**.  
+Только **`docs/assets/*.css|js`** — пересборка не обязательна (HTML ссылается на assets).
+
+## Разделы меню
+
+- **Развёртывание** — `quickstart` (прод: `stack-up.sh` / `stack-up.bat`).
+- **Разработка** — `intro` (dev: `docker-compose.dev.yml`, `go run`, `web/`).
+- **Панель управления** — страницы `manage-*` + вход `login`.
+- **Справочник** — `rules-acl-syntax`.
+
+## Интерактивные макеты
+
+На страницах с `ui-mock-wrap`: hover-подсказки (`ui-tour.js`). В макетах кабинета — плейсхолдер **`__MANAGE_ASIDE__`** (сайдбар подставляет `build.mjs`). Вкладки ACL/Инспекция на `manage-rules` — `data-mock-tabs` в разметке + `ui-tour.js`.
+
+## Новая страница
+
+1. `id` в `docs/build.mjs` (`PAGES`, `META`, `NAV`), `docs/manifest.json`, content ru+en.
+2. При необходимости — промпт в `content/prompts/`.
+3. `node docs/build.mjs`.
+
+## Пример
+
+Изменили `web/app/manage/page.tsx` → `content/ru/manage-home.html` и `content/en/manage-home.html` → `node docs/build.mjs`.
+
+Изменили `scripts/stack-up.sh` → `content/*/quickstart.html` (+ `manifest.json` `sources` при смене привязки).
+
+## Когда можно не трогать docs
+
+Рефакторинг без смены поведения для пользователя; тесты и CI без влияния на панель/деплой/инструкции.

@@ -1,0 +1,34 @@
+{
+  "docsRoot": "docs/",
+  "build": "node docs/build.mjs",
+  "contentDir": "docs/content/",
+  "locales": ["ru", "en"],
+  "pages": [
+    { "id": "intro", "docPath": "index.html", "webRoute": null, "sources": ["README.md", "docker-compose.dev.yml", ".env.example", "web/package.json"] },
+    {
+      "id": "quickstart",
+      "docPath": "quickstart.html",
+      "webRoute": null,
+      "sources": ["scripts/stack-up.sh", "scripts/stack-up.bat", "docker-compose.yml", "docker-compose.desktop.yml"]
+    },
+    { "id": "login", "docPath": "login.html", "webRoute": "/login", "sources": ["web/app/login/page.tsx", "web/api/auth.ts"] },
+    { "id": "manage-home", "docPath": "manage/index.html", "webRoute": "/manage", "sources": ["web/app/manage/page.tsx"] },
+    { "id": "manage-rules", "docPath": "manage/rules.html", "webRoute": "/manage/rules", "sources": ["web/app/manage/rules/page.tsx"] },
+    {
+      "id": "rules-acl-syntax",
+      "docPath": "manage/rules-acl-syntax.html",
+      "webRoute": null,
+      "sources": ["web/app/manage/rules/page.tsx"],
+      "aiPrompt": "docs/content/prompts/{locale}/rules-acl-syntax.txt"
+    },
+    { "id": "manage-access-log", "docPath": "manage/access-log.html", "webRoute": "/manage/access-log", "sources": ["web/app/manage/access-log/page.tsx"] },
+    {
+      "id": "manage-access-log-reports",
+      "docPath": "manage/access-log/reports.html",
+      "webRoute": "/manage/access-log/reports",
+      "sources": ["web/app/manage/access-log/reports/page.tsx"]
+    },
+    { "id": "manage-proxy", "docPath": "manage/proxy.html", "webRoute": "/manage/proxy", "sources": ["web/app/manage/proxy/page.tsx"] },
+    { "id": "manage-users", "docPath": "manage/users.html", "webRoute": "/manage/users", "sources": ["web/app/manage/users/page.tsx"] }
+  ]
+}
