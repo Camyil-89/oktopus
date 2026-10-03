@@ -1,0 +1,55 @@
+{
+  "docsRoot": "docs/",
+  "locales": {
+    "ru": "docs/ru/index.html",
+    "en": "docs/en/index.html"
+  },
+  "entry": "docs/index.html",
+  "pages": [
+    {
+      "id": "intro",
+      "webRoute": null,
+      "sources": ["README.md", "docker-compose.yml"]
+    },
+    {
+      "id": "quickstart",
+      "webRoute": null,
+      "sources": ["docker-compose.yml", "docker-compose.desktop.yml", "cmd/serve.go"]
+    },
+    {
+      "id": "login",
+      "webRoute": "/login",
+      "sources": ["web/app/login/page.tsx", "web/api/auth.ts"]
+    },
+    {
+      "id": "manage-home",
+      "webRoute": "/manage",
+      "sources": ["web/app/manage/page.tsx", "web/app/page.tsx"]
+    },
+    {
+      "id": "manage-rules",
+      "webRoute": "/manage/rules",
+      "sources": ["web/app/manage/rules/page.tsx", "web/api/proxy.ts"]
+    },
+    {
+      "id": "manage-access-log",
+      "webRoute": "/manage/access-log",
+      "sources": ["web/app/manage/access-log/page.tsx", "web/api/proxy.ts"]
+    },
+    {
+      "id": "manage-access-log-reports",
+      "webRoute": "/manage/access-log/reports",
+      "sources": ["web/app/manage/access-log/reports/page.tsx", "web/api/proxy.ts"]
+    },
+    {
+      "id": "manage-proxy",
+      "webRoute": "/manage/proxy",
+      "sources": ["web/app/manage/proxy/page.tsx", "web/api/proxy.ts"]
+    },
+    {
+      "id": "manage-users",
+      "webRoute": "/manage/users",
+      "sources": ["web/app/manage/users/page.tsx", "web/api/users.ts"]
+    }
+  ]
+}
