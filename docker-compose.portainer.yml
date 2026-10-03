@@ -8,7 +8,7 @@
 #
 # Postgres / ClickHouse: проброс на 127.0.0.1 — мост для oktopus (host network), не публикация в LAN.
 
-name: oktopus-local
+name: oktopus-onprem
 
 services:
   postgres:
@@ -18,7 +18,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - oktopus_local_pg:/var/lib/postgresql/data
+      - oktopus_onprem_pg:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:${POSTGRES_HOST_PORT}:5432"
     healthcheck:
@@ -39,7 +39,7 @@ services:
       - "127.0.0.1:${CLICKHOUSE_HTTP_HOST_PORT}:8123"
       - "127.0.0.1:${CLICKHOUSE_NATIVE_HOST_PORT}:9000"
     volumes:
-      - oktopus_local_ch:/var/lib/clickhouse
+      - oktopus_onprem_ch:/var/lib/clickhouse
       - ./deploy/clickhouse/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8123/ping | grep -q Ok"]
@@ -69,7 +69,7 @@ services:
       OKTOPUS_ADMIN_USERNAME: ${OKTOPUS_ADMIN_USERNAME}
       OKTOPUS_ADMIN_PASSWORD: ${OKTOPUS_ADMIN_PASSWORD}
     volumes:
-      - oktopus_local_config:/app/config
+      - oktopus_onprem_config:/app/config
 
   nginx:
     build:
@@ -89,6 +89,6 @@ services:
       - "host.docker.internal:host-gateway"
 
 volumes:
-  oktopus_local_pg:
-  oktopus_local_ch:
-  oktopus_local_config:
+  oktopus_onprem_pg:
+  oktopus_onprem_ch:
+  oktopus_onprem_config:

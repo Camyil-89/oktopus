@@ -87,6 +87,21 @@ docker_volume_exists() {
   docker volume inspect "$1" >/dev/null 2>&1
 }
 
+docker_volume_exists_any() {
+  local v
+  for v in "$@"; do
+    if docker_volume_exists "$v"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+COMPOSE_PG_VOLUME="oktopus-onprem_oktopus_onprem_pg"
+COMPOSE_CH_VOLUME="oktopus-onprem_oktopus_onprem_ch"
+LEGACY_PG_VOLUME="oktopus-local_oktopus_local_pg"
+LEGACY_CH_VOLUME="oktopus-local_oktopus_local_ch"
+
 write_env() {
   local prev_pg_pass prev_ch_pass prev_api_internal
   prev_pg_pass="$(read_env_var POSTGRES_PASSWORD "$ENV_FILE")"
@@ -107,10 +122,10 @@ write_env() {
   local pg_pass ch_pass admin_pass api_host api_port api_internal_port cors
   if [[ -n "${POSTGRES_PASSWORD:-}" ]]; then
     pg_pass="$POSTGRES_PASSWORD"
-  elif docker_volume_exists oktopus-local_oktopus_local_pg && [[ -n "$prev_pg_pass" ]]; then
+  elif docker_volume_exists_any "$COMPOSE_PG_VOLUME" "$LEGACY_PG_VOLUME" && [[ -n "$prev_pg_pass" ]]; then
     pg_pass="$prev_pg_pass"
     echo "Keeping Postgres password (existing Docker volume)."
-  elif docker_volume_exists oktopus-local_oktopus_local_pg; then
+  elif docker_volume_exists_any "$COMPOSE_PG_VOLUME" "$LEGACY_PG_VOLUME"; then
     echo "Postgres volume exists but POSTGRES_PASSWORD is unknown. Run: docker compose down -v then stack-up again." >&2
     exit 1
   else
@@ -118,10 +133,10 @@ write_env() {
   fi
   if [[ -n "${CLICKHOUSE_PASSWORD:-}" ]]; then
     ch_pass="$CLICKHOUSE_PASSWORD"
-  elif docker_volume_exists oktopus-local_oktopus_local_ch && [[ -n "$prev_ch_pass" ]]; then
+  elif docker_volume_exists_any "$COMPOSE_CH_VOLUME" "$LEGACY_CH_VOLUME" && [[ -n "$prev_ch_pass" ]]; then
     ch_pass="$prev_ch_pass"
     echo "Keeping ClickHouse password (existing Docker volume)."
-  elif docker_volume_exists oktopus-local_oktopus_local_ch; then
+  elif docker_volume_exists_any "$COMPOSE_CH_VOLUME" "$LEGACY_CH_VOLUME"; then
     echo "ClickHouse volume exists but CLICKHOUSE_PASSWORD is unknown. Run: docker compose down -v then stack-up again." >&2
     exit 1
   else

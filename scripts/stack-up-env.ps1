@@ -68,6 +68,19 @@ function Test-DockerVolumeExists {
     return $ok
 }
 
+function Test-AnyDockerVolumeExists {
+    param([string[]] $Names)
+    foreach ($n in $Names) {
+        if (Test-DockerVolumeExists $n) { return $true }
+    }
+    return $false
+}
+
+$composePgVol = 'oktopus-onprem_oktopus_onprem_pg'
+$composeChVol = 'oktopus-onprem_oktopus_onprem_ch'
+$legacyPgVol = 'oktopus-local_oktopus_local_pg'
+$legacyChVol = 'oktopus-local_oktopus_local_ch'
+
 $prevPgPass = Read-EnvFileValue -Path $EnvFile -Key 'POSTGRES_PASSWORD'
 $prevChPass = Read-EnvFileValue -Path $EnvFile -Key 'CLICKHOUSE_PASSWORD'
 $prevApiInternalPort = Read-EnvFileValue -Path $EnvFile -Key 'OKTOPUS_API_INTERNAL_PORT'
@@ -85,15 +98,12 @@ $pgHostPort = if ($env:POSTGRES_HOST_PORT) { $env:POSTGRES_HOST_PORT } else { '5
 $chHttpPort = if ($env:CLICKHOUSE_HTTP_HOST_PORT) { $env:CLICKHOUSE_HTTP_HOST_PORT } else { '18177' }
 $chNativePort = if ($env:CLICKHOUSE_NATIVE_HOST_PORT) { $env:CLICKHOUSE_NATIVE_HOST_PORT } else { '19054' }
 
-$pgVol = 'oktopus-local_oktopus_local_pg'
-$chVol = 'oktopus-local_oktopus_local_ch'
-
 if ($env:POSTGRES_PASSWORD) {
     $pgPass = $env:POSTGRES_PASSWORD.Trim()
-} elseif ((Test-DockerVolumeExists $pgVol) -and $prevPgPass) {
+} elseif ((Test-AnyDockerVolumeExists @($composePgVol, $legacyPgVol)) -and $prevPgPass) {
     $pgPass = $prevPgPass
     Write-Host 'Keeping Postgres password (existing Docker volume).'
-} elseif (Test-DockerVolumeExists $pgVol) {
+} elseif (Test-AnyDockerVolumeExists @($composePgVol, $legacyPgVol)) {
     Write-Error 'Postgres volume exists but POSTGRES_PASSWORD is unknown. Run: docker compose -f docker-compose.desktop.yml down -v then stack-up again.'
     exit 1
 } else {
@@ -102,10 +112,10 @@ if ($env:POSTGRES_PASSWORD) {
 
 if ($env:CLICKHOUSE_PASSWORD) {
     $chPass = $env:CLICKHOUSE_PASSWORD.Trim()
-} elseif ((Test-DockerVolumeExists $chVol) -and $prevChPass) {
+} elseif ((Test-AnyDockerVolumeExists @($composeChVol, $legacyChVol)) -and $prevChPass) {
     $chPass = $prevChPass
     Write-Host 'Keeping ClickHouse password (existing Docker volume).'
-} elseif (Test-DockerVolumeExists $chVol) {
+} elseif (Test-AnyDockerVolumeExists @($composeChVol, $legacyChVol)) {
     Write-Error 'ClickHouse volume exists but CLICKHOUSE_PASSWORD is unknown. Run: docker compose -f docker-compose.desktop.yml down -v then stack-up again.'
     exit 1
 } else {
