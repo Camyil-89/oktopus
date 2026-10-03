@@ -63,6 +63,9 @@ func (c *Client) ApplyProxyTestProfile(connectMode, aclText string) (listen stri
 	if connectMode != "mitm" && connectMode != "tunnel" {
 		return "", fmt.Errorf("connect_mode must be mitm or tunnel, got %q", connectMode)
 	}
+	if err := c.EnsureCAForConnectMode(connectMode); err != nil {
+		return "", fmt.Errorf("ca: %w", err)
+	}
 	users := ProxyAuthUser + ":" + ProxyAuthPass
 	if err := c.patchJSON("/api/proxy/settings", map[string]interface{}{
 		"proxy_enabled":     true,
@@ -124,8 +127,55 @@ func (c *Client) WaitACLReady(timeout time.Duration) error {
 	}
 }
 
+type CAStatusDTO struct {
+	CertInstalled bool   `json:"cert_installed"`
+	KeyInstalled  bool   `json:"key_installed"`
+	ValidUntil    string `json:"valid_until,omitempty"`
+}
+
+// CAStatus — установлен ли CA на сервере прокси.
+func (c *Client) CAStatus() (CAStatusDTO, error) {
+	var out CAStatusDTO
+	if err := c.getJSON("/api/proxy/ca/status", &out); err != nil {
+		return CAStatusDTO{}, err
+	}
+	return out, nil
+}
+
+// GenerateCA создаёт корневой CA через API (config/ca.crt, config/ca.key на сервере).
+func (c *Client) GenerateCA() error {
+	if err := c.postJSON("/api/proxy/ca/generate", map[string]interface{}{}, nil); err != nil {
+		return fmt.Errorf("POST ca/generate: %w", err)
+	}
+	return nil
+}
+
+// EnsureCA генерирует CA, если cert/key ещё не установлены.
+func (c *Client) EnsureCA() error {
+	st, err := c.CAStatus()
+	if err != nil {
+		return err
+	}
+	if st.CertInstalled && st.KeyInstalled {
+		return nil
+	}
+	return c.GenerateCA()
+}
+
+// EnsureCAForConnectMode — MITM требует CA до apply настроек прокси.
+func (c *Client) EnsureCAForConnectMode(connectMode string) error {
+	connectMode = strings.TrimSpace(strings.ToLower(connectMode))
+	if connectMode != "mitm" {
+		return nil
+	}
+	return c.EnsureCA()
+}
+
 // DownloadCACert сохраняет CA MITM в path (создаёт каталоги при необходимости).
 func (c *Client) DownloadCACert(path string) error {
+	if err := c.EnsureCA(); err != nil {
+		return err
+	}
 	req, err := http.NewRequest(http.MethodGet, c.BaseURL+"/api/proxy/ca/cert", nil)
 	if err != nil {
 		return err

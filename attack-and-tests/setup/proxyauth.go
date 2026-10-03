@@ -93,6 +93,11 @@ func normalizeConnectMode(connectMode string) (string, error) {
 }
 
 func (c *Client) patchProxyAuthAndWait(body map[string]interface{}) (listen string, err error) {
+	if mode, ok := body["connect_mode"].(string); ok {
+		if err := c.EnsureCAForConnectMode(mode); err != nil {
+			return "", fmt.Errorf("ca: %w", err)
+		}
+	}
 	if err := c.patchJSON("/api/proxy/settings", body); err != nil {
 		return "", err
 	}
