@@ -6,7 +6,7 @@
 
 **[Русский](README.md)**
 
-**Documentation:** [Russian](docs/ru/index.html) · [English](docs/en/index.html)
+**Documentation:** [Russian](https://camyil-89.github.io/oktopus/ru/index.html) · [English](https://camyil-89.github.io/oktopus/en/index.html)
 
 Oktopus controls outbound internet traffic for an organization: a single HTTP/HTTPS exit point, clear rules for who may reach which destinations, an audit trail, and a web console for operators. In MITM mode the proxy can **inspect outbound HTTP requests** against custom rules after ACL allows the connection.
 
@@ -41,7 +41,7 @@ Measured on **localhost** (load generator and proxy on the same host), **6 cores
 
 ## Quick start (Docker)
 
-Git and [Docker Compose](https://docs.docker.com/compose/) required. Step-by-step: [deployment docs](docs/en/quickstart.html).
+Git and [Docker Compose](https://docs.docker.com/compose/) required. Step-by-step: [deployment docs](https://camyil-89.github.io/oktopus/en/quickstart.html).
 
 ```bash
 git clone https://github.com/Camyil-89/oktopus.git
@@ -52,7 +52,7 @@ cd oktopus
 
 **Windows:** `scripts\stack-up.bat` (uses `docker-compose.desktop.yml`).
 
-After login, confirm **RUNNING** and configure clients with the listen address from [proxy settings](docs/en/manage/proxy.html).
+After login, confirm **RUNNING** and configure clients with the listen address from [proxy settings](https://camyil-89.github.io/oktopus/en/manage/proxy.html).
 
 ## Development
 
@@ -61,7 +61,7 @@ After login, confirm **RUNNING** and configure clients with the listen address f
 3. `go run ./cmd serve` (API default `http://127.0.0.1:8000`)
 4. In `web/`: `npm install`, `npm run dev`; set `NEXT_PUBLIC_API_URL=http://localhost:8000` in `web/.env.local`
 
-Details: [developer intro](docs/en/index.html). Page map: [docs/DOC_MAP.md](docs/DOC_MAP.md). Build docs: `node docs/build.mjs`.
+Details: [developer intro](https://camyil-89.github.io/oktopus/en/index.html). Docs sources in the repo: [docs/DOC_MAP.md](docs/DOC_MAP.md), build: `node docs/build.mjs`.
 
 ## CLI
 

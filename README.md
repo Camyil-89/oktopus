@@ -6,7 +6,7 @@
 
 **[English](README.en.md)**
 
-**Документация:** [русский](docs/ru/index.html) · [English](docs/en/index.html)
+**Документация:** [русский](https://camyil-89.github.io/oktopus/ru/index.html) · [English](https://camyil-89.github.io/oktopus/en/index.html)
 
 Oktopus — система контроля исходящего интернет‑трафика организации: единая точка выхода (HTTP/HTTPS‑прокси), понятные правила «кто куда может ходить», журнал решений и веб‑кабинет для администраторов. В режиме MITM прокси может не только разрешать или блокировать сайты, но и **проверять исходящие HTTP‑запросы** по своим правилам после прохождения ACL.
 
@@ -41,7 +41,7 @@ Oktopus — система контроля исходящего интерне�
 
 ## Быстрый старт (Docker)
 
-Требуются Git и [Docker Compose](https://docs.docker.com/compose/). Пошагово — в [документации: развёртывание](docs/ru/quickstart.html).
+Требуются Git и [Docker Compose](https://docs.docker.com/compose/). Пошагово — в [документации: развёртывание](https://camyil-89.github.io/oktopus/ru/quickstart.html).
 
 ```bash
 git clone https://github.com/Camyil-89/oktopus.git
@@ -52,7 +52,7 @@ cd oktopus
 
 **Windows:** `scripts\stack-up.bat` (использует `docker-compose.desktop.yml`).
 
-После входа в кабинет убедитесь, что прокси **RUNNING**, и укажите клиентам listen‑адрес из [настроек прокси](docs/ru/manage/proxy.html).
+После входа в кабинет убедитесь, что прокси **RUNNING**, и укажите клиентам listen‑адрес из [настроек прокси](https://camyil-89.github.io/oktopus/ru/manage/proxy.html).
 
 ## Разработка
 
@@ -61,7 +61,7 @@ cd oktopus
 3. `go run ./cmd serve` (API по умолчанию `http://127.0.0.1:8000`).
 4. UI: `web/` — `npm install`, `npm run dev`; `NEXT_PUBLIC_API_URL=http://localhost:8000` в `web/.env.local`.
 
-Подробнее: [раздел для разработчиков](docs/ru/index.html). Карта страниц: [docs/DOC_MAP.md](docs/DOC_MAP.md). Сборка сайта docs: `node docs/build.mjs`.
+Подробнее: [раздел для разработчиков](https://camyil-89.github.io/oktopus/ru/index.html). Исходники docs в репозитории: [docs/DOC_MAP.md](docs/DOC_MAP.md), сборка: `node docs/build.mjs`.
 
 ## CLI
 
