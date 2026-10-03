@@ -61,7 +61,7 @@ export function accessLogAclDecisionLabel(
 
 /** Подпись для decision_rule_ref в таблице и карточке записи. */
 export function accessLogDecisionRuleLabel(
-  decisionRuleRef: string | undefined,
+  decisionRuleRef: string | null | undefined,
   ruleNames?: ReadonlyMap<string, string>,
 ): string {
   const ref = decisionRuleRef?.trim() ?? "";

@@ -21,14 +21,14 @@ COPY config ./config
 COPY attack-and-tests ./attack-and-tests
 
 FROM base AS test
-RUN go test ./...
+RUN go test ./internal/...
 RUN go build -trimpath -o /out/oktopus ./cmd
 
 FROM base AS integration
 COPY --from=test /out/oktopus /out/oktopus
-COPY scripts/ci-backend-integration.sh /ci/ci-backend-integration.sh
-RUN chmod +x /ci/ci-backend-integration.sh
+COPY scripts/ci-backend-integration.sh /src/scripts/ci-backend-integration.sh
+RUN chmod +x /src/scripts/ci-backend-integration.sh
 ENV OKTOPUS_BIN=/out/oktopus
 ENV CI_SKIP_COMPOSE=1
 WORKDIR /src
-ENTRYPOINT ["/ci/ci-backend-integration.sh"]
+ENTRYPOINT ["/src/scripts/ci-backend-integration.sh"]

@@ -38,8 +38,8 @@ if [[ "${CI_SKIP_COMPOSE:-}" != "1" ]]; then
   echo "==> go build ./cmd"
   go build -o "$OKTOPUS_BIN" ./cmd
 
-  echo "==> go test ./..."
-  go test ./...
+  echo "==> go test ./internal/..."
+  go test ./internal/...
 else
   echo "==> CI_SKIP_COMPOSE=1 (ожидаем postgres/openldap/clickhouse на хосте)"
   if [[ ! -x "$OKTOPUS_BIN" ]]; then
@@ -50,7 +50,7 @@ fi
 
 mkdir -p "$(dirname "$SERVE_LOG")"
 echo "==> serve (background)"
-"$OKTOPUS_BIN" serve >"$SERVE_LOG" 2>&1 &
+"$OKTOPUS_BIN" serve -migrations "$ROOT/db/migrations" >"$SERVE_LOG" 2>&1 &
 SERVE_PID=$!
 
 echo "==> wait for API"

@@ -361,7 +361,7 @@ export function squidPolicyCompletions(
         mkOption("skip", "keyword", "действие", DIRECTIVE_HELP.skip, "skip "),
       ]);
     }
-    const aclOptions = catalog.map((e) => {
+    const aclOptions: Completion[] = catalog.map((e) => {
       const h = ACL_TYPE_HELP[e.kind] ?? ACL_TYPE_HELP.src;
       const src =
         e.source === "list"
@@ -377,7 +377,7 @@ export function squidPolicyCompletions(
         apply(view: EditorView, _c: Completion, from: number, to: number) {
           insertReplace(view, from, to, `${name} `);
         },
-      } satisfies Completion;
+      };
     });
     aclOptions.push(
       mkOption("all", "variable", "all", ACL_TYPE_HELP.all.info, "all "),
@@ -406,7 +406,7 @@ export function squidPolicyCompletions(
         mkOption("deny", "keyword", "действие", DIRECTIVE_HELP.deny, "deny "),
       ]);
     }
-    const aclOptions = catalog.map((e) => {
+    const aclOptions: Completion[] = catalog.map((e) => {
       const h = ACL_TYPE_HELP[e.kind] ?? ACL_TYPE_HELP.src;
       const src =
         e.source === "list"
@@ -422,7 +422,7 @@ export function squidPolicyCompletions(
         apply(view: EditorView, _c: Completion, from: number, to: number) {
           insertReplace(view, from, to, `${name} `);
         },
-      } satisfies Completion;
+      };
     });
     aclOptions.push(
       mkOption("all", "variable", "all", ACL_TYPE_HELP.all.info, "all "),
