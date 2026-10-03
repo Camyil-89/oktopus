@@ -1,0 +1,30 @@
+            <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Разработка</p>
+            <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Разработчикам</h1>
+            <p class="lead">Oktopus — корпоративный прокси и веб-панель (Go + Next.js). Локально: зависимости в Docker, API/прокси и UI — из исходников на хосте. Продакшен в Docker — <a href="quickstart.html">Развёртывание</a>.</p>
+
+            <h2 id="intro-who">Документация по панели</h2>
+            <p>Разделы <strong>Панель управления</strong> описывают интерфейс для операторов. Эта страница — для разработки в репозитории.</p>
+
+            <h2 id="intro-deps">Зависимости (Docker)</h2>
+            <p>Из корня репозитория поднимите dev-стек: PostgreSQL, ClickHouse, OpenLDAP и вспомогательный nginx для нагрузочных тестов. Подробности и учётки LDAP — в комментариях в файле <code>docker-compose.dev.yml</code>.</p>
+            <div class="code">
+              <div class="code-head"><span class="code-name">shell</span><button type="button" class="copy-btn" onclick="copyCode(this)">Копировать</button></div>
+              <pre><code>docker compose -f docker-compose.dev.yml up -d</code></pre>
+            </div>
+            <p>Скопируйте <code>.env.example</code> в <code>.env</code> в корне (значения уже рассчитаны на порты из dev-compose: Postgres <code>5434</code>, ClickHouse native <code>9054</code>, HTTP <code>8177</code>).</p>
+
+            <h2 id="intro-dev">Бэкенд и фронтенд</h2>
+            <ol>
+              <li><strong>API и прокси</strong> — из корня репозитория, с загруженным <code>.env</code>: <code>go run ./cmd serve</code>. По умолчанию HTTP API слушает <code>127.0.0.1:8000</code> (см. <code>OKTOPUS_API_LISTEN</code>).</li>
+              <li><strong>Панель (Next.js)</strong> — каталог <code>web/</code>: <code>npm install</code>, затем <code>npm run dev</code> (обычно <code>http://localhost:3000</code>). В <code>web/.env.local</code> укажите <code>NEXT_PUBLIC_API_URL=http://localhost:8000</code>, если браузер не ходит в API (см. комментарии в <code>.env.example</code>).</li>
+              <li>Откройте UI в браузере, войдите (при первом bootstrap — учётка из <code>OKTOPUS_ADMIN_*</code> в <code>.env</code>, по умолчанию <code>admin</code> / <code>admin</code>).</li>
+            </ol>
+
+            <h2 id="intro-docs">Документация</h2>
+            <p>После изменений UI или API сверяйте <code>docs/DOC_MAP.md</code> и пересобирайте сайт: <code>node docs/build.mjs</code>.</p>
+
+            <h2 id="intro-ai">Помощь через ИИ</h2>
+            <p>Для правил ACL: <a href="manage/rules-acl-syntax.html">Синтаксис ACL</a> — промпт для копирования в чат с нейросетью.</p>
+
+            <h2 id="intro-lang">Языки</h2>
+            <p>Документация на <a href="index.html">русском</a> и <a href="../en/index.html">английском</a>.</p>

@@ -1,0 +1,42 @@
+            <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Развёртывание</p>
+            <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Развёртывание</h1>
+            <p class="lead">Запуск Oktopus в Docker: скрипт создаёт <code>.env</code>, поднимает compose и выводит URL панели управления и учётные данные администратора.</p>
+
+            <h2 id="qs-req">Что нужно</h2>
+            <ul>
+              <li>Git и <a href="https://docs.docker.com/compose/">Docker Compose</a> (команда <code>docker compose</code>).</li>
+              <li>На Windows — Docker Desktop; на Linux — обычный <code>docker-compose.yml</code> в корне репозитория.</li>
+            </ul>
+
+            <h2 id="qs-clone">Клонирование</h2>
+            <div class="code">
+              <div class="code-head"><span class="code-name">shell</span><button type="button" class="copy-btn" onclick="copyCode(this)">Копировать</button></div>
+              <pre><code>git clone https://github.com/Camyil-89/oktopus.git
+cd oktopus</code></pre>
+            </div>
+
+            <h2 id="qs-linux">Linux и macOS</h2>
+            <p>Скрипт <code>scripts/stack-up.sh</code> спросит хост и порт API (или задайте <code>OKTOPUS_API_HOST</code> и <code>OKTOPUS_API_PORT</code> в окружении), пересоздаст <code>.env</code> и выполнит <code>docker compose -f docker-compose.yml up --build -d</code>.</p>
+            <div class="code">
+              <div class="code-head"><span class="code-name">bash</span><button type="button" class="copy-btn" onclick="copyCode(this)">Копировать</button></div>
+              <pre><code>chmod +x scripts/stack-up.sh
+./scripts/stack-up.sh</code></pre>
+            </div>
+            <p>Только сгенерировать <code>.env</code> без запуска (например, для Portainer): <code>./scripts/stack-up.sh --write-env-only</code>.</p>
+
+            <h2 id="qs-windows">Windows</h2>
+            <p>Скрипт <code>scripts\stack-up.bat</code> использует <code>docker-compose.desktop.yml</code> (сеть bridge для Docker Desktop). Запуск из корня репозитория:</p>
+            <div class="code">
+              <div class="code-head"><span class="code-name">cmd</span><button type="button" class="copy-btn" onclick="copyCode(this)">Копировать</button></div>
+              <pre><code>scripts\stack-up.bat</code></pre>
+            </div>
+            <p>Только <code>.env</code>: <code>scripts\stack-up.bat --write-env-only</code>. Переменные <code>OKTOPUS_API_HOST</code> / <code>OKTOPUS_API_PORT</code> тоже отключают интерактивные вопросы.</p>
+
+            <h2 id="qs-after">После запуска</h2>
+            <ol>
+              <li>В конце скрипт выведет <strong>UI</strong> (<code>http://…</code>), логин и пароль администратора из <code>.env</code>.</li>
+              <li>Откройте URL в браузере, войдите и на <a href="manage/index.html">главной</a> проверьте, что прокси <strong>RUNNING</strong>.</li>
+              <li>Порт и режим прокси — в <a href="manage/proxy.html">настройках прокси</a>; клиентам укажите listen-адрес из панели.</li>
+            </ol>
+
+            <p>При повторном запуске скрипт пересоздаёт <code>.env</code>, но пароли БД сохраняются, если тома Docker уже существуют.</p>

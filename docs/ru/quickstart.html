@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Oktopus — Разработчикам</title>
+  <title>Oktopus — Развёртывание</title>
   <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
-  <link rel="alternate" hreflang="ru" href="./ru/index.html">
-  <link rel="alternate" hreflang="en" href="./en/index.html">
+  <link rel="alternate" hreflang="ru" href="./ru/quickstart.html">
+  <link rel="alternate" hreflang="en" href="./en/quickstart.html">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
   tailwind.config = {
@@ -49,14 +49,14 @@
       <div>
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Развёртывание</p>
         <div class="flex flex-col gap-0.5">
-          <a href="./quickstart.html" class="nav-item"><span class="dot"></span>Развёртывание</a>
+          <a href="./quickstart.html" class="nav-item active"><span class="dot"></span>Развёртывание</a>
         </div>
       </div>
 
       <div>
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Разработка</p>
         <div class="flex flex-col gap-0.5">
-          <a href="./index.html" class="nav-item active"><span class="dot"></span>Разработчикам</a>
+          <a href="./index.html" class="nav-item"><span class="dot"></span>Разработчикам</a>
         </div>
       </div>
 
@@ -106,13 +106,13 @@
         <span class="text-zinc-700">/</span>
         <span class="text-zinc-600">ru</span>
         <span class="text-zinc-700">/</span>
-        <span class="text-zinc-600">Разработка</span>
+        <span class="text-zinc-600">Развёртывание</span>
         <span class="text-zinc-700">/</span>
-        <span class="text-zinc-300 truncate">Разработчикам</span>
+        <span class="text-zinc-300 truncate">Развёртывание</span>
       </nav>
       <div class="ml-auto flex items-center gap-3">
         <div class="flex items-center gap-1 text-[12px] font-mono"><span class="text-zinc-500 border border-teal-400/30 text-teal-300 rounded px-2 py-0.5">RU</span>
-          <a href="./en/index.html" class="text-zinc-500 border border-white/8 rounded px-2 py-0.5 hover:text-zinc-200 hover:bg-white/5 transition">EN</a></div>
+          <a href="./en/quickstart.html" class="text-zinc-500 border border-white/8 rounded px-2 py-0.5 hover:text-zinc-200 hover:bg-white/5 transition">EN</a></div>
         <a href="https://github.com/Camyil-89/oktopus" target="_blank" rel="noopener noreferrer"
            class="hidden sm:inline-flex items-center gap-1.5 text-[12px] text-zinc-400 border border-white/8 rounded-lg px-3 py-1.5 hover:bg-white/5 hover:text-zinc-200 transition">GitHub</a>
       </div>
@@ -123,43 +123,61 @@
         <div class="min-w-0 flex-1 max-w-[740px]">
 
           <article class="doc doc-page">
-            <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Разработка</p>
-            <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Разработчикам</h1>
-            <p class="lead">Oktopus — корпоративный прокси и веб-панель (Go + Next.js). Локально: зависимости в Docker, API/прокси и UI — из исходников на хосте. Продакшен в Docker — <a href="quickstart.html">Развёртывание</a>.</p>
+            <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Развёртывание</p>
+            <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Развёртывание</h1>
+            <p class="lead">Запуск Oktopus в Docker: скрипт создаёт <code>.env</code>, поднимает compose и выводит URL панели управления и учётные данные администратора.</p>
 
-            <h2 id="intro-who">Документация по панели</h2>
-            <p>Разделы <strong>Панель управления</strong> описывают интерфейс для операторов. Эта страница — для разработки в репозитории.</p>
+            <h2 id="qs-req">Что нужно</h2>
+            <ul>
+              <li>Git и <a href="https://docs.docker.com/compose/">Docker Compose</a> (команда <code>docker compose</code>).</li>
+              <li>На Windows — Docker Desktop; на Linux — обычный <code>docker-compose.yml</code> в корне репозитория.</li>
+            </ul>
 
-            <h2 id="intro-deps">Зависимости (Docker)</h2>
-            <p>Из корня репозитория поднимите dev-стек: PostgreSQL, ClickHouse, OpenLDAP и вспомогательный nginx для нагрузочных тестов. Подробности и учётки LDAP — в комментариях в файле <code>docker-compose.dev.yml</code>.</p>
+            <h2 id="qs-clone">Клонирование</h2>
             <div class="code">
               <div class="code-head"><span class="code-name">shell</span><button type="button" class="copy-btn" onclick="copyCode(this)">Копировать</button></div>
-              <pre><code>docker compose -f docker-compose.dev.yml up -d</code></pre>
+              <pre><code>git clone https://github.com/Camyil-89/oktopus.git
+cd oktopus</code></pre>
             </div>
-            <p>Скопируйте <code>.env.example</code> в <code>.env</code> в корне (значения уже рассчитаны на порты из dev-compose: Postgres <code>5434</code>, ClickHouse native <code>9054</code>, HTTP <code>8177</code>).</p>
 
-            <h2 id="intro-dev">Бэкенд и фронтенд</h2>
+            <h2 id="qs-linux">Linux и macOS</h2>
+            <p>Скрипт <code>scripts/stack-up.sh</code> спросит хост и порт API (или задайте <code>OKTOPUS_API_HOST</code> и <code>OKTOPUS_API_PORT</code> в окружении), пересоздаст <code>.env</code> и выполнит <code>docker compose -f docker-compose.yml up --build -d</code>.</p>
+            <div class="code">
+              <div class="code-head"><span class="code-name">bash</span><button type="button" class="copy-btn" onclick="copyCode(this)">Копировать</button></div>
+              <pre><code>chmod +x scripts/stack-up.sh
+./scripts/stack-up.sh</code></pre>
+            </div>
+            <p>Только сгенерировать <code>.env</code> без запуска (например, для Portainer): <code>./scripts/stack-up.sh --write-env-only</code>.</p>
+
+            <h2 id="qs-windows">Windows</h2>
+            <p>Скрипт <code>scripts\stack-up.bat</code> использует <code>docker-compose.desktop.yml</code> (сеть bridge для Docker Desktop). Запуск из корня репозитория:</p>
+            <div class="code">
+              <div class="code-head"><span class="code-name">cmd</span><button type="button" class="copy-btn" onclick="copyCode(this)">Копировать</button></div>
+              <pre><code>scripts\stack-up.bat</code></pre>
+            </div>
+            <p>Только <code>.env</code>: <code>scripts\stack-up.bat --write-env-only</code>. Переменные <code>OKTOPUS_API_HOST</code> / <code>OKTOPUS_API_PORT</code> тоже отключают интерактивные вопросы.</p>
+
+            <h2 id="qs-after">После запуска</h2>
             <ol>
-              <li><strong>API и прокси</strong> — из корня репозитория, с загруженным <code>.env</code>: <code>go run ./cmd serve</code>. По умолчанию HTTP API слушает <code>127.0.0.1:8000</code> (см. <code>OKTOPUS_API_LISTEN</code>).</li>
-              <li><strong>Панель (Next.js)</strong> — каталог <code>web/</code>: <code>npm install</code>, затем <code>npm run dev</code> (обычно <code>http://localhost:3000</code>). В <code>web/.env.local</code> укажите <code>NEXT_PUBLIC_API_URL=http://localhost:8000</code>, если браузер не ходит в API (см. комментарии в <code>.env.example</code>).</li>
-              <li>Откройте UI в браузере, войдите (при первом bootstrap — учётка из <code>OKTOPUS_ADMIN_*</code> в <code>.env</code>, по умолчанию <code>admin</code> / <code>admin</code>).</li>
+              <li>В конце скрипт выведет <strong>UI</strong> (<code>http://…</code>), логин и пароль администратора из <code>.env</code>.</li>
+              <li>Откройте URL в браузере, войдите и на <a href="manage/index.html">главной</a> проверьте, что прокси <strong>RUNNING</strong>.</li>
+              <li>Порт и режим прокси — в <a href="manage/proxy.html">настройках прокси</a>; клиентам укажите listen-адрес из панели.</li>
             </ol>
 
-            <h2 id="intro-docs">Документация</h2>
-            <p>После изменений UI или API сверяйте <code>docs/DOC_MAP.md</code> и пересобирайте сайт: <code>node docs/build.mjs</code>.</p>
-
-            <h2 id="intro-ai">Помощь через ИИ</h2>
-            <p>Для правил ACL: <a href="manage/rules-acl-syntax.html">Синтаксис ACL</a> — промпт для копирования в чат с нейросетью.</p>
-
-            <h2 id="intro-lang">Языки</h2>
-            <p>Документация на <a href="index.html">русском</a> и <a href="../en/index.html">английском</a>.</p>
+            <p>При повторном запуске скрипт пересоздаёт <code>.env</code>, но пароли БД сохраняются, если тома Docker уже существуют.</p>
 
           </article>
 
-<div class="flex items-center justify-between gap-3 mt-14 pt-6 border-t border-white/5"><span class="pager-link pager-hidden" aria-hidden="true"></span><a href="./quickstart.html" class="pager-link group text-right ml-auto">
+<div class="flex items-center justify-between gap-3 mt-14 pt-6 border-t border-white/5"><a href="./index.html" class="pager-link group text-left">
+        <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+        <span class="min-w-0">
+          <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Назад</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Разработчикам</span>
+        </span>
+      </a><a href="./login.html" class="pager-link group text-right ml-auto">
         <span class="min-w-0">
           <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Далее</span>
-          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Развёртывание</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Вход</span>
         </span>
         <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
       </a></div>

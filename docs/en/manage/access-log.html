@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Oktopus — Developers</title>
-  <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
-  <link rel="alternate" hreflang="ru" href="./ru/index.html">
-  <link rel="alternate" hreflang="en" href="./en/index.html">
+  <title>Oktopus — Access log</title>
+  <link rel="icon" href="../../assets/icon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="ru" href="../ru/manage/access-log.html">
+  <link rel="alternate" hreflang="en" href="../en/manage/access-log.html">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
   tailwind.config = {
@@ -24,7 +24,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/docs.css">
+  <link rel="stylesheet" href="../../assets/docs.css">
+  <link rel="stylesheet" href="../../assets/ui-mock.css">
 </head>
 <body class="bg-ink text-zinc-400 font-sans antialiased overflow-hidden" data-copy="Copy" data-copied="Copied">
 
@@ -32,7 +33,7 @@
 
   <aside class="w-[262px] flex-shrink-0 border-r border-white/5 flex flex-col bg-ink/50">
     <div class="h-14 flex items-center gap-2.5 px-5 border-b border-white/5">
-      <img src="../assets/icon.svg" alt="" class="w-7 h-7 rounded-md border border-teal-400/25 bg-teal-400/10 p-0.5" width="28" height="28">
+      <img src="../../assets/icon.svg" alt="" class="w-7 h-7 rounded-md border border-teal-400/25 bg-teal-400/10 p-0.5" width="28" height="28">
       <span class="text-zinc-200 text-sm font-medium tracking-tight">Oktopus</span>
       <span class="ml-auto text-[10px] font-mono text-zinc-600 border border-white/10 rounded px-1.5 py-0.5">docs</span>
     </div>
@@ -49,40 +50,40 @@
       <div>
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Deployment</p>
         <div class="flex flex-col gap-0.5">
-          <a href="./quickstart.html" class="nav-item"><span class="dot"></span>Deployment</a>
+          <a href="../quickstart.html" class="nav-item"><span class="dot"></span>Deployment</a>
         </div>
       </div>
 
       <div>
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Development</p>
         <div class="flex flex-col gap-0.5">
-          <a href="./index.html" class="nav-item active"><span class="dot"></span>Developers</a>
+          <a href="../index.html" class="nav-item"><span class="dot"></span>Developers</a>
         </div>
       </div>
 
       <div>
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Sign in</p>
         <div class="flex flex-col gap-0.5">
-          <a href="./login.html" class="nav-item"><span class="dot"></span>Sign in</a>
+          <a href="../login.html" class="nav-item"><span class="dot"></span>Sign in</a>
         </div>
       </div>
 
       <div>
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Control panel</p>
         <div class="flex flex-col gap-0.5">
-          <a href="./manage/index.html" class="nav-item"><span class="dot"></span>Home</a>
-<a href="./manage/rules.html" class="nav-item"><span class="dot"></span>Proxy rules</a>
-<a href="./manage/access-log.html" class="nav-item"><span class="dot"></span>Access log</a>
-<a href="./manage/access-log/reports.html" class="nav-item"><span class="dot"></span>Access log reports</a>
-<a href="./manage/proxy.html" class="nav-item"><span class="dot"></span>Proxy settings</a>
-<a href="./manage/users.html" class="nav-item"><span class="dot"></span>Users</a>
+          <a href="./index.html" class="nav-item"><span class="dot"></span>Home</a>
+<a href="./rules.html" class="nav-item"><span class="dot"></span>Proxy rules</a>
+<a href="./access-log.html" class="nav-item active"><span class="dot"></span>Access log</a>
+<a href="./access-log/reports.html" class="nav-item"><span class="dot"></span>Access log reports</a>
+<a href="./proxy.html" class="nav-item"><span class="dot"></span>Proxy settings</a>
+<a href="./users.html" class="nav-item"><span class="dot"></span>Users</a>
         </div>
       </div>
 
       <div>
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Reference</p>
         <div class="flex flex-col gap-0.5">
-          <a href="./manage/rules-acl-syntax.html" class="nav-item"><span class="dot"></span>ACL syntax</a>
+          <a href="./rules-acl-syntax.html" class="nav-item"><span class="dot"></span>ACL syntax</a>
         </div>
       </div>
     </nav>
@@ -106,12 +107,12 @@
         <span class="text-zinc-700">/</span>
         <span class="text-zinc-600">en</span>
         <span class="text-zinc-700">/</span>
-        <span class="text-zinc-600">Development</span>
+        <span class="text-zinc-600">Control panel</span>
         <span class="text-zinc-700">/</span>
-        <span class="text-zinc-300 truncate">Developers</span>
+        <span class="text-zinc-300 truncate">Access log</span>
       </nav>
       <div class="ml-auto flex items-center gap-3">
-        <div class="flex items-center gap-1 text-[12px] font-mono"><a href="./ru/index.html" class="text-zinc-500 border border-white/8 rounded px-2 py-0.5 hover:text-zinc-200 hover:bg-white/5 transition">RU</a>
+        <div class="flex items-center gap-1 text-[12px] font-mono"><a href="../ru/manage/access-log.html" class="text-zinc-500 border border-white/8 rounded px-2 py-0.5 hover:text-zinc-200 hover:bg-white/5 transition">RU</a>
           <span class="text-zinc-500 border border-teal-400/30 text-teal-300 rounded px-2 py-0.5">EN</span></div>
         <a href="https://github.com/Camyil-89/oktopus" target="_blank" rel="noopener noreferrer"
            class="hidden sm:inline-flex items-center gap-1.5 text-[12px] text-zinc-400 border border-white/8 rounded-lg px-3 py-1.5 hover:bg-white/5 hover:text-zinc-200 transition">GitHub</a>
@@ -123,43 +124,70 @@
         <div class="min-w-0 flex-1 max-w-[740px]">
 
           <article class="doc doc-page">
-            <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Development</p>
-            <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Developers</h1>
-            <p class="lead">Oktopus — forward proxy and control panel (Go + Next.js). Locally: run dependencies in Docker, API/proxy and UI from source on the host. Production Docker — <a href="quickstart.html">Deployment</a>.</p>
+            <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Control panel</p>
+            <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Access log</h1>
+            <p class="lead">Route <code>/manage/access-log</code> — search and inspect allow/deny decisions.</p>
 
-            <h2 id="intro-who">Control panel docs</h2>
-            <p><strong>Control panel</strong> sections describe the operator UI. This page is for working in the repository.</p>
-
-            <h2 id="intro-deps">Dependencies (Docker)</h2>
-            <p>From the repo root, start the dev stack: PostgreSQL, ClickHouse, OpenLDAP, and a small nginx for load tests. LDAP accounts and ports are documented in <code>docker-compose.dev.yml</code>.</p>
-            <div class="code">
-              <div class="code-head"><span class="code-name">shell</span><button type="button" class="copy-btn" onclick="copyCode(this)">Copy</button></div>
-              <pre><code>docker compose -f docker-compose.dev.yml up -d</code></pre>
+            <h2 id="mal-tour">Interface</h2>
+            <div class="ui-mock-wrap">
+              <div class="ui-mock ui-mock--tall" aria-hidden="true">
+                <aside class="ui-mock-aside">
+                  <div class="ui-mock-brand">
+                    <img src="../../assets/icon.svg" alt="">
+                    <span class="ui-mock-brand-text">Oktopus</span>
+                  </div>
+                  <nav class="ui-mock-nav tour-zone" tabindex="0"
+                    data-tour-title="Sidebar"
+                    data-tour-body="Console navigation: home, rules, access log, reports, proxy settings, users. Sign out is at the bottom.">
+                    <div class="ui-mock-nav-item">Home</div>
+                    <div class="ui-mock-nav-item">Proxy rules</div>
+                    <div class="ui-mock-nav-item is-active">Access log</div>
+                    <div class="ui-mock-nav-item">Access log reports</div>
+                    <div class="ui-mock-nav-item">Proxy settings</div>
+                    <div class="ui-mock-nav-item">Users</div>
+                  </nav>
+                </aside>
+                <div class="ui-mock-main">
+                  <header class="ui-mock-top">
+                    <h2>Access log</h2>
+                    <span class="ui-mock-lang">EN ▾</span>
+                  </header>
+                  <div class="ui-mock-content">
+                    <div class="ui-mock-toolbar tour-zone" tabindex="0" data-tour-title="Toolbar" data-tour-body="Search, filters, refresh, retention, purge; link to reports.">
+                      <span class="ui-mock-btn">Filters</span>
+                      <span class="ui-mock-btn">Refresh</span>
+                      <span class="ui-mock-btn">Reports →</span>
+                    </div>
+                    <div class="ui-mock-table-wrap tour-zone" tabindex="0" data-tour-title="Table" data-tour-body="Time, user, host/SNI, allow/deny, rule; row opens detail modal.">
+                      <div class="ui-mock-table-head"><span>Time</span><span>Host</span><span>Action</span></div>
+                      <div class="ui-mock-table-row"><span>22:01:03</span><span>api.example.com</span><span class="ui-mock-tag-allow">allow</span></div>
+                      <div class="ui-mock-table-row"><span>22:01:05</span><span>ads.bad.net</span><span class="ui-mock-tag-deny">deny</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="ui-tour-hint">
+                <p class="ui-tour-hint-label">Hint</p>
+                <p id="ui-tour-title" class="ui-tour-hint-title" data-default-title="Hover a block">Hover a block</p>
+                <p id="ui-tour-body" class="ui-tour-hint-body" data-default-body="Mock of /manage/access-log.">Mock of /manage/access-log.</p>
+              </div>
             </div>
-            <p>Copy <code>.env.example</code> to <code>.env</code> at the repo root (defaults match dev-compose: Postgres <code>5434</code>, ClickHouse native <code>9054</code>, HTTP <code>8177</code>).</p>
 
-            <h2 id="intro-dev">Backend and frontend</h2>
-            <ol>
-              <li><strong>API and proxy</strong> — from the repo root with <code>.env</code> loaded: <code>go run ./cmd serve</code>. Default API listen: <code>127.0.0.1:8000</code> (<code>OKTOPUS_API_LISTEN</code>).</li>
-              <li><strong>UI (Next.js)</strong> — <code>web/</code>: <code>npm install</code>, then <code>npm run dev</code> (typically <code>http://localhost:3000</code>). Set <code>NEXT_PUBLIC_API_URL=http://localhost:8000</code> in <code>web/.env.local</code> if the browser cannot reach the API (see <code>.env.example</code>).</li>
-              <li>Open the UI, sign in (first DB bootstrap uses <code>OKTOPUS_ADMIN_*</code> from <code>.env</code>, default <code>admin</code> / <code>admin</code>).</li>
-            </ol>
-
-            <h2 id="intro-docs">Documentation</h2>
-            <p>After product changes, check <code>docs/DOC_MAP.md</code> and run <code>node docs/build.mjs</code>.</p>
-
-            <h2 id="intro-ai">Help from AI</h2>
-            <p>ACL rules: <a href="manage/rules-acl-syntax.html">ACL syntax</a> — copy the prompt at the bottom.</p>
-
-            <h2 id="intro-lang">Languages</h2>
-            <p><a href="../ru/index.html">Russian</a> and <a href="index.html">English</a> documentation.</p>
+            <h2 id="mal-use">How to use</h2>
+            <p>Set time range and filters, open a row for details (rule, latency, inspect). Use purge actions if your role allows removing old entries.</p>
 
           </article>
 
-<div class="flex items-center justify-between gap-3 mt-14 pt-6 border-t border-white/5"><span class="pager-link pager-hidden" aria-hidden="true"></span><a href="./quickstart.html" class="pager-link group text-right ml-auto">
+<div class="flex items-center justify-between gap-3 mt-14 pt-6 border-t border-white/5"><a href="./rules-acl-syntax.html" class="pager-link group text-left">
+        <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+        <span class="min-w-0">
+          <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Back</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">ACL syntax</span>
+        </span>
+      </a><a href="./access-log/reports.html" class="pager-link group text-right ml-auto">
         <span class="min-w-0">
           <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Next</span>
-          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Deployment</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Access log reports</span>
         </span>
         <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
       </a></div>
@@ -181,6 +209,7 @@
   </div>
 </div>
 
-<script src="../assets/docs-page.js"></script>
+<script src="../../assets/docs-page.js"></script>
+<script src="../../assets/ui-tour.js"></script>
 </body>
 </html>

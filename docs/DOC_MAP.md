@@ -1,25 +1,29 @@
 # Карта документации (docs ↔ код)
 
-Языки: **`docs/ru/index.html`** и **`docs/en/index.html`** — одна структура, разный текст. Общие стили и скрипт: `docs/assets/`.
+Языки: **`docs/ru/`** и **`docs/en/`** — отдельный HTML на каждый раздел.  
+Источник текста: **`docs/content/<locale>/<id>.html`**. Оболочка (меню, шапка) собирается **`node docs/build.mjs`**.
 
 Машиночитаемая карта: **`docs/manifest.json`**.
 
-## Разделы (одинаковые `data-doc` в ru и en)
+## Страницы (как в `web/app`)
 
-| `data-doc` | URL кабинета | Где править текст |
-|------------|--------------|-------------------|
-| `intro` | — | `<article id="doc-intro">` в ru и en |
-| `quickstart` | — | `<article id="doc-quickstart">` |
-| `login` | `/login` | `<article id="doc-login">` |
-| `manage-home` | `/manage` | `<article id="doc-manage-home">` |
-| `manage-rules` | `/manage/rules` | `<article id="doc-manage-rules">` |
-| `manage-access-log` | `/manage/access-log` | `<article id="doc-manage-access-log">` |
-| `manage-access-log-reports` | `/manage/access-log/reports` | `<article id="doc-manage-access-log-reports">` |
-| `manage-proxy` | `/manage/proxy` | `<article id="doc-manage-proxy">` |
-| `manage-users` | `/manage/users` | `<article id="doc-manage-users">` |
+| `id` | Файл docs (ru/en) | URL кабинета |
+|------|-------------------|--------------|
+| `intro` | `index.html` | — |
+| `quickstart` | `quickstart.html` | — |
+| `login` | `login.html` | `/login` |
+| `manage-home` | `manage/index.html` | `/manage` |
+| `manage-rules` | `manage/rules.html` | `/manage/rules` |
+| `rules-acl-syntax` | `manage/rules-acl-syntax.html` | — (справочник ACL; промпт для ИИ: `content/prompts/<locale>/rules-acl-syntax.txt`) |
+| `manage-access-log` | `manage/access-log.html` | `/manage/access-log` |
+| `manage-access-log-reports` | `manage/access-log/reports.html` | `/manage/access-log/reports` |
+| `manage-proxy` | `manage/proxy.html` | `/manage/proxy` |
+| `manage-users` | `manage/users.html` | `/manage/users` |
 
-Порядок в боковом меню = `web/assets/components/manageNav.ts`.
+## Правка
 
-## Правило для правок
+1. Изменить **`docs/content/ru/<id>.html`** и **`docs/content/en/<id>.html`**.
+2. Выполнить **`node docs/build.mjs`** (пересоберёт HTML в `ru/` и `en/`).
+3. Новая страница кабинета — добавить `id` в `docs/build.mjs` (`PAGES`), `manifest.json`, content-файлы, пересобрать.
 
-Любое изменение смысла в коде → обновить **оба** файла `docs/ru/index.html` и `docs/en/index.html` в соответствующем `<article id="doc-…">`. Навигацию (`data-doc`, порядок пунктов) менять синхронно в обоих языках.
+Интерактивные макеты (hover + `ui-tour.js`): **`login`**, все **`manage-*`**, **`rules-acl-syntax`** — в `content/<locale>/<id>.html`, плейсхолдер **`__MANAGE_ASIDE__`** подставляется в `build.mjs`.
