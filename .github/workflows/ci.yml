@@ -20,8 +20,8 @@ jobs:
 
       - name: Dev stack (postgres, openldap, clickhouse)
         run: |
-          docker compose -f docker-compose.dev.yml up -d postgres openldap clickhouse
-          docker compose -f docker-compose.dev.yml wait postgres openldap clickhouse --timeout 300
+          docker compose -f docker-compose.dev.yml up -d --wait --wait-timeout 300 \
+            postgres openldap clickhouse
 
       - name: Go test and build (Dockerfile.ci target test)
         run: docker build -f deploy/docker/Dockerfile.ci --target test .

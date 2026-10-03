@@ -32,8 +32,7 @@ export OKTOPUS_ADMIN_PASSWORD="${OKTOPUS_ADMIN_PASSWORD:-admin}"
 
 if [[ "${CI_SKIP_COMPOSE:-}" != "1" ]]; then
   echo "==> docker compose: ${SERVICES[*]}"
-  "${COMPOSE[@]}" up -d "${SERVICES[@]}"
-  "${COMPOSE[@]}" wait "${SERVICES[@]}" --timeout 300
+  "${COMPOSE[@]}" up -d --wait --wait-timeout 300 "${SERVICES[@]}"
 
   mkdir -p bin
   echo "==> go build ./cmd"
