@@ -287,6 +287,8 @@ export const ru = {
   "inspect.validateCode": "Проверить код",
   "inspect.viewTitle": "Просмотр правила инспекции",
   "loading.title": "Загрузка",
+  "app.github": "GitHub",
+  "app.githubAriaLabel": "Репозиторий Oktopus на GitHub",
   "app.version": "v{version}",
   "login.submit": "Войти",
   "login.title": "Вход в Oktopus",

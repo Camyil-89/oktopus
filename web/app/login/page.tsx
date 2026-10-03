@@ -96,7 +96,7 @@ export default function LoginPage() {
         </div>
       </Card>
       <AppVersion
-        className="pointer-events-none absolute bottom-4 left-0 right-0 text-center font-mono text-[10px] tabular-nums text-zinc-600"
+        className="absolute bottom-4 left-0 right-0 text-center font-mono text-[10px] tabular-nums text-zinc-600"
       />
     </main>
   );
