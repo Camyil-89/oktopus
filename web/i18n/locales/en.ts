@@ -289,6 +289,7 @@ export const en: Record<keyof typeof ru, string> = {
   "inspect.validateCode": "Validate code",
   "inspect.viewTitle": "View inspection rule",
   "loading.title": "Loading",
+  "app.version": "v{version}",
   "login.submit": "Sign in",
   "login.title": "Sign in to Oktopus",
   "nav.accessLog": "Access log",
