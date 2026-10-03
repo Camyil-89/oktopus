@@ -65,7 +65,7 @@ func New(cfg config.Config, engine *acl.Engine, inspectRunner *inspect.Runner, h
 		connect = &proxyhttps.Tunnel{Hooks: h, CA: ca, RateLimit: engine}
 	case config.ConnectMITM:
 		if caErr != nil {
-			return nil, fmt.Errorf("mitm requires CA (%s, %s): %w; run: go run ./cmd genca", cfg.CACertPath, cfg.CAKeyPath, caErr)
+			return nil, fmt.Errorf("mitm requires CA (%s, %s): %w", cfg.CACertPath, cfg.CAKeyPath, caErr)
 		}
 		ca.LogSummary(logger)
 		connect = &proxyhttps.MITM{CA: ca, Hooks: h, AccessLog: accessRec, RateLimit: engine}

@@ -48,8 +48,9 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	clientIP := authmw.ClientIP(r)
 	now := time.Now()
-	if h.loginLockout.Blocked(now) {
+	if h.loginLockout.Blocked(now, clientIP) {
 		response.Error(w, http.StatusTooManyRequests, "login temporarily disabled")
 		return
 	}
@@ -57,7 +58,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	user, err := h.users.Authenticate(r.Context(), body.Username, body.Password)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidCredentials) {
-			h.loginLockout.RecordFailure(time.Now())
+			h.loginLockout.RecordFailure(time.Now(), clientIP)
 			response.Error(w, http.StatusUnauthorized, "invalid credentials")
 			return
 		}

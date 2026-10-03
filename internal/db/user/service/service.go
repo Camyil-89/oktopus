@@ -38,21 +38,24 @@ type ListPage struct {
 	Size  int
 }
 
-// EnsureAdmin создаёт администратора, если пользователя с таким username ещё нет.
+// EnsureAdmin создаёт admin или обновляет его пароль до значения из конфигурации (каждый запуск).
 func (s *Service) EnsureAdmin(ctx context.Context, username, plainPassword string) error {
 	if username == "" {
 		return fmt.Errorf("admin username is empty")
 	}
+	if plainPassword == "" {
+		return fmt.Errorf("admin password is empty")
+	}
 
-	_, err := s.repo.FindByUsername(ctx, username)
+	user, err := s.repo.FindByUsername(ctx, username)
 	switch {
-	case err == nil:
-		return nil
 	case errors.Is(err, domain.ErrNotFound):
 		_, err = s.CreateWithPassword(ctx, username, plainPassword)
 		return err
-	default:
+	case err != nil:
 		return err
+	default:
+		return s.UpdatePassword(ctx, user.ID, plainPassword)
 	}
 }
 

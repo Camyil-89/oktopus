@@ -31,7 +31,7 @@ func NewGuard(secret []byte, users ActiveUsers, loginLockout *LoginLockout) *Gua
 // Require оборачивает handler проверкой сессии и статуса учётной записи.
 func (g *Guard) Require(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if g.LoginLockout != nil && g.LoginLockout.Blocked(time.Now()) {
+		if g.LoginLockout != nil && g.LoginLockout.Blocked(time.Now(), ClientIP(r)) {
 			response.Error(w, http.StatusTooManyRequests, "authentication temporarily disabled")
 			return
 		}

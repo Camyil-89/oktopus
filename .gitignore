@@ -2,6 +2,7 @@ docker_data/
 docker_data/logs/
 backups/
 *.env
+.env
 .venv/
 back/silk_profiles/
 

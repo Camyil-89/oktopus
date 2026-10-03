@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // standalone — локальный Dockerfile.web; export — статика в nginx (Dockerfile.nginx).
+  output: process.env.NEXT_OUTPUT === "export" ? "export" : "standalone",
 };
 
 export default nextConfig;
