@@ -1,0 +1,42 @@
+---
+description: UI strings and API error translations for all supported locales
+globs: web/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Frontend: i18n
+
+## Языки
+
+- Локали: `ru` (по умолчанию), `en`; расширение — добавить файл `web/i18n/locales/<code>.ts` и тип `Locale`.
+- Выбор языка сохраняется в `localStorage` (`oktopus_locale`) через `LocaleProvider`.
+
+## Тексты интерфейса
+
+- **Не хардкодить** пользовательские строки в компонентах (кроме имён бренда, технических идентификаторов в данных).
+- Использовать `useTranslation()` → `t('section.key', { param })` из `@/contexts/LocaleContext`.
+- Каждый новый ключ — **во всех** файлах локалей (`ru.ts`, `en.ts`); `en` типизирован как `Record<keyof typeof ru, string>`.
+
+## Ошибки API
+
+- Бэкенд отдаёт код в `error`. На фронте: `useApiErrorMessage()` / `t('errors.<code>')`.
+- Если строка не похожа на код (`isApiErrorCode`) или нет перевода — показывать оригинал.
+
+## Ant Design
+
+- `ConfigProvider` + `antd/locale/ru_RU` | `en_US` в `providers.tsx` (валидация форм, пагинация).
+- `okText` / `cancelText` / `placeholder` / `title` модалок — через `t()`, не литералы.
+
+## Форматирование
+
+- Даты и числа: `localeTag` из `useTranslation()` (`ru-RU` / `en-US`), не фиксированный `ru-RU`.
+
+```tsx
+// ✅
+const { t, localeTag } = useTranslation();
+<Button>{t("common.save")}</Button>
+new Intl.NumberFormat(localeTag).format(n)
+
+// ❌
+<Button>Сохранить</Button>
+```

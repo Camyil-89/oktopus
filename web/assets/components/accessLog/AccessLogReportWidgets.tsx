@@ -11,17 +11,22 @@ import { SkeletonLoader } from "@/assets/components/SkeletonLoader";
 import { Card, Input, Table, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { formatDurationUs } from "@/utils/formatDurationUs";
+import { useTranslation } from "@/contexts/LocaleContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 function isDurationMetric(metric?: string): boolean {
   return metric === "avg_decide_duration_us";
 }
 
-function formatMetricValue(value: number, metric?: string): string {
+function formatMetricValue(
+  value: number,
+  metric?: string,
+  localeTag = "ru-RU",
+): string {
   if (isDurationMetric(metric)) {
     return formatDurationUs(value);
   }
-  return formatCount(value);
+  return formatCount(value, localeTag);
 }
 
 function formatMetricAxisTick(value: number, metric?: string): string {
@@ -68,8 +73,8 @@ function chartYMax(values: number[]): number {
   return nice * exp;
 }
 
-function formatCount(n: number): string {
-  return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(n);
+function formatCount(n: number, localeTag: string): string {
+  return new Intl.NumberFormat(localeTag, { maximumFractionDigits: 2 }).format(n);
 }
 
 function formatTick(value: number): string {
@@ -104,6 +109,7 @@ function TimeseriesBody({
   data: AccessLogReportWidgetData;
   metric?: string;
 }) {
+  const { t, localeTag } = useTranslation();
   const series = data.series ?? [];
   const bucketKeys = useMemo(() => {
     const set = new Set<string>();
@@ -133,7 +139,7 @@ function TimeseriesBody({
   if (bucketKeys.length === 0) {
     return (
       <p className="m-0 py-8 text-center font-mono text-[12px] text-zinc-500">
-        Нет данных
+        {t("reports.noData")}
       </p>
     );
   }
@@ -158,13 +164,13 @@ function TimeseriesBody({
                 key={t}
                 title={
                   <div className="flex flex-col gap-1 font-mono text-[11px]">
-                    <span>{new Date(t).toLocaleString("ru-RU")}</span>
+                    <span>{new Date(t).toLocaleString(localeTag)}</span>
                     {series.map((s) => {
                       const p = s.points.find((x) => x.t === t);
                       if (!p || p.value <= 0) return null;
                       return (
                         <span key={s.key}>
-                          {s.label}: {formatMetricValue(p.value, metric)}
+                          {s.label}: {formatMetricValue(p.value, metric, localeTag)}
                         </span>
                       );
                     })}
@@ -222,11 +228,12 @@ function BarBody({
   rules: ReportRuleLabelContext;
   metric?: string;
 }) {
+  const { t } = useTranslation();
   const items = data.items ?? [];
   if (items.length === 0) {
     return (
       <p className="m-0 py-6 text-center font-mono text-[12px] text-zinc-500">
-        Нет данных
+        {t("reports.noData")}
       </p>
     );
   }
@@ -267,10 +274,11 @@ function StatBody({
   data: AccessLogReportWidgetData;
   metric?: string;
 }) {
+  const { localeTag } = useTranslation();
   const v = data.value ?? 0;
   return (
     <p className="m-0 py-4 font-mono text-3xl tracking-tight text-zinc-50">
-      {formatMetricValue(v, metric)}
+      {formatMetricValue(v, metric, localeTag)}
     </p>
   );
 }
@@ -294,6 +302,7 @@ function TableBody({
   onFetchTable?: ReportTableFetchFn;
   onData?: (data: AccessLogReportWidgetData) => void;
 }) {
+  const { t, localeTag } = useTranslation();
   const columns = data.columns ?? [];
   const rows = data.rows ?? [];
   const values = data.values ?? [];
@@ -332,7 +341,9 @@ function TableBody({
   if (columns.length === 0) {
     return null;
   }
-  const metricLabel = isDurationMetric(metric) ? "Среднее" : "Количество";
+  const metricLabel = isDurationMetric(metric)
+    ? t("reports.metricAvg")
+    : t("reports.metricCount");
   const tableColumns: ColumnsType<Record<string, string>> = [
     ...columns.map((c) => ({
       key: c,
@@ -355,7 +366,7 @@ function TableBody({
       dataIndex: "value",
       width: 120,
       align: "right" as const,
-      render: (v: string) => formatMetricValue(Number(v), metric),
+      render: (v: string) => formatMetricValue(Number(v), metric, localeTag),
     },
   ];
   const dataSource = rows.map((row, i) => {
@@ -370,7 +381,7 @@ function TableBody({
       {canSearch ? (
         <Input.Search
           allowClear
-          placeholder="Поиск"
+          placeholder={t("reports.searchPlaceholder")}
           value={search}
           loading={tableLoading}
           onChange={(e) => {

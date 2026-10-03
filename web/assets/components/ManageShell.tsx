@@ -5,14 +5,17 @@ import { Button } from "antd";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { LanguageSelect } from "@/assets/components/LanguageSelect";
 import { managePageTitle } from "@/assets/components/manageNav";
 import { ManageSidebar } from "@/assets/components/ManageSidebar";
+import { useTranslation } from "@/contexts/LocaleContext";
 
 export function ManageShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const pageTitle = managePageTitle(pathname);
+  const { t } = useTranslation();
+  const pageTitle = managePageTitle(pathname, t);
 
   const handleLogout = async () => {
     await logout();
@@ -24,9 +27,10 @@ export function ManageShell({ children }: { children: React.ReactNode }) {
       <ManageSidebar onLogout={handleLogout} user={user} />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 flex-row items-center gap-4 border-b border-white/5 bg-ink/40 px-6 backdrop-blur">
-          <h1 className="text-[14px] font-medium tracking-tight text-zinc-50">
+          <h1 className="min-w-0 flex-1 text-[14px] font-medium tracking-tight text-zinc-50">
             {pageTitle}
           </h1>
+          <LanguageSelect />
         </header>
         <main className="grid-bg min-h-0 flex-1 overflow-y-auto">
           <div className="manage-main-inner mx-auto max-w-[1200px] px-6 py-7">

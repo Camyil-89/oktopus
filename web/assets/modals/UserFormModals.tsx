@@ -2,6 +2,7 @@
 
 import { Form, Input, Modal } from "antd";
 import { scrollableModalProps } from "@/assets/modals/modalConfig";
+import { useTranslation } from "@/contexts/LocaleContext";
 import type { User } from "@/types/user";
 
 type CreateUserModalProps = {
@@ -18,13 +19,14 @@ export function CreateUserModal({
   onSubmit,
 }: CreateUserModalProps) {
   const [form] = Form.useForm();
+  const { t } = useTranslation();
 
   return (
     <Modal
-      title="Новый пользователь"
+      title={t("users.newUser")}
       open={open}
-      okText="Создать"
-      cancelText="Отмена"
+      okText={t("common.create")}
+      cancelText={t("common.cancel")}
       confirmLoading={loading}
       onCancel={() => {
         form.resetFields();
@@ -40,15 +42,15 @@ export function CreateUserModal({
       <Form form={form} layout="vertical">
         <Form.Item
           name="username"
-          label="Логин"
-          rules={[{ required: true, message: "Введите логин" }]}
+          label={t("common.username")}
+          rules={[{ required: true, message: t("common.enterUsername") }]}
         >
           <Input autoComplete="off" />
         </Form.Item>
         <Form.Item
           name="password"
-          label="Пароль"
-          rules={[{ required: true, message: "Введите пароль" }]}
+          label={t("common.password")}
+          rules={[{ required: true, message: t("common.enterPassword") }]}
         >
           <Input.Password autoComplete="new-password" />
         </Form.Item>
@@ -73,13 +75,18 @@ export function ChangePasswordModal({
   onSubmit,
 }: ChangePasswordModalProps) {
   const [form] = Form.useForm();
+  const { t } = useTranslation();
 
   return (
     <Modal
-      title={user ? `Пароль: ${user.username}` : "Смена пароля"}
+      title={
+        user
+          ? t("users.passwordTitle", { username: user.username })
+          : t("users.changePassword")
+      }
       open={open}
-      okText="Сохранить"
-      cancelText="Отмена"
+      okText={t("common.save")}
+      cancelText={t("common.cancel")}
       confirmLoading={loading}
       onCancel={() => {
         form.resetFields();
@@ -100,8 +107,8 @@ export function ChangePasswordModal({
       <Form form={form} layout="vertical">
         <Form.Item
           name="password"
-          label="Новый пароль"
-          rules={[{ required: true, message: "Введите пароль" }]}
+          label={t("users.newPassword")}
+          rules={[{ required: true, message: t("common.enterPassword") }]}
         >
           <Input.Password autoComplete="new-password" />
         </Form.Item>

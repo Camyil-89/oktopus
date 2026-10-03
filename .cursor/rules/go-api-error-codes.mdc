@@ -1,0 +1,36 @@
+---
+description: API errors must use machine-readable codes for the frontend
+globs: internal/**/*.go
+alwaysApply: false
+---
+
+# API: коды ошибок
+
+## Обязательно
+
+- Поле JSON `error` в ответах `response.Error` / `response.ErrorFrom` — **код** (`snake_case`, латиница), не произвольный текст для пользователя.
+- Новые коды добавлять в `internal/apperr/codes.go` и возвращать через `apperr.New` / `apperr.Wrap` / `apperr.Internal`.
+- Handlers: `response.ErrorFrom(w, status, err)` или `response.Error(w, status, string(apperr.SomeCode))`.
+- Для обёрнутых ошибок применения домена — маппинг в `apperr.Map*` или явный `Wrap`, без цепочек `fmt.Errorf("apply ...: %w")` в ответ клиенту.
+
+## Запрещено
+
+- Отдавать в `error` сырые `err.Error()` с путями файлов, SQL, stack (детали — только в логах).
+- Дублировать один смысл разными строками вместо одного кода.
+
+## Пример
+
+```go
+// ✅
+if err := s.applier.Apply(...); err != nil {
+    return domain.Settings{}, apperr.MapProxyApply(err)
+}
+response.ErrorFrom(w, http.StatusBadRequest, err)
+
+// ❌
+response.Error(w, http.StatusBadRequest, err.Error())
+```
+
+## Фронт
+
+Перевод кодов — в `web/i18n/locales/*.ts` (ключи `errors.<code>`). Неизвестный код или не-код — показывать оригинал `error` с сервера.

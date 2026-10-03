@@ -4,8 +4,9 @@ import {
   BreakdownTooltipRow,
   breakdownTooltipShellClassName,
 } from "@/assets/components/dashboard/BreakdownTooltipRow";
+import { useTranslation } from "@/contexts/LocaleContext";
 import type { ProxyInspectBreakdown5m } from "@/types/proxy";
-import { formatDurationUs } from "@/utils/formatDurationUs";
+import { durationUnitLabelsFromT, formatDurationUs } from "@/utils/formatDurationUs";
 
 type Props = {
   totalAvgUs: number;
@@ -20,31 +21,33 @@ export function InspectBreakdownTooltip({
   totalP99Us,
   breakdown,
 }: Props) {
+  const { t } = useTranslation();
+  const units = durationUnitLabelsFromT(t);
   return (
     <div className={breakdownTooltipShellClassName}>
       <p className="m-0 text-[11px] text-zinc-400">
-        Исходящий HTTP после ACL allow (MITM). CONNECT и deny не входят.
+        {t("dashboard.inspectBreakdownIntro")}
       </p>
       <div className="flex flex-col gap-1.5 border-t border-white/10 pt-2">
         <BreakdownTooltipRow
-          label="Итого inspect"
+          label={t("dashboard.inspectBreakdownTotal")}
           avgUs={totalAvgUs}
           p95Us={totalP95Us}
           totalAvgUs={totalAvgUs}
         />
         {totalP99Us != null ? (
           <p className="m-0 text-right font-mono text-[11px] text-zinc-500">
-            p99 {formatDurationUs(totalP99Us)}
+            p99 {formatDurationUs(totalP99Us, undefined, units)}
           </p>
         ) : null}
         <BreakdownTooltipRow
-          label="Контекст запроса"
+          label={t("dashboard.inspectBreakdownCtx")}
           avgUs={breakdown.prepare_us_avg_5m}
           p95Us={breakdown.prepare_us_p95_5m}
           totalAvgUs={totalAvgUs}
         />
         <BreakdownTooltipRow
-          label="Тело (meta)"
+          label={t("dashboard.inspectBreakdownBody")}
           avgUs={breakdown.body_us_avg_5m}
           p95Us={breakdown.body_us_p95_5m}
           totalAvgUs={totalAvgUs}

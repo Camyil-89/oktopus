@@ -1,3 +1,5 @@
+import type { TranslateFn } from "@/i18n/translate";
+
 export const ACCESS_LOG_RULE_AUTH_FAIL = "system_auth_fail";
 export const ACCESS_LOG_RULE_DEFAULT_DENY = "system_default_deny";
 export const ACCESS_LOG_RULE_INSPECT_ERROR = "system_inspect_error";
@@ -42,34 +44,53 @@ export function isAccessLogRecordId(value: string): boolean {
   return UUID_LIKE.test(value.trim());
 }
 
+const SYSTEM_RULE_KEYS: Record<string, Parameters<TranslateFn>[0]> = {
+  [ACCESS_LOG_RULE_AUTH_FAIL]: "accessLog.system.auth_fail",
+  [ACCESS_LOG_RULE_DEFAULT_DENY]: "accessLog.system.default_deny",
+  [ACCESS_LOG_RULE_INSPECT_ERROR]: "accessLog.system.inspect_error",
+  [ACCESS_LOG_RULE_GATEWAY_ERROR]: "accessLog.system.gateway_error",
+};
+
+export function accessLogSystemRuleLabel(ruleId: string, t: TranslateFn): string {
+  const key = SYSTEM_RULE_KEYS[ruleId];
+  if (key) {
+    return t(key);
+  }
+  return t("accessLog.system.fallback", {
+    id: ruleId.replace(/^system_/, ""),
+  });
+}
+
 /** Текст для колонки «Правило ACL» — только Squid (не UUID инспекции). */
 export function accessLogAclDecisionLabel(
   decisionRuleRef: string | undefined,
+  t: TranslateFn,
 ): string {
   const ref = decisionRuleRef?.trim() ?? "";
   if (!ref) {
-    return "—";
+    return t("common.emDash");
   }
   if (isSystemAccessLogRuleId(ref)) {
-    return accessLogSystemRuleLabel(ref);
+    return accessLogSystemRuleLabel(ref, t);
   }
   if (isAccessLogSquidDirectiveRef(ref)) {
     return ref;
   }
-  return "—";
+  return t("common.emDash");
 }
 
 /** Подпись для decision_rule_ref в таблице и карточке записи. */
 export function accessLogDecisionRuleLabel(
   decisionRuleRef: string | null | undefined,
+  t: TranslateFn,
   ruleNames?: ReadonlyMap<string, string>,
 ): string {
   const ref = decisionRuleRef?.trim() ?? "";
   if (!ref) {
-    return "—";
+    return t("common.emDash");
   }
   if (isSystemAccessLogRuleId(ref)) {
-    return accessLogSystemRuleLabel(ref);
+    return accessLogSystemRuleLabel(ref, t);
   }
   if (isAccessLogSquidDirectiveRef(ref)) {
     return ref;
@@ -82,20 +103,6 @@ export function accessLogDecisionRuleLabel(
     return ref;
   }
   return ref;
-}
-
-const SYSTEM_RULE_LABELS: Record<string, string> = {
-  [ACCESS_LOG_RULE_AUTH_FAIL]:
-    "Не удалось авторизоваться (неверные или отсутствующие учётные данные proxy)",
-  [ACCESS_LOG_RULE_DEFAULT_DENY]:
-    "Запрет по умолчанию — ни одно правило ACL не подошло",
-  [ACCESS_LOG_RULE_INSPECT_ERROR]:
-    "Сбой Lua-инспекции (запрос отклонён)",
-  [ACCESS_LOG_RULE_GATEWAY_ERROR]:
-    "Ошибка шлюза (502) — не удалось получить ответ от origin",
-};
-export function accessLogSystemRuleLabel(ruleId: string): string {
-  return SYSTEM_RULE_LABELS[ruleId] ?? `Система: ${ruleId.replace(/^system_/, "")}`;
 }
 
 const RESERVED_ACCESS_LOG_EXTRA_KEYS = new Set([
@@ -129,7 +136,10 @@ export function parseAccessLogExtra(extra: unknown): AccessLogExtra {
   return extra as AccessLogExtra;
 }
 
-export function searchEngineLabel(engine: string | undefined): string {
-  if (!engine) return "—";
+export function searchEngineLabel(
+  engine: string | undefined,
+  t: TranslateFn,
+): string {
+  if (!engine) return t("common.emDash");
   return engine;
 }

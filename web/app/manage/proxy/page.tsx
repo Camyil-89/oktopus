@@ -1,7 +1,8 @@
 "use client";
 
-import { ApiError } from "@/api/base";
 import * as proxyApi from "@/api/proxy";
+import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
+import type { TranslateFn } from "@/i18n/translate";
 import type {
   ProxyCAStatus,
   ProxyErrorPagePreviewVariant,
@@ -28,21 +29,27 @@ import {
 import type { UploadFile } from "antd/es/upload";
 import { useCallback, useEffect, useState } from "react";
 
-const KEY_BITS_OPTIONS = [
-  { value: 2048, label: "2048 бит" },
-  { value: 3072, label: "3072 бит" },
-  { value: 4096, label: "4096 бит" },
-];
+function keyBitsOptions(t: TranslateFn) {
+  return [
+    { value: 2048, label: t("proxy.keyBits2048") },
+    { value: 3072, label: t("proxy.keyBits3072") },
+    { value: 4096, label: t("proxy.keyBits4096") },
+  ];
+}
 
-const CONNECT_MODE_OPTIONS = [
-  { value: "tunnel", label: "Туннель" },
-  { value: "mitm", label: "Перехват HTTPS (MITM)" },
-] as const;
+function connectModeOptions(t: TranslateFn) {
+  return [
+    { value: "tunnel", label: t("proxy.tunnel") },
+    { value: "mitm", label: t("proxy.mitm") },
+  ] as const;
+}
 
-const AUTH_BACKEND_OPTIONS = [
-  { value: "ldap", label: "LDAP" },
-  { value: "static", label: "Список login:password" },
-];
+function authBackendOptions(t: TranslateFn) {
+  return [
+    { value: "ldap", label: "LDAP" },
+    { value: "static", label: t("proxy.staticUsers") },
+  ];
+}
 
 type FormValues = {
   proxy_enabled: boolean;
@@ -59,26 +66,32 @@ type FormValues = {
   ldap_bind_password?: string;
 };
 
-function formatValidUntil(iso?: string) {
+function formatValidUntil(iso?: string, localeTag = "ru-RU") {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return new Intl.DateTimeFormat("ru-RU", { dateStyle: "long" }).format(d);
+  return new Intl.DateTimeFormat(localeTag, { dateStyle: "long" }).format(d);
 }
 
-function caStatusText(status: ProxyCAStatus | null) {
+function caStatusText(
+  status: ProxyCAStatus | null,
+  t: TranslateFn,
+  localeTag: string,
+) {
   if (!status?.cert_installed) {
-    return "Корневой сертификат не установлен.";
+    return t("proxy.caNotInstalled");
   }
-  const until = formatValidUntil(status.valid_until);
+  const until = formatValidUntil(status.valid_until, localeTag);
   if (until) {
-    return `Сертификат установлен, действует до ${until}.`;
+    return t("proxy.caInstalledUntil", { until });
   }
-  return "Сертификат установлен.";
+  return t("proxy.caInstalled");
 }
 
 export default function ManageProxyPage() {
   const { message, modal } = App.useApp();
+  const formatApiError = useApiErrorMessage();
+  const { t, localeTag } = useTranslation();
   const [form] = Form.useForm<FormValues>();
   const authEnabled = Form.useWatch("auth_enabled", form);
   const authBackend = Form.useWatch("auth_backend", form);
@@ -135,12 +148,10 @@ export default function ManageProxyPage() {
       try {
         await proxyApi.openProxyErrorPagePreview(kind, variant);
       } catch (e) {
-        const msg =
-          e instanceof ApiError ? e.message : "Не удалось открыть предпросмотр";
-        message.error(msg);
+        message.error(formatApiError(e, t("proxy.previewFailed")));
       }
     },
-    [message],
+    [formatApiError, message, t],
   );
 
   const applyToForm = useCallback(
@@ -171,13 +182,11 @@ export default function ManageProxyPage() {
       await loadGatewayStatus();
       applyToForm(s);
     } catch (e) {
-      const msg =
-        e instanceof ApiError ? e.message : "Не удалось загрузить настройки";
-      message.error(msg);
+      message.error(formatApiError(e, t("proxy.loadFailed")));
     } finally {
       setLoading(false);
     }
-  }, [applyToForm, loadCAStatus, loadForbiddenStatus, loadGatewayStatus, message]);
+  }, [applyToForm, formatApiError, loadCAStatus, loadForbiddenStatus, loadGatewayStatus, message, t]);
 
   useEffect(() => {
     void load();
@@ -192,11 +201,9 @@ export default function ManageProxyPage() {
       }
       const updated = await proxyApi.patchProxySettings(body);
       applyToForm(updated);
-      message.success("Настройки сохранены и применены к прокси");
+      message.success(t("proxy.savedApplied"));
     } catch (e) {
-      const msg =
-        e instanceof ApiError ? e.message : "Не удалось сохранить настройки";
-      message.error(msg);
+      message.error(formatApiError(e, t("proxy.saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -204,11 +211,10 @@ export default function ManageProxyPage() {
 
   const confirmGenerate = () => {
     modal.confirm({
-      title: "Сгенерировать новый корневой сертификат?",
-      content:
-        "Текущий сертификат и ключ будут удалены. Все клиенты должны будут установить новый корневой CA.",
-      okText: "Сгенерировать",
-      cancelText: "Отмена",
+      title: t("proxy.generateCaTitle"),
+      content: t("proxy.generateCaContent"),
+      okText: t("common.generate"),
+      cancelText: t("common.cancel"),
       okButtonProps: { danger: true },
       onOk: async () => {
         setGenerating(true);
@@ -218,13 +224,9 @@ export default function ManageProxyPage() {
           });
           applyToForm(updated);
           await loadCAStatus();
-          message.success("Новый сертификат создан");
+          message.success(t("proxy.certCreated"));
         } catch (e) {
-          const msg =
-            e instanceof ApiError
-              ? e.message
-              : "Не удалось создать сертификат";
-          message.error(msg);
+          message.error(formatApiError(e, t("proxy.certCreateFailed")));
         } finally {
           setGenerating(false);
         }
@@ -235,7 +237,7 @@ export default function ManageProxyPage() {
   const handleForbiddenUpload = async () => {
     const html = forbiddenHtmlFiles[0]?.originFileObj;
     if (!html) {
-      message.error("Выберите HTML-файл");
+      message.error(t("proxy.selectHtml"));
       return;
     }
     setForbiddenUploading(true);
@@ -246,11 +248,9 @@ export default function ManageProxyPage() {
       setForbiddenStatus(st);
       setForbiddenHtmlFiles([]);
       setForbiddenUploadOpen(false);
-      message.success("Страница 403 загружена");
+      message.success(t("proxy.page403Uploaded"));
     } catch (e) {
-      const msg =
-        e instanceof ApiError ? e.message : "Не удалось загрузить страницу";
-      message.error(msg);
+      message.error(formatApiError(e, t("proxy.pageUploadFailed")));
     } finally {
       setForbiddenUploading(false);
     }
@@ -259,7 +259,7 @@ export default function ManageProxyPage() {
   const handleGatewayUpload = async () => {
     const html = gatewayHtmlFiles[0]?.originFileObj;
     if (!html) {
-      message.error("Выберите HTML-файл");
+      message.error(t("proxy.selectHtml"));
       return;
     }
     setGatewayUploading(true);
@@ -270,11 +270,9 @@ export default function ManageProxyPage() {
       setGatewayStatus(st);
       setGatewayHtmlFiles([]);
       setGatewayUploadOpen(false);
-      message.success("Страница 502 загружена");
+      message.success(t("proxy.page502Uploaded"));
     } catch (e) {
-      const msg =
-        e instanceof ApiError ? e.message : "Не удалось загрузить страницу";
-      message.error(msg);
+      message.error(formatApiError(e, t("proxy.pageUploadFailed")));
     } finally {
       setGatewayUploading(false);
     }
@@ -282,18 +280,16 @@ export default function ManageProxyPage() {
 
   const confirmClearGateway = () => {
     modal.confirm({
-      title: "Вернуть страницу 502 по умолчанию?",
-      okText: "Вернуть",
-      cancelText: "Отмена",
+      title: t("proxy.reset502Title"),
+      okText: t("common.return"),
+      cancelText: t("common.cancel"),
       onOk: async () => {
         try {
           const st = await proxyApi.clearProxyGatewayPage();
           setGatewayStatus(st);
-          message.success("Используется страница по умолчанию");
+          message.success(t("proxy.usingDefaultPage"));
         } catch (e) {
-          const msg =
-            e instanceof ApiError ? e.message : "Не удалось сбросить страницу";
-          message.error(msg);
+          message.error(formatApiError(e, t("proxy.pageResetFailed")));
         }
       },
     });
@@ -301,18 +297,16 @@ export default function ManageProxyPage() {
 
   const confirmClearForbidden = () => {
     modal.confirm({
-      title: "Вернуть страницу 403 по умолчанию?",
-      okText: "Вернуть",
-      cancelText: "Отмена",
+      title: t("proxy.reset403Title"),
+      okText: t("common.return"),
+      cancelText: t("common.cancel"),
       onOk: async () => {
         try {
           const st = await proxyApi.clearProxyForbiddenPage();
           setForbiddenStatus(st);
-          message.success("Используется страница по умолчанию");
+          message.success(t("proxy.usingDefaultPage"));
         } catch (e) {
-          const msg =
-            e instanceof ApiError ? e.message : "Не удалось сбросить страницу";
-          message.error(msg);
+          message.error(formatApiError(e, t("proxy.pageResetFailed")));
         }
       },
     });
@@ -322,7 +316,7 @@ export default function ManageProxyPage() {
     const cert = certFiles[0]?.originFileObj;
     const key = keyFiles[0]?.originFileObj;
     if (!cert || !key) {
-      message.error("Выберите оба файла");
+      message.error(t("proxy.selectBothFiles"));
       return;
     }
     setUploading(true);
@@ -336,11 +330,9 @@ export default function ManageProxyPage() {
       setKeyFiles([]);
       setUploadOpen(false);
       await loadCAStatus();
-      message.success("Сертификат загружен");
+      message.success(t("proxy.certUploaded"));
     } catch (e) {
-      const msg =
-        e instanceof ApiError ? e.message : "Не удалось загрузить сертификат";
-      message.error(msg);
+      message.error(formatApiError(e, t("proxy.certUploadFailed")));
     } finally {
       setUploading(false);
     }
@@ -348,7 +340,7 @@ export default function ManageProxyPage() {
 
   return (
     <div className="flex w-full flex-col gap-4">
-      <Card title="Параметры" loading={loading}>
+      <Card title={t("proxy.params")} loading={loading}>
         <Form
           form={form}
           layout="vertical"
@@ -356,53 +348,53 @@ export default function ManageProxyPage() {
           onFinish={(v) => void handleSave(v)}
           className="flex max-w-3xl flex-col gap-0"
         >
-          <Typography.Title level={5}>Сеть</Typography.Title>
+          <Typography.Title level={5}>{t("proxy.network")}</Typography.Title>
           <Form.Item
             name="proxy_enabled"
-            label="Прокси-сервер"
+            label={t("proxy.server")}
             valuePropName="checked"
           >
-            <Switch checkedChildren="Вкл" unCheckedChildren="Выкл" />
+            <Switch checkedChildren={t("common.on")} unCheckedChildren={t("common.off")} />
           </Form.Item>
           <Form.Item
             name="listen"
-            label="Адрес прослушивания"
-            rules={[{ required: true, message: "Укажите адрес" }]}
+            label={t("proxy.listenAddress")}
+            rules={[{ required: true, message: t("proxy.listenRequired") }]}
           >
             <Input placeholder="127.0.0.1:8080" />
           </Form.Item>
-          <Form.Item name="connect_mode" label="Режим HTTPS (CONNECT)">
+          <Form.Item name="connect_mode" label={t("proxy.connectMode")}>
             <Select
-              placeholder="Туннель"
-              options={[...CONNECT_MODE_OPTIONS]}
+              placeholder={t("proxy.tunnel")}
+              options={[...connectModeOptions(t)]}
             />
           </Form.Item>
 
           <Divider />
 
-          <Typography.Title level={5}>Авторизация</Typography.Title>
+          <Typography.Title level={5}>{t("proxy.auth")}</Typography.Title>
           <Form.Item
             name="auth_enabled"
-            label="Требовать логин и пароль"
+            label={t("proxy.requireAuth")}
             valuePropName="checked"
           >
-            <Switch checkedChildren="Да" unCheckedChildren="Нет" />
+            <Switch checkedChildren={t("common.yes")} unCheckedChildren={t("common.no")} />
           </Form.Item>
 
           {authEnabled ? (
             <>
-              <Form.Item name="auth_backend" label="Источник учётных записей">
+              <Form.Item name="auth_backend" label={t("proxy.authBackend")}>
                 <Select
                   placeholder="LDAP"
-                  options={[...AUTH_BACKEND_OPTIONS]}
+                  options={[...authBackendOptions(t)]}
                 />
               </Form.Item>
-              <Form.Item name="auth_realm" label="Имя realm">
+              <Form.Item name="auth_realm" label={t("proxy.authRealm")}>
                 <Input placeholder="oktopus" />
               </Form.Item>
               <Form.Item
                 name="auth_cache_ttl_minutes"
-                label="Кеш успешного входа, мин"
+                label={t("proxy.authCacheMin")}
               >
                 <InputNumber
                   className="w-full"
@@ -414,11 +406,11 @@ export default function ManageProxyPage() {
               {authBackend === "static" ? (
                 <Form.Item
                   name="auth_static_users"
-                  label="Учётные записи"
+                  label={t("proxy.accounts")}
                   rules={[
                     {
                       required: true,
-                      message: "Укажите хотя бы одну строку login:password",
+                      message: t("proxy.accountsRequired"),
                     },
                   ]}
                 >
@@ -432,21 +424,21 @@ export default function ManageProxyPage() {
               {authBackend === "ldap" ? (
                 <>
                   <Divider />
-                  <Typography.Title level={5}>LDAP — подключение</Typography.Title>
-                  <Form.Item name="ldap_url" label="Адрес сервера">
+                  <Typography.Title level={5}>{t("proxy.ldapConnection")}</Typography.Title>
+                  <Form.Item name="ldap_url" label={t("proxy.ldapServer")}>
                     <Input placeholder="ldap://127.0.0.1:1389" />
                   </Form.Item>
 
                   <Typography.Title level={5}>
-                    LDAP — сервисная учётка
+                    {t("proxy.ldapServiceAccount")}
                   </Typography.Title>
-                  <Form.Item name="ldap_bind_dn" label="DN сервисной учётки">
+                  <Form.Item name="ldap_bind_dn" label={t("proxy.ldapBindDn")}>
                     <Input placeholder="cn=admin,dc=oktopus,dc=dev" />
                   </Form.Item>
-                  <Form.Item name="ldap_bind_password" label="Пароль">
-                    <Input.Password placeholder="Пусто — не менять" />
+                  <Form.Item name="ldap_bind_password" label={t("common.password")}>
+                    <Input.Password placeholder={t("proxy.ldapPasswordPlaceholder")} />
                   </Form.Item>
-                  <Form.Item name="ldap_base_dn" label="Корень каталога (Base DN)">
+                  <Form.Item name="ldap_base_dn" label={t("proxy.ldapBaseDn")}>
                     <Input placeholder="dc=oktopus,dc=dev" />
                   </Form.Item>
                 </>
@@ -456,114 +448,122 @@ export default function ManageProxyPage() {
 
           <Divider />
           <Button type="primary" htmlType="submit" loading={saving}>
-            Сохранить
+            {t("common.save")}
           </Button>
         </Form>
       </Card>
 
-      <Card title="Страница 403 (ACL)">
+      <Card title={t("proxy.page403")}>
         <div className="flex max-w-3xl flex-col gap-4">
           <Typography.Text>
             {forbiddenStatus?.using_custom
-              ? "Используется загруженная HTML-страница."
-              : "Используется страница по умолчанию из config."}
+              ? t("proxy.customHtml")
+              : t("proxy.defaultHtml")}
           </Typography.Text>
           <Space wrap>
             <Button onClick={() => setForbiddenUploadOpen(true)}>
-              Загрузить HTML…
+              {t("proxy.uploadHtml")}
             </Button>
             <Button
               disabled={!forbiddenStatus?.using_custom}
               onClick={confirmClearForbidden}
             >
-              По умолчанию
+              {t("common.default")}
             </Button>
             <Button
               onClick={() => void openErrorPagePreview("forbidden", "default")}
             >
-              Предпросмотр: шаблон
+              {t("proxy.previewTemplate")}
             </Button>
             <Button
               disabled={!forbiddenStatus?.using_custom}
               onClick={() => void openErrorPagePreview("forbidden", "custom")}
             >
-              Предпросмотр: загруженная
+              {t("proxy.previewUploaded")}
             </Button>
           </Space>
         </div>
       </Card>
 
-      <Card title="Страница 502 (ошибка шлюза)">
+      <Card title={t("proxy.page502")}>
         <div className="flex max-w-3xl flex-col gap-4">
           <Typography.Text>
             {gatewayStatus?.using_custom
-              ? "Используется загруженная HTML-страница."
-              : "Используется страница по умолчанию из config."}
+              ? t("proxy.customHtml")
+              : t("proxy.defaultHtml")}
           </Typography.Text>
           <Space wrap>
             <Button onClick={() => setGatewayUploadOpen(true)}>
-              Загрузить HTML…
+              {t("proxy.uploadHtml")}
             </Button>
             <Button
               disabled={!gatewayStatus?.using_custom}
               onClick={confirmClearGateway}
             >
-              По умолчанию
+              {t("common.default")}
             </Button>
             <Button
               onClick={() => void openErrorPagePreview("gateway", "default")}
             >
-              Предпросмотр: шаблон
+              {t("proxy.previewTemplate")}
             </Button>
             <Button
               disabled={!gatewayStatus?.using_custom}
               onClick={() => void openErrorPagePreview("gateway", "custom")}
             >
-              Предпросмотр: загруженная
+              {t("proxy.previewUploaded")}
             </Button>
           </Space>
         </div>
       </Card>
 
-      <Card title="Корневой сертификат для MITM">
+      <Card title={t("proxy.mitmCa")}>
         <div className="flex max-w-3xl flex-col gap-4">
-          <Typography.Text>{caStatusText(caStatus)}</Typography.Text>
+          <Typography.Text>{caStatusText(caStatus, t, localeTag)}</Typography.Text>
 
           <Space wrap>
             <Button
               disabled={!caStatus?.cert_installed}
-              onClick={() => void proxyApi.downloadProxyCACert().catch(handleDownloadError(message))}
+              onClick={() =>
+                void proxyApi
+                  .downloadProxyCACert()
+                  .catch(handleDownloadError(message, formatApiError, t("proxy.downloadFailed")))
+              }
             >
-              Скачать сертификат
+              {t("proxy.downloadCert")}
             </Button>
             <Button
               disabled={!caStatus?.key_installed}
-              onClick={() => void proxyApi.downloadProxyCAKey().catch(handleDownloadError(message))}
+              onClick={() =>
+                void proxyApi
+                  .downloadProxyCAKey()
+                  .catch(handleDownloadError(message, formatApiError, t("proxy.downloadFailed")))
+              }
             >
-              Скачать ключ
+              {t("proxy.downloadKey")}
             </Button>
             <Select
               className="min-w-[140px]"
               value={genKeyBits}
               onChange={setGenKeyBits}
-              options={KEY_BITS_OPTIONS}
+              options={keyBitsOptions(t)}
             />
             <Button danger loading={generating} onClick={confirmGenerate}>
-              Сгенерировать новый
+              {t("proxy.generateNew")}
             </Button>
-            <Button onClick={() => setUploadOpen(true)}>Загрузить…</Button>
+            <Button onClick={() => setUploadOpen(true)}>{t("proxy.uploadCert")}</Button>
           </Space>
         </div>
       </Card>
 
       <Modal
-        title="Загрузить страницу 502"
+        title={t("proxy.upload502")}
         open={gatewayUploadOpen}
         onCancel={() => setGatewayUploadOpen(false)}
         onOk={() => void handleGatewayUpload()}
         confirmLoading={gatewayUploading}
-        okText="Загрузить"
-        cancelText="Отмена"
+        okText={t("common.upload")}
+        cancelText={t("common.cancel")}
       >
         <Upload
           beforeUpload={() => false}
@@ -572,18 +572,18 @@ export default function ManageProxyPage() {
           onChange={({ fileList }) => setGatewayHtmlFiles(fileList)}
           accept=".html,.htm,text/html"
         >
-          <Button icon={<UploadOutlined />}>HTML-файл</Button>
+          <Button icon={<UploadOutlined />}>{t("common.htmlFile")}</Button>
         </Upload>
       </Modal>
 
       <Modal
-        title="Загрузить страницу 403"
+        title={t("proxy.upload403")}
         open={forbiddenUploadOpen}
         onCancel={() => setForbiddenUploadOpen(false)}
         onOk={() => void handleForbiddenUpload()}
         confirmLoading={forbiddenUploading}
-        okText="Загрузить"
-        cancelText="Отмена"
+        okText={t("common.upload")}
+        cancelText={t("common.cancel")}
       >
         <Upload
           beforeUpload={() => false}
@@ -592,18 +592,18 @@ export default function ManageProxyPage() {
           onChange={({ fileList }) => setForbiddenHtmlFiles(fileList)}
           accept=".html,.htm,text/html"
         >
-          <Button icon={<UploadOutlined />}>HTML-файл</Button>
+          <Button icon={<UploadOutlined />}>{t("common.htmlFile")}</Button>
         </Upload>
       </Modal>
 
       <Modal
-        title="Загрузить сертификат и ключ"
+        title={t("proxy.uploadCertKey")}
         open={uploadOpen}
         onCancel={() => setUploadOpen(false)}
         onOk={() => void handleUpload()}
         confirmLoading={uploading}
-        okText="Загрузить"
-        cancelText="Отмена"
+        okText={t("common.upload")}
+        cancelText={t("common.cancel")}
       >
         <div className="flex flex-col gap-3">
           <Upload
@@ -613,7 +613,7 @@ export default function ManageProxyPage() {
             onChange={({ fileList }) => setCertFiles(fileList)}
             accept=".crt,.pem"
           >
-            <Button icon={<UploadOutlined />}>Файл сертификата (.crt)</Button>
+            <Button icon={<UploadOutlined />}>{t("proxy.certFile")}</Button>
           </Upload>
           <Upload
             beforeUpload={() => false}
@@ -622,7 +622,7 @@ export default function ManageProxyPage() {
             onChange={({ fileList }) => setKeyFiles(fileList)}
             accept=".key,.pem"
           >
-            <Button icon={<UploadOutlined />}>Файл ключа (.key)</Button>
+            <Button icon={<UploadOutlined />}>{t("proxy.keyFile")}</Button>
           </Upload>
         </div>
       </Modal>
@@ -630,9 +630,12 @@ export default function ManageProxyPage() {
   );
 }
 
-function handleDownloadError(message: { error: (s: string) => void }) {
+function handleDownloadError(
+  message: { error: (s: string) => void },
+  formatApiError: (e: unknown, fallback: string) => string,
+  fallback: string,
+) {
   return (e: unknown) => {
-    const msg = e instanceof ApiError ? e.message : "Не удалось скачать файл";
-    message.error(msg);
+    message.error(formatApiError(e, fallback));
   };
 }

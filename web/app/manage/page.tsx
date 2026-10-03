@@ -10,23 +10,25 @@ import { PolicyBreakdownTooltip } from "@/assets/components/dashboard/PolicyBrea
 import { TrafficAllowDenyChart } from "@/assets/components/dashboard/TrafficAllowDenyChart";
 import { TrafficThroughputChart } from "@/assets/components/dashboard/TrafficThroughputChart";
 import type { ProxyRuntimeStatus } from "@/types/proxy";
-import { formatBytes } from "@/utils/formatBytes";
-import { formatDurationUs } from "@/utils/formatDurationUs";
+import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
+import type { TranslateFn } from "@/i18n/translate";
+import { byteUnitLabelsFromT, formatBytes } from "@/utils/formatBytes";
+import { durationUnitLabelsFromT, formatDurationUs } from "@/utils/formatDurationUs";
 import { OktopusLoading } from "@/assets/components/oktopus/OktopusLoading";
 import { Alert, Tag, Tooltip, Typography } from "antd";
 import Link from "next/link";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
-function aclBuildLabel(st: ProxyRuntimeStatus["acl"]): string {
+function aclBuildLabel(st: ProxyRuntimeStatus["acl"], t: TranslateFn): string {
   switch (st.build_status) {
     case "building":
-      return "СБОРКА";
+      return t("dashboard.aclBuilding");
     case "error":
-      return "ОШИБКА";
+      return t("dashboard.aclError");
     case "ready":
       return "OK";
     default:
-      return "ОЖИДАНИЕ";
+      return t("dashboard.aclPending");
   }
 }
 
@@ -57,15 +59,16 @@ function formatSharePct(part: number, total: number): string {
   return pct < 10 ? `${pct.toFixed(1)}%` : `${Math.round(pct)}%`;
 }
 
-function formatInt(n: number): string {
-  return new Intl.NumberFormat("ru-RU").format(n);
+function formatInt(n: number, localeTag: string): string {
+  return new Intl.NumberFormat(localeTag).format(n);
 }
 
-function formatStartupClock(iso?: string): string {
-  if (!iso) return "—";
+function formatStartupClock(iso?: string, localeTag = "ru-RU"): string {
+  const emDash = "—";
+  if (!iso) return emDash;
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("ru-RU", {
+  if (Number.isNaN(d.getTime())) return emDash;
+  return d.toLocaleString(localeTag, {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -91,20 +94,35 @@ function aclCompileDurationMs(
   return undefined;
 }
 
-function formatDurationMs(ms?: number): string {
-  if (ms == null || ms < 0) return "—";
-  if (ms < 1000) return `${ms} мс`;
+function formatDurationMs(ms?: number, t?: TranslateFn): string {
+  const emDash = "—";
+  if (ms == null || ms < 0) return emDash;
+  if (!t) {
+    if (ms < 1000) return `${ms} ms`;
+    const sec = ms / 1000;
+    return sec < 60 ? `${sec.toFixed(1)} s` : `${Math.floor(sec / 60)} min`;
+  }
+  if (ms < 1000) return `${ms} ${t("units.ms")}`;
   const sec = ms / 1000;
-  if (sec < 60) return `${sec.toFixed(sec < 10 ? 1 : 0)} с`;
+  if (sec < 60) {
+    return `${sec.toFixed(sec < 10 ? 1 : 0)} ${t("units.sec")}`;
+  }
   const min = Math.floor(sec / 60);
   const rest = Math.round(sec % 60);
-  return rest > 0 ? `${min} мин ${rest} с` : `${min} мин`;
+  return rest > 0
+    ? t("units.minSec", { min, sec: rest })
+    : t("units.minOnly", { min });
 }
 
-/** Задержка от старта serve до события (прокси / ACL). */
-function formatDelayFromServeStart(ms?: number): string {
-  if (ms == null || ms < 0) return "ещё не произошло";
-  return `через ${formatDurationMs(ms)} после старта serve`;
+function formatDelayFromServeStart(ms?: number, t?: TranslateFn): string {
+  if (!t) {
+    if (ms == null || ms < 0) return "—";
+    return formatDurationMs(ms);
+  }
+  if (ms == null || ms < 0) return t("dashboard.notYet");
+  return t("dashboard.delayAfterServe", {
+    duration: formatDurationMs(ms, t),
+  });
 }
 
 function StatusDot({ tone }: { tone: DashboardStatTone }) {
@@ -119,13 +137,18 @@ function StatusDot({ tone }: { tone: DashboardStatTone }) {
   );
 }
 
-function MetricsWindow5mBadge() {
+function MetricsWindow5mBadge({ label }: { label: string }) {
   return (
-    <span className="font-mono text-[11px] text-teal-300/70">5m окно</span>
+    <span className="font-mono text-[11px] text-teal-300/70">{label}</span>
   );
 }
 
 export default function ManagePage() {
+  const { t, localeTag } = useTranslation();
+  const formatApiError = useApiErrorMessage();
+  const byteUnits = useMemo(() => byteUnitLabelsFromT(t), [t]);
+  const durationUnits = useMemo(() => durationUnitLabelsFromT(t), [t]);
+  const emDash = t("common.emDash");
   const [status, setStatus] = useState<ProxyRuntimeStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -135,11 +158,9 @@ export default function ManagePage() {
       setStatus(st);
       setError(null);
     } catch (e) {
-      setError(
-        e instanceof ApiError ? e.message : "Не удалось загрузить статус",
-      );
+      setError(formatApiError(e, t("dashboard.loadFailed")));
     }
-  }, []);
+  }, [formatApiError, t]);
 
   useEffect(() => {
     void load();
@@ -181,14 +202,14 @@ export default function ManagePage() {
         <Alert
           type="warning"
           showIcon
-          message="Прокси не запущен"
+          message={t("dashboard.proxyDown")}
           description={status.proxy_start_error}
         />
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <DashboardStatCard
-          label="Прокси"
+          label={t("dashboard.proxy")}
           loading={loading}
           tone={proxyUp ? "success" : "danger"}
           badge={<StatusDot tone={proxyUp ? "success" : "danger"} />}
@@ -196,51 +217,63 @@ export default function ManagePage() {
           hint={status?.listen || "—"}
         />
         <DashboardStatCard
-          label="Сборка ACL"
+          label={t("dashboard.aclBuild")}
           loading={loading && !acl}
           tone={acl ? aclBuildTone(acl) : undefined}
           badge={
             acl ? <StatusDot tone={aclBuildTone(acl)} /> : undefined
           }
-          value={acl ? aclBuildLabel(acl) : "—"}
+          value={acl ? aclBuildLabel(acl, t) : emDash}
           hint={
             acl
-              ? `${acl.active_logical_rules} правил · ${acl.active_patterns} паттернов`
+              ? t("dashboard.rulesPatterns", {
+                  rules: acl.active_logical_rules,
+                  patterns: acl.active_patterns,
+                })
               : undefined
           }
         />
         <DashboardStatCard
-          label="За 1 мин"
+          label={t("dashboard.perMinute")}
           loading={loading}
           badge={
             traffic && proxyUp ? (
-              <span className="font-mono text-[11px] text-zinc-500">скольз.</span>
+              <span className="font-mono text-[11px] text-zinc-500">{t("dashboard.sliding")}</span>
             ) : undefined
           }
           value={
             proxyUp ? (
-              <span className="font-mono">{formatInt(reqPerMin)}</span>
+              <span className="font-mono">{formatInt(reqPerMin, localeTag)}</span>
             ) : (
               "—"
             )
           }
           hint={
             traffic && proxyUp
-              ? `за 5 с: ${formatInt(reqLast5s)} · средн. 5 мин: ${formatInt(reqPerMinAvg5m)}/мин`
+              ? t("dashboard.reqHint", {
+                  last5s: formatInt(reqLast5s, localeTag),
+                  avg: formatInt(reqPerMinAvg5m, localeTag),
+                })
               : undefined
           }
         />
         <DashboardStatCard
           label="Allow / Deny"
           loading={loading}
-          badge={traffic ? <MetricsWindow5mBadge /> : undefined}
+          badge={
+            traffic ? (
+              <MetricsWindow5mBadge label={t("dashboard.window5m")} />
+            ) : undefined
+          }
           value={
             traffic ? (
               <span className="font-mono text-xl">
-                <span className="text-teal-300">{formatInt(traffic.allowed_5m)}</span>
+                <span className="text-teal-300">
+                  {formatInt(traffic.allowed_5m, localeTag)}
+                </span>
                 <span className="mx-1.5 text-zinc-600">/</span>
                 <span className="text-red-300/90">
-                  {formatInt(traffic.denied_5m)}
+                  {formatInt(traffic.denied_5m, localeTag)}
                 </span>
               </span>
             ) : (
@@ -249,7 +282,10 @@ export default function ManagePage() {
           }
           hint={
             traffic
-              ? `сумма за 5 мин · ${formatSharePct(traffic.allowed_5m, totalDecisions)} allow · ${formatSharePct(traffic.denied_5m, totalDecisions)} deny`
+              ? t("dashboard.trafficHint", {
+                  allowPct: formatSharePct(traffic.allowed_5m, totalDecisions),
+                  denyPct: formatSharePct(traffic.denied_5m, totalDecisions),
+                })
               : undefined
           }
         />
@@ -260,9 +296,9 @@ export default function ManagePage() {
       ) : null}
 
       <div className="rounded-xl border border-white/10 bg-white/5 p-5">
-        <p className="text-[13px] font-medium text-zinc-100">Запуск процесса</p>
+        <p className="text-[13px] font-medium text-zinc-100">{t("dashboard.startupTitle")}</p>
         <p className="mb-4 mt-0.5 font-mono text-[11.5px] text-zinc-500">
-          отсчёт от запуска serve · в карточках ниже — задержка до события
+          {t("dashboard.startupHint")}
         </p>
         {loading ? (
           <div className="flex justify-center py-6">
@@ -272,36 +308,40 @@ export default function ManagePage() {
           <ul className="grid gap-3 sm:grid-cols-3">
             <li className="flex flex-col gap-1 rounded-lg border border-white/8 bg-black/20 px-4 py-3">
               <span className="text-[11px] text-zinc-500">
-                Старт serve
+                {t("dashboard.serveStart")}
               </span>
               <span className="font-mono text-[13px] text-zinc-100">
-                {formatStartupClock(startup?.started_at)}
+                {formatStartupClock(startup?.started_at, localeTag)}
               </span>
             </li>
             <li className="flex flex-col gap-1.5 rounded-lg border border-white/8 bg-black/20 px-4 py-3">
               <span className="text-[11px] text-zinc-500">
-                Прокси начал принимать запросы
+                {t("dashboard.proxyReady")}
               </span>
               <span className="text-[13px] leading-snug text-teal-200/90">
-                {formatDelayFromServeStart(startup?.proxy_ready_ms)}
+                {formatDelayFromServeStart(startup?.proxy_ready_ms, t)}
               </span>
               <span className="font-mono text-[11px] text-zinc-600">
-                момент: {formatStartupClock(startup?.proxy_ready_at)}
+                {t("dashboard.moment", {
+                  time: formatStartupClock(startup?.proxy_ready_at, localeTag),
+                })}
               </span>
             </li>
             <li className="flex flex-col gap-1.5 rounded-lg border border-white/8 bg-black/20 px-4 py-3">
               <span className="text-[11px] text-zinc-500">
-                Компиляция ACL
+                {t("dashboard.aclCompile")}
               </span>
               <span className="text-[13px] leading-snug text-teal-200/90">
                 {acl?.build_status === "building"
-                  ? "в процессе…"
-                  : formatDurationMs(aclCompileDurationMs(acl))}
+                  ? t("dashboard.inProgress")
+                  : formatDurationMs(aclCompileDurationMs(acl), t)}
               </span>
               <span className="font-mono text-[11px] text-zinc-600">
                 {acl?.build_finished_at
-                  ? `готово: ${formatStartupClock(acl.build_finished_at)}`
-                  : "ещё не выполнялась"}
+                  ? t("dashboard.aclDoneAt", {
+                      time: formatStartupClock(acl.build_finished_at, localeTag),
+                    })
+                  : t("dashboard.aclNever")}
               </span>
             </li>
           </ul>
@@ -312,9 +352,9 @@ export default function ManagePage() {
         <div className="rounded-xl border border-white/10 bg-white/[0.05] p-5 lg:col-span-2">
           <div className="mb-6 flex flex-row flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-[13px] font-medium text-zinc-100">Трафик</p>
+              <p className="text-[13px] font-medium text-zinc-100">{t("dashboard.traffic")}</p>
               <p className="mt-0.5 font-mono text-[11.5px] text-zinc-500">
-                запросы за последние 5 мин · интервал 10 с
+                {t("dashboard.trafficHintChart")}
               </p>
             </div>
             <div className="flex flex-row items-center gap-3 font-mono text-[11px]">
@@ -330,7 +370,7 @@ export default function ManagePage() {
           </div>
           {!proxyUp && !loading ? (
             <Typography.Text type="secondary">
-              Прокси не запущен — график появится после старта.
+              {t("dashboard.chartWhenUp")}
             </Typography.Text>
           ) : (
             <TrafficAllowDenyChart buckets={buckets} loading={loading} />
@@ -339,26 +379,26 @@ export default function ManagePage() {
             <div className="mb-6 flex flex-row flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[13px] font-medium text-zinc-100">
-                  Пропускная способность
+                  {t("dashboard.throughput")}
                 </p>
                 <p className="mt-0.5 font-mono text-[11.5px] text-zinc-500">
-                  исх / вх за 5 мин · интервал 10 с
+                  {t("dashboard.throughputHint")}
                 </p>
               </div>
               <div className="flex flex-row items-center gap-3 font-mono text-[11px]">
                 <span className="flex flex-row items-center gap-1.5 text-zinc-500">
                   <span className="h-2 w-2 rounded-sm bg-amber-400/70" />
-                  исх
+                  {t("dashboard.egress")}
                 </span>
                 <span className="flex flex-row items-center gap-1.5 text-zinc-500">
                   <span className="h-2 w-2 rounded-sm bg-sky-400/70" />
-                  вх
+                  {t("dashboard.ingress")}
                 </span>
               </div>
             </div>
             {!proxyUp && !loading ? (
               <Typography.Text type="secondary">
-                Прокси не запущен — график появится после старта.
+                {t("dashboard.chartWhenUp")}
               </Typography.Text>
             ) : (
               <TrafficThroughputChart buckets={buckets} loading={loading} />
@@ -369,7 +409,7 @@ export default function ManagePage() {
         <div className="rounded-xl border border-white/10 bg-white/[0.05] p-5">
           <p className="text-[13px] font-medium text-zinc-100">Runtime</p>
           <p className="mb-5 mt-0.5 font-mono text-[11.5px] text-zinc-500">
-            нагрузка и ACL
+            {t("dashboard.runtimeHint")}
           </p>
           {loading ? (
             <div className="flex justify-center py-8">
@@ -378,7 +418,7 @@ export default function ManagePage() {
           ) : (
             <ul className="flex flex-col gap-3.5 text-[12.5px]">
               <RuntimeRow
-                label="соединения"
+                label={t("dashboard.connections")}
                 value={
                   proxyUp && traffic
                     ? String(traffic.active_connections)
@@ -386,7 +426,7 @@ export default function ManagePage() {
                 }
               />
               <RuntimeRow
-                label="WebSocket (MITM)"
+                label={t("dashboard.wsMitm")}
                 value={
                   proxyUp && traffic
                     ? String(traffic.active_websocket_connections ?? 0)
@@ -394,16 +434,16 @@ export default function ManagePage() {
                 }
               />
               <RuntimeRow
-                label="правила в прокси"
+                label={t("dashboard.rulesInProxy")}
                 value={
                   acl ? (
                     acl.rules_in_sync ? (
                       <Tag color="success" className="!m-0">
-                        актуальные
+                        {t("dashboard.rulesCurrent")}
                       </Tag>
                     ) : (
                       <Tag color="warning" className="!m-0">
-                        устарели
+                        {t("dashboard.rulesStale")}
                       </Tag>
                     )
                   ) : (
@@ -417,15 +457,13 @@ export default function ManagePage() {
                   acl ? (
                     <div className="flex max-w-[340px] flex-col gap-2 text-[11px]">
                       <p className="m-0 text-zinc-400">
-                        При компиляции каждая строка SNI проверяется на fast
-                        index (exact / suffix / *.domain). Остальное — regexp
-                        (проверяется только в slow-правилах).
+                        {t("dashboard.sniTooltip")}
                       </p>
                       {acl.sni_regexp_reason_counts &&
                       Object.keys(acl.sni_regexp_reason_counts).length > 0 ? (
                         <div className="border-t border-white/10 pt-2 text-zinc-500">
                           <p className="m-0 mb-1 text-[10px] uppercase tracking-wide">
-                            причины regexp
+                            {t("dashboard.regexpReasons")}
                           </p>
                           <ul className="m-0 list-none space-y-0.5 font-mono text-zinc-300">
                             {Object.entries(acl.sni_regexp_reason_counts).map(
@@ -442,7 +480,7 @@ export default function ManagePage() {
                       acl.sni_regexp_samples.length > 0 ? (
                         <div className="border-t border-white/10 pt-2 text-zinc-500">
                           <p className="m-0 mb-1 text-[10px] uppercase tracking-wide">
-                            примеры строк
+                            {t("dashboard.regexpSamples")}
                           </p>
                           <ul className="m-0 max-h-40 list-none space-y-1 overflow-y-auto font-mono text-[10px] text-zinc-400">
                             {acl.sni_regexp_samples.slice(0, 12).map((s) => (
@@ -464,7 +502,7 @@ export default function ManagePage() {
                 }
               />
               <RuntimeRow
-                label="пользователи / источники"
+                label={t("dashboard.usersSources")}
                 value={
                   traffic && proxyUp
                     ? `${traffic.unique_users_5m} / ${traffic.unique_sources_5m}`
@@ -472,46 +510,46 @@ export default function ManagePage() {
                 }
               />
               <RuntimeRow
-                label="очередь access log"
+                label={t("dashboard.accessLogQueue")}
                 value={
                   traffic ? String(traffic.access_log_queue_pending) : "—"
                 }
               />
               <RuntimeRow
-                label="трафик всего"
+                label={t("dashboard.trafficTotal")}
                 tooltip={
                   traffic && proxyUp ? (
                     <div className="flex flex-col gap-1.5 font-mono text-[11px]">
                       <span>
-                        <span className="text-amber-300/90">исх </span>
-                        {formatBytes(bytesTotalUp)}
+                        <span className="text-amber-300/90">{t("dashboard.egress")} </span>
+                        {formatBytes(bytesTotalUp, byteUnits)}
                       </span>
                       <span>
                         <span className="text-teal-300">allow </span>
-                        {formatBytes(traffic.bytes_total_up_allow ?? 0)}
+                        {formatBytes(traffic.bytes_total_up_allow ?? 0, byteUnits)}
                       </span>
                       <span>
                         <span className="text-red-300">deny </span>
-                        {formatBytes(traffic.bytes_total_up_deny ?? 0)}
+                        {formatBytes(traffic.bytes_total_up_deny ?? 0, byteUnits)}
                       </span>
                       <span className="mt-1 border-t border-white/10 pt-1">
-                        <span className="text-sky-300/90">вх </span>
-                        {formatBytes(bytesTotalDown)}
+                        <span className="text-sky-300/90">{t("dashboard.ingress")} </span>
+                        {formatBytes(bytesTotalDown, byteUnits)}
                       </span>
                       <span>
                         <span className="text-teal-300">allow </span>
-                        {formatBytes(traffic.bytes_total_down_allow ?? 0)}
+                        {formatBytes(traffic.bytes_total_down_allow ?? 0, byteUnits)}
                       </span>
                       <span>
                         <span className="text-red-300">deny </span>
-                        {formatBytes(traffic.bytes_total_down_deny ?? 0)}
+                        {formatBytes(traffic.bytes_total_down_deny ?? 0, byteUnits)}
                       </span>
                     </div>
                   ) : undefined
                 }
                 value={
                   proxyUp && traffic
-                    ? formatBytes(bytesTotal)
+                    ? formatBytes(bytesTotal, byteUnits)
                     : "—"
                 }
               />
@@ -519,12 +557,12 @@ export default function ManagePage() {
           )}
           <div className="mt-5 border-t border-white/8 pt-4">
             <p className="mb-3 font-mono text-[11px] text-zinc-600">
-              avg / p95 / p99 · последние 1000 решений
+              {t("dashboard.latencyHint")}
             </p>
             {loading ? null : (
               <ul className="flex flex-col gap-3.5 text-[12.5px]">
                 <RuntimeRow
-                  label="ACL avg / p95 / p99"
+                  label={t("dashboard.aclLatency")}
                   tooltip={
                     traffic && proxyUp && traffic.decide_breakdown_5m
                       ? (
@@ -539,12 +577,12 @@ export default function ManagePage() {
                   }
                   value={
                     traffic && proxyUp
-                      ? `${formatDurationUs(traffic.decide_duration_us_avg_5m)} / ${formatDurationUs(traffic.decide_duration_us_p95_5m)} / ${formatDurationUs(traffic.decide_duration_us_p99_5m)}`
+                      ? `${formatDurationUs(traffic.decide_duration_us_avg_5m, emDash, durationUnits)} / ${formatDurationUs(traffic.decide_duration_us_p95_5m, emDash, durationUnits)} / ${formatDurationUs(traffic.decide_duration_us_p99_5m, emDash, durationUnits)}`
                       : "—"
                   }
                 />
                 <RuntimeRow
-                  label="Inspect avg / p95 / p99"
+                  label={t("dashboard.inspectLatency")}
                   tooltip={
                     traffic && proxyUp && traffic.inspect_breakdown_5m
                       ? (
@@ -559,12 +597,12 @@ export default function ManagePage() {
                   }
                   value={
                     traffic && proxyUp
-                      ? `${formatDurationUs(traffic.inspect_duration_us_avg_5m)} / ${formatDurationUs(traffic.inspect_duration_us_p95_5m)} / ${formatDurationUs(traffic.inspect_duration_us_p99_5m)}`
+                      ? `${formatDurationUs(traffic.inspect_duration_us_avg_5m, emDash, durationUnits)} / ${formatDurationUs(traffic.inspect_duration_us_p95_5m, emDash, durationUnits)} / ${formatDurationUs(traffic.inspect_duration_us_p99_5m, emDash, durationUnits)}`
                       : "—"
                   }
                 />
                 <RuntimeRow
-                  label="Политика avg / p95 / p99"
+                  label={t("dashboard.policyLatency")}
                   tooltip={
                     traffic && proxyUp
                       ? (
@@ -586,7 +624,7 @@ export default function ManagePage() {
                   }
                   value={
                     traffic && proxyUp
-                      ? `${formatDurationUs(traffic.policy_duration_us_avg_5m)} / ${formatDurationUs(traffic.policy_duration_us_p95_5m)} / ${formatDurationUs(traffic.policy_duration_us_p99_5m)}`
+                      ? `${formatDurationUs(traffic.policy_duration_us_avg_5m, emDash, durationUnits)} / ${formatDurationUs(traffic.policy_duration_us_p95_5m, emDash, durationUnits)} / ${formatDurationUs(traffic.policy_duration_us_p99_5m, emDash, durationUnits)}`
                       : "—"
                   }
                 />
@@ -598,7 +636,7 @@ export default function ManagePage() {
               href="/manage/access-log"
               className="text-[12px] text-zinc-500 transition hover:text-teal-300"
             >
-              Журнал доступа →
+              {t("accessLog.linkToLog")}
             </Link>
           </div>
         </div>

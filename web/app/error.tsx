@@ -1,6 +1,7 @@
 "use client";
 
 import { ErrorTraceCollapse } from "@/assets/components/ErrorTraceCollapse";
+import { useTranslation } from "@/contexts/LocaleContext";
 import { formatErrorTrace } from "@/utils/formatErrorTrace";
 import { Button, Result, Typography } from "antd";
 import { useEffect, useMemo } from "react";
@@ -12,6 +13,8 @@ export default function ErrorPage({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = useTranslation();
+
   useEffect(() => {
     console.error(error);
   }, [error]);
@@ -30,7 +33,7 @@ export default function ErrorPage({
       <div className="flex w-full max-w-2xl flex-col gap-6">
         <Result
           status="error"
-          title="Что-то пошло не так"
+          title={t("errorPage.title")}
           subTitle={
             <div className="flex flex-col gap-4">
               <Typography.Text type="secondary">{error.message}</Typography.Text>
@@ -39,10 +42,10 @@ export default function ErrorPage({
           }
           extra={[
             <Button key="retry" type="primary" onClick={() => reset()}>
-              Повторить
+              {t("errorPage.retry")}
             </Button>,
             <Button key="home" href="/">
-              На главную
+              {t("errorPage.home")}
             </Button>,
           ]}
         />

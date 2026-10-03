@@ -12,34 +12,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { AuthUser } from "@/types/auth";
 import { OktopusIcon } from "@/assets/components/oktopus/OktopusIcon";
-import { MANAGE_PAGE_TITLES } from "@/assets/components/manageNav";
+import {
+  manageNavLabel,
+  type ManageNavPath,
+} from "@/assets/components/manageNav";
+import { useTranslation } from "@/contexts/LocaleContext";
 
-const navItems = [
-  { href: "/manage", icon: HomeOutlined, label: "Главная" },
-  {
-    href: "/manage/rules",
-    icon: SafetyCertificateOutlined,
-    label: "Правила ACL",
-  },
-  {
-    href: "/manage/access-log",
-    icon: UnorderedListOutlined,
-    label: "Журнал доступа",
-  },
-  {
-    href: "/manage/access-log/reports",
-    icon: BarChartOutlined,
-    label: "Отчёты журнала",
-  },
-  {
-    href: "/manage/proxy",
-    icon: ApiOutlined,
-    label: MANAGE_PAGE_TITLES["/manage/proxy"],
-  },
-  { href: "/manage/users", icon: TeamOutlined, label: "Пользователи" },
-] as const;
+const navItems: { href: ManageNavPath; icon: typeof HomeOutlined }[] = [
+  { href: "/manage", icon: HomeOutlined },
+  { href: "/manage/rules", icon: SafetyCertificateOutlined },
+  { href: "/manage/access-log", icon: UnorderedListOutlined },
+  { href: "/manage/access-log/reports", icon: BarChartOutlined },
+  { href: "/manage/proxy", icon: ApiOutlined },
+  { href: "/manage/users", icon: TeamOutlined },
+];
 
-function selectedHref(pathname: string): string {
+function selectedHref(pathname: string): ManageNavPath {
   if (pathname === "/manage/users" || pathname.startsWith("/manage/users/")) {
     return "/manage/users";
   }
@@ -69,6 +57,7 @@ type ManageSidebarProps = {
 export function ManageSidebar({ user, onLogout }: ManageSidebarProps) {
   const pathname = usePathname();
   const active = selectedHref(pathname);
+  const { t } = useTranslation();
 
   return (
     <aside className="flex w-[236px] shrink-0 flex-col border-r border-white/5 bg-ink/50">
@@ -82,8 +71,9 @@ export function ManageSidebar({ user, onLogout }: ManageSidebarProps) {
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 px-3 py-4">
-        {navItems.map(({ href, icon: Icon, label }) => {
+        {navItems.map(({ href, icon: Icon }) => {
           const isActive = active === href;
+          const label = manageNavLabel(href, t);
           return (
             <Link
               key={href}
@@ -113,7 +103,7 @@ export function ManageSidebar({ user, onLogout }: ManageSidebarProps) {
               {user?.username ?? "—"}
             </p>
             <p className="truncate font-mono text-[10.5px] text-zinc-500">
-              панель управления
+              {t("nav.controlPanel")}
             </p>
           </div>
           <LogoutIcon className="ml-auto h-4 w-4 text-zinc-500" />

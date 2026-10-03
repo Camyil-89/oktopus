@@ -17,6 +17,8 @@ import {
 } from "@/utils/accessLogExtra";
 import { normalizeAccessLogRow } from "@/utils/accessLogRow";
 import { OktopusLoading } from "@/assets/components/oktopus/OktopusLoading";
+import { useTranslation } from "@/contexts/LocaleContext";
+import type { TranslateFn } from "@/i18n/translate";
 import { Descriptions, Modal, Typography } from "antd";
 import { useEffect, useState } from "react";
 
@@ -78,20 +80,23 @@ function RuleLine({
   missing,
   rule,
   onOpen,
+  t,
 }: {
   ruleId: string | undefined;
   loading: boolean;
   missing: boolean;
   rule: { name: string } | null;
   onOpen?: () => void;
+  t: TranslateFn;
 }) {
+  const emDash = t("common.emDash");
   if (!ruleId) {
-    return <>—</>;
+    return <>{emDash}</>;
   }
   if (isSystemAccessLogRuleId(ruleId)) {
     return (
       <Typography.Text type="secondary">
-        {accessLogSystemRuleLabel(ruleId)}
+        {accessLogSystemRuleLabel(ruleId, t)}
       </Typography.Text>
     );
   }
@@ -101,12 +106,12 @@ function RuleLine({
   if (missing) {
     return (
       <Typography.Text type="warning">
-        Правило не найдено ({ruleId})
+        {t("accessLog.ruleNotFound", { ruleId })}
       </Typography.Text>
     );
   }
   if (!rule) {
-    return <>—</>;
+    return <>{emDash}</>;
   }
   if (onOpen) {
     return <Typography.Link onClick={onOpen}>{rule.name}</Typography.Link>;
@@ -120,6 +125,8 @@ export function AccessLogDetailModal({
   onClose,
   ruleNames,
 }: AccessLogDetailModalProps) {
+  const { t } = useTranslation();
+  const emDash = t("common.emDash");
   const rowNorm = row ? normalizeAccessLogRow(row) : null;
   const extra = rowNorm ? rowNorm.extra : {};
   const extraJson =
@@ -138,12 +145,16 @@ export function AccessLogDetailModal({
     }
   }, [open]);
 
-  const aclDecisionLabel = accessLogAclDecisionLabel(decisionRef);
-  const decisionRuleLabel = accessLogDecisionRuleLabel(decisionRef, ruleNames);
+  const aclDecisionLabel = accessLogAclDecisionLabel(decisionRef, t);
+  const decisionRuleLabel = accessLogDecisionRuleLabel(
+    decisionRef,
+    t,
+    ruleNames,
+  );
   return (
     <>
       <Modal
-        title="Запись журнала"
+        title={t("accessLog.detailTitle")}
         open={open}
         onCancel={onClose}
         footer={null}
@@ -154,50 +165,51 @@ export function AccessLogDetailModal({
           <>
             <Descriptions column={1} bordered size="small">
               <Descriptions.Item label="ID">{rowNorm.id}</Descriptions.Item>
-              <Descriptions.Item label="Время">
+              <Descriptions.Item label={t("common.time")}>
                 {new Date(rowNorm.created_at).toLocaleString()}
               </Descriptions.Item>
-              <Descriptions.Item label="Источник">
+              <Descriptions.Item label={t("common.source")}>
                 {rowNorm.source_address}
               </Descriptions.Item>
-              <Descriptions.Item label="Назначение">
+              <Descriptions.Item label={t("common.destination")}>
                 {rowNorm.destination_address}
               </Descriptions.Item>
-              <Descriptions.Item label="Пользователь">
-                {rowNorm.user ?? "—"}
+              <Descriptions.Item label={t("common.user")}>
+                {rowNorm.user ?? emDash}
               </Descriptions.Item>
-              <Descriptions.Item label="Действие">
+              <Descriptions.Item label={t("common.action")}>
                 <AccessLogActionTag
                   action={rowNorm.action}
                   decisionRuleRef={rowNorm.decision_rule_ref}
                   deniedBy={rowNorm.denied_by}
                 />
               </Descriptions.Item>
-              <Descriptions.Item label="Решение ACL">
+              <Descriptions.Item label={t("accessLog.detailAclDecision")}>
                 <Typography.Text className="break-all font-mono text-sm">
                   {aclDecisionLabel}
                 </Typography.Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Решающее правило">
+              <Descriptions.Item label={t("accessLog.detailDecisionRule")}>
                 <Typography.Text className="break-all font-mono text-sm">
                   {decisionRuleLabel}
                 </Typography.Text>
               </Descriptions.Item>
               {inspectRuleId ? (
-                <Descriptions.Item label="Правило инспекции">
+                <Descriptions.Item label={t("accessLog.detailInspectRule")}>
                   <RuleLine
                     ruleId={inspectRuleId}
                     loading={inspect.ruleLoading}
                     missing={inspect.ruleMissing}
                     rule={inspect.rule}
                     onOpen={() => setInspectViewOpen(true)}
+                    t={t}
                   />
                 </Descriptions.Item>
               ) : rowNorm.denied_by === "inspect" &&
                 rowNorm.decision_rule_ref === ACCESS_LOG_RULE_INSPECT_ERROR ? (
-                <Descriptions.Item label="Инспекция">
+                <Descriptions.Item label={t("accessLog.detailInspect")}>
                   <Typography.Text type="secondary">
-                    {accessLogSystemRuleLabel(rowNorm.decision_rule_ref)}
+                    {accessLogSystemRuleLabel(rowNorm.decision_rule_ref, t)}
                     {extra.inspect_error ? (
                       <span className="block text-xs opacity-80">
                         {extra.inspect_error}
@@ -206,7 +218,7 @@ export function AccessLogDetailModal({
                   </Typography.Text>
                 </Descriptions.Item>
               ) : null}
-              <Descriptions.Item label="ACL, мкс">
+              <Descriptions.Item label={t("accessLog.col.decide_duration_us")}>
                 {rowNorm.decide_duration_us}
               </Descriptions.Item>
               <Descriptions.Item label="URL">

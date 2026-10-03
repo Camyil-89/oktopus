@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"oktopus/internal/apperr"
 	authmw "oktopus/internal/api/auth/middleware"
 	"oktopus/internal/api/platform/response"
 	"oktopus/internal/db/proxysettings/domain"
@@ -48,15 +49,13 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	updated, err := h.settings.Update(r.Context(), body.toInput())
 	if err != nil {
-		if strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "invalid") {
-			response.Error(w, http.StatusBadRequest, err.Error())
-			return
+		status := http.StatusBadRequest
+		if _, ok := apperr.CodeOf(err); ok && !apperr.IsClient(err) {
+			status = http.StatusInternalServerError
+		} else if _, ok := apperr.CodeOf(err); !ok {
+			status = http.StatusBadRequest
 		}
-		if strings.Contains(err.Error(), "apply proxy config") {
-			response.Error(w, http.StatusBadRequest, err.Error())
-			return
-		}
-		response.Error(w, http.StatusInternalServerError, "update proxy settings failed")
+		response.ErrorFrom(w, status, err)
 		return
 	}
 	response.JSON(w, http.StatusOK, toResponse(updated))

@@ -1,4 +1,7 @@
+"use client";
+
 import { OKTOPUS_TENTACLES } from "@/assets/components/oktopus/tentacles";
+import { useTranslation } from "@/contexts/LocaleContext";
 
 const sizeClass = {
   sm: "h-6 w-6",
@@ -20,9 +23,11 @@ type OktopusLoadingProps = {
 export function OktopusLoading({
   className = "",
   size = "lg",
-  title = "Загрузка",
+  title,
   decorative = false,
 }: OktopusLoadingProps) {
+  const { t } = useTranslation();
+  const ariaTitle = title ?? t("loading.title");
   const dim = sizeClass[size];
   return (
     <svg
@@ -35,25 +40,25 @@ export function OktopusLoading({
       strokeLinecap="round"
       role={decorative ? "presentation" : "img"}
       aria-hidden={decorative ? true : undefined}
-      aria-label={decorative ? undefined : title}
+      aria-label={decorative ? undefined : ariaTitle}
     >
-      {!decorative ? <title>{title}</title> : null}
+      {!decorative ? <title>{ariaTitle}</title> : null}
       <circle cx="60" cy="40" r="20" />
       <circle cx="53" cy="38" r="2" fill="currentColor" stroke="none" />
       <circle cx="67" cy="38" r="2" fill="currentColor" stroke="none" />
-      {OKTOPUS_TENTACLES.map((t, i) => (
-        <g key={t.path} className={`tent t${i + 1}`}>
-          <path className="base" d={t.path} />
+      {OKTOPUS_TENTACLES.map((tentacle, i) => (
+        <g key={tentacle.path} className={`tent t${i + 1}`}>
+          <path className="base" d={tentacle.path} />
           <path
             className="flow"
-            d={t.path}
+            d={tentacle.path}
             pathLength={18}
             strokeDasharray="0.1 18"
             strokeDashoffset={0}
           />
           <circle
-            cx={t.dotCx}
-            cy={t.dotCy}
+            cx={tentacle.dotCx}
+            cy={tentacle.dotCy}
             r={2.6}
             fill="currentColor"
             stroke="none"

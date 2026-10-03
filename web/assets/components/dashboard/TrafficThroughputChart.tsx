@@ -3,6 +3,8 @@
 import type { ProxyTrafficBucket } from "@/types/proxy";
 import { SkeletonLoader } from "@/assets/components/SkeletonLoader";
 import { Tooltip } from "antd";
+import { useTranslation } from "@/contexts/LocaleContext";
+import { byteUnitLabelsFromT } from "@/utils/formatBytes";
 import { useMemo } from "react";
 
 type Props = {
@@ -30,11 +32,13 @@ function chartYMax(peak: number): number {
   return nice * exp;
 }
 
-function formatBytesPerSec(bps: number): string {
+function formatBytesPerSec(
+  bps: number,
+  units: string[],
+): string {
   if (bps <= 0) {
     return "0";
   }
-  const units = ["Б/с", "КиБ/с", "МиБ/с", "ГиБ/с"];
   let v = bps;
   let i = 0;
   while (v >= 1024 && i < units.length - 1) {
@@ -45,11 +49,10 @@ function formatBytesPerSec(bps: number): string {
   return `${v.toFixed(digits)} ${units[i]}`;
 }
 
-function formatBytes(n: number): string {
+function formatChartBytes(n: number, units: string[]): string {
   if (n <= 0) {
-    return "0 Б";
+    return `0 ${units[0]}`;
   }
-  const units = ["Б", "КиБ", "МиБ", "ГиБ"];
   let v = n;
   let i = 0;
   while (v >= 1024 && i < units.length - 1) {
@@ -104,10 +107,18 @@ function BucketTooltipContent({
   b,
   upBps,
   downBps,
+  byteUnits,
+  bpsUnits,
+  egressLabel,
+  ingressLabel,
 }: {
   b: ProxyTrafficBucket;
   upBps: number;
   downBps: number;
+  byteUnits: string[];
+  bpsUnits: string[];
+  egressLabel: string;
+  ingressLabel: string;
 }) {
   const up = bucketBytesUp(b);
   const down = bucketBytesDown(b);
@@ -115,28 +126,28 @@ function BucketTooltipContent({
     <div className="flex flex-col gap-1.5 font-mono text-[11px] leading-snug">
       <span className="text-zinc-300">{formatBucketRange(b.t)}</span>
       <span>
-        <span className="text-amber-300/90">исх </span>
-        <span className="text-zinc-100">{formatBytes(up.total)}</span>
-        <span className="text-zinc-500"> · {formatBytesPerSec(upBps)}</span>
+        <span className="text-amber-300/90">{egressLabel} </span>
+        <span className="text-zinc-100">{formatChartBytes(up.total, byteUnits)}</span>
+        <span className="text-zinc-500"> · {formatBytesPerSec(upBps, bpsUnits)}</span>
       </span>
       <span>
         <span className="text-teal-300">allow </span>
-        <span className="text-zinc-100">{formatBytes(up.allow)}</span>
+        <span className="text-zinc-100">{formatChartBytes(up.allow, byteUnits)}</span>
         <span className="text-zinc-500"> ({sharePct(up.allow, up.total)})</span>
       </span>
       <span>
         <span className="text-red-300">deny </span>
-        <span className="text-zinc-100">{formatBytes(up.deny)}</span>
+        <span className="text-zinc-100">{formatChartBytes(up.deny, byteUnits)}</span>
         <span className="text-zinc-500"> ({sharePct(up.deny, up.total)})</span>
       </span>
       <span>
-        <span className="text-sky-300/90">вх </span>
-        <span className="text-zinc-100">{formatBytes(down.total)}</span>
-        <span className="text-zinc-500"> · {formatBytesPerSec(downBps)}</span>
+        <span className="text-sky-300/90">{ingressLabel} </span>
+        <span className="text-zinc-100">{formatChartBytes(down.total, byteUnits)}</span>
+        <span className="text-zinc-500"> · {formatBytesPerSec(downBps, bpsUnits)}</span>
       </span>
       <span>
         <span className="text-teal-300">allow </span>
-        <span className="text-zinc-100">{formatBytes(down.allow)}</span>
+        <span className="text-zinc-100">{formatChartBytes(down.allow, byteUnits)}</span>
         <span className="text-zinc-500">
           {" "}
           ({sharePct(down.allow, down.total)})
@@ -144,7 +155,7 @@ function BucketTooltipContent({
       </span>
       <span>
         <span className="text-red-300">deny </span>
-        <span className="text-zinc-100">{formatBytes(down.deny)}</span>
+        <span className="text-zinc-100">{formatChartBytes(down.deny, byteUnits)}</span>
         <span className="text-zinc-500">
           {" "}
           ({sharePct(down.deny, down.total)})
@@ -203,6 +214,20 @@ function gridBottomPct(rate: number, yMax: number, aboveCenter: boolean): number
 }
 
 export function TrafficThroughputChart({ buckets, loading }: Props) {
+  const { t } = useTranslation();
+  const byteLabels = byteUnitLabelsFromT(t);
+  const byteUnits = [
+    byteLabels.byte,
+    byteLabels.kib,
+    byteLabels.mib,
+    byteLabels.gib,
+  ];
+  const bpsUnits = [
+    t("units.bytesPerSec"),
+    t("units.kibPerSec"),
+    t("units.mibPerSec"),
+    t("units.gibPerSec"),
+  ];
   const data = buckets?.length ? buckets : [];
 
   const { upBps, downBps, yMax } = useMemo(() => {
@@ -307,6 +332,10 @@ export function TrafficThroughputChart({ buckets, loading }: Props) {
                   b={b}
                   upBps={up}
                   downBps={down}
+                  byteUnits={byteUnits}
+                  bpsUnits={bpsUnits}
+                  egressLabel={t("dashboard.egress")}
+                  ingressLabel={t("dashboard.ingress")}
                 />
               }
               placement="top"
@@ -377,13 +406,13 @@ export function TrafficThroughputChart({ buckets, loading }: Props) {
           ) : (
             <>
               <span className="absolute right-0 top-0 text-right">
-                {formatBytesPerSec(yMax)}
+                {formatBytesPerSec(yMax, bpsUnits)}
               </span>
               <span className="absolute right-0 top-1/2 -translate-y-1/2 text-right text-zinc-400">
                 0
               </span>
               <span className="absolute right-0 bottom-0 text-right">
-                {formatBytesPerSec(yMax)}
+                {formatBytesPerSec(yMax, bpsUnits)}
               </span>
             </>
           )}
@@ -392,9 +421,9 @@ export function TrafficThroughputChart({ buckets, loading }: Props) {
       </div>
       {!loading && data.length > 0 ? (
         <div className="flex justify-between pl-12 font-mono text-[10.5px] text-zinc-500">
-          <span>−5м</span>
-          <span className="text-zinc-600">5 мин · 10 с · исх ↑ · вх ↓</span>
-          <span>сейчас</span>
+          <span>{t("dashboard.minus5m")}</span>
+          <span className="text-zinc-600">{t("dashboard.chartBuckets")}</span>
+          <span>{t("dashboard.now")}</span>
         </div>
       ) : null}
     </div>

@@ -51,6 +51,8 @@ import {
 } from "antd";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import Link from "next/link";
+import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
+import type { MessageKey } from "@/i18n/translate";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -81,22 +83,22 @@ const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = [
   "decision_rule",
 ];
 
-const COLUMN_LABELS: Record<ColumnKey, string> = {
-  created_at: "Время",
-  source_address: "Источник",
-  destination_address: "Назначение",
-  user: "Пользователь",
-  action: "Действие",
-  acl_rule: "Правило ACL",
-  inspect_rule: "Инспекция",
-  decision_rule: "Решающее правило",
-  decide_duration_us: "ACL, мкс",
-  full_url: "URL",
-  search_engine: "Поисковая система",
-  search_query: "Поисковый запрос",
+const COLUMN_LABEL_KEYS: Record<ColumnKey, MessageKey> = {
+  created_at: "accessLog.col.created_at",
+  source_address: "accessLog.col.source_address",
+  destination_address: "accessLog.col.destination_address",
+  user: "accessLog.col.user",
+  action: "accessLog.col.action",
+  acl_rule: "accessLog.col.acl_rule",
+  inspect_rule: "accessLog.col.inspect_rule",
+  decision_rule: "accessLog.col.decision_rule",
+  decide_duration_us: "accessLog.col.decide_duration_us",
+  full_url: "accessLog.col.full_url",
+  search_engine: "accessLog.col.search_engine",
+  search_query: "accessLog.col.search_query",
 };
 
-const ALL_COLUMN_KEYS = Object.keys(COLUMN_LABELS) as ColumnKey[];
+const ALL_COLUMN_KEYS = Object.keys(COLUMN_LABEL_KEYS) as ColumnKey[];
 const VISIBLE_COLUMNS_STORAGE_KEY = "oktopus.manage.access-log.visible-columns";
 const FILTERS_STORAGE_KEY = "oktopus.manage.access-log.filters";
 
@@ -185,6 +187,15 @@ function accessLogListParams(
 
 export default function ManageAccessLogPage() {
   const { message, modal } = App.useApp();
+  const { t } = useTranslation();
+  const formatApiError = useApiErrorMessage();
+  const columnLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        ALL_COLUMN_KEYS.map((k) => [k, t(COLUMN_LABEL_KEYS[k])]),
+      ) as Record<ColumnKey, string>,
+    [t],
+  );
   const [data, setData] = useState<ProxyAccessLogRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -263,13 +274,11 @@ export default function ManageAccessLogPage() {
       setData(res.results.map(normalizeAccessLogRow));
       setTotal(res.count);
     } catch (e) {
-      const msg =
-        e instanceof ApiError ? e.message : "Не удалось загрузить журнал";
-      message.error(msg);
+      message.error(formatApiError(e, t("accessLog.loadFailed")));
     } finally {
       setLoading(false);
     }
-  }, [appliedFilters, message, page, pageSize, searchNonce]);
+  }, [appliedFilters, formatApiError, message, page, pageSize, searchNonce, t]);
 
   useEffect(() => {
     if (!filtersHydrated) {
@@ -310,7 +319,7 @@ export default function ManageAccessLogPage() {
   const searchByRecordId = (raw: string) => {
     const id = raw.trim();
     if (id && !isAccessLogRecordId(id)) {
-      message.error("Укажите корректный UUID записи");
+      message.error(t("accessLog.invalidUuid"));
       return;
     }
     applyFilters({ ...appliedFilters, id });
@@ -320,16 +329,18 @@ export default function ManageAccessLogPage() {
     const fromLabel = new Date(range.from).toLocaleString();
     const toLabel = new Date(range.to).toLocaleString();
     modal.confirm({
-      title: "Удалить записи за период?",
+      title: t("accessLog.deletePeriodConfirm"),
       content: `${fromLabel} — ${toLabel}`,
-      okText: "Удалить",
+      okText: t("common.delete"),
       okType: "danger",
-      cancelText: "Отмена",
+      cancelText: t("common.cancel"),
       onOk: async () => {
         setDeleteLoading(true);
         try {
           const res = await deleteProxyAccessLogByPeriod(range);
-          message.success(`Удалено записей: ${res.deleted}`);
+          message.success(
+            t("accessLog.deletedCount", { count: res.deleted }),
+          );
           setDeleteOpen(false);
           setPage(1);
           const list = await listProxyAccessLog(
@@ -338,9 +349,7 @@ export default function ManageAccessLogPage() {
           setData(list.results.map(normalizeAccessLogRow));
           setTotal(list.count);
         } catch (e) {
-          const msg =
-            e instanceof ApiError ? e.message : "Не удалось удалить";
-          message.error(msg);
+          message.error(formatApiError(e, t("accessLog.deleteFailed")));
         } finally {
           setDeleteLoading(false);
         }
@@ -352,12 +361,10 @@ export default function ManageAccessLogPage() {
     setSettingsSaving(true);
     try {
       await patchProxySettings(body);
-      message.success("Сохранено");
+      message.success(t("common.saved"));
       setSettingsOpen(false);
     } catch (e) {
-      const msg =
-        e instanceof ApiError ? e.message : "Не удалось сохранить";
-      message.error(msg);
+      message.error(formatApiError(e, t("common.saveFailed")));
     } finally {
       setSettingsSaving(false);
     }
@@ -367,33 +374,33 @@ export default function ManageAccessLogPage() {
     () => [
       {
         key: "created_at",
-        title: COLUMN_LABELS.created_at,
+        title: columnLabels.created_at,
         dataIndex: "created_at",
         width: 190,
         render: (v: string) => new Date(v).toLocaleString(),
       },
       {
         key: "source_address",
-        title: COLUMN_LABELS.source_address,
+        title: columnLabels.source_address,
         dataIndex: "source_address",
         ellipsis: true,
       },
       {
         key: "destination_address",
-        title: COLUMN_LABELS.destination_address,
+        title: columnLabels.destination_address,
         dataIndex: "destination_address",
         ellipsis: true,
       },
       {
         key: "user",
-        title: COLUMN_LABELS.user,
+        title: columnLabels.user,
         dataIndex: "user",
         width: 140,
         render: (v: string | null) => v ?? "—",
       },
       {
         key: "action",
-        title: COLUMN_LABELS.action,
+        title: columnLabels.action,
         dataIndex: "action",
         width: 100,
         render: (_: AccessLogActionCode, row: ProxyAccessLogRow) => (
@@ -406,15 +413,15 @@ export default function ManageAccessLogPage() {
       },
       {
         key: "acl_rule",
-        title: COLUMN_LABELS.acl_rule,
+        title: columnLabels.acl_rule,
         width: 160,
         ellipsis: true,
         render: (_: unknown, row: ProxyAccessLogRow) =>
-          accessLogAclDecisionLabel(row.decision_rule_ref),
+          accessLogAclDecisionLabel(row.decision_rule_ref, t),
       },
       {
         key: "inspect_rule",
-        title: COLUMN_LABELS.inspect_rule,
+        title: columnLabels.inspect_rule,
         width: 160,
         ellipsis: true,
         render: (_: unknown, row: ProxyAccessLogRow) => (
@@ -426,7 +433,7 @@ export default function ManageAccessLogPage() {
       },
       {
         key: "decision_rule",
-        title: COLUMN_LABELS.decision_rule,
+        title: columnLabels.decision_rule,
         width: 180,
         ellipsis: true,
         render: (_: unknown, row: ProxyAccessLogRow) => (
@@ -438,26 +445,26 @@ export default function ManageAccessLogPage() {
       },
       {
         key: "decide_duration_us",
-        title: COLUMN_LABELS.decide_duration_us,
+        title: columnLabels.decide_duration_us,
         dataIndex: "decide_duration_us",
         width: 100,
       },
       {
         key: "full_url",
-        title: COLUMN_LABELS.full_url,
+        title: columnLabels.full_url,
         dataIndex: "full_url",
         ellipsis: true,
       },
       {
         key: "search_engine",
-        title: COLUMN_LABELS.search_engine,
+        title: columnLabels.search_engine,
         width: 140,
         render: (_: unknown, row: ProxyAccessLogRow) =>
-          searchEngineLabel(parseAccessLogExtra(row.extra).search?.engine),
+          searchEngineLabel(parseAccessLogExtra(row.extra).search?.engine, t),
       },
       {
         key: "search_query",
-        title: COLUMN_LABELS.search_query,
+        title: columnLabels.search_query,
         ellipsis: true,
         render: (_: unknown, row: ProxyAccessLogRow) => {
           const q = parseAccessLogExtra(row.extra).search?.query;
@@ -465,7 +472,7 @@ export default function ManageAccessLogPage() {
         },
       },
     ],
-    [ruleNames],
+    [columnLabels, ruleNames, t],
   );
 
   const tableColumns = useMemo(
@@ -489,7 +496,7 @@ export default function ManageAccessLogPage() {
         value={visibleColumns}
         onChange={(keys) => onVisibleColumnsChange(keys as ColumnKey[])}
         options={ALL_COLUMN_KEYS.map((key) => ({
-          label: COLUMN_LABELS[key],
+          label: columnLabels[key],
           value: key,
         }))}
       />
@@ -503,17 +510,17 @@ export default function ManageAccessLogPage() {
           href="/manage/access-log/reports"
           className="text-[12px] text-zinc-500 transition hover:text-teal-300"
         >
-          Отчёты →
+          {t("accessLog.reportsLink")}
         </Link>
         <Space wrap>
           <Button danger onClick={() => setDeleteOpen(true)}>
-            Удалить за период
+            {t("accessLog.deletePeriod")}
           </Button>
           <Button
             icon={<SettingOutlined />}
             onClick={() => setSettingsOpen(true)}
           >
-            Настройки
+            {t("common.settings")}
           </Button>
         </Space>
       </header>
@@ -551,29 +558,29 @@ export default function ManageAccessLogPage() {
           <Space wrap className="flex-1">
             <Input.Search
               allowClear
-              placeholder="ID записи (UUID)"
+              placeholder={t("accessLog.recordIdPlaceholder")}
               value={idSearchDraft}
               onChange={(e) => setIdSearchDraft(e.target.value)}
               onSearch={searchByRecordId}
               className="w-full min-w-[220px] max-w-sm"
-              enterButton="Найти"
+              enterButton={t("common.search")}
             />
             <Button
               icon={<ReloadOutlined />}
               loading={loading}
               onClick={refreshList}
             >
-              Обновить
+              {t("common.refresh")}
             </Button>
             <Button
               type={filtersActive ? "primary" : "default"}
               icon={<FilterOutlined />}
               onClick={() => setFiltersOpen(true)}
             >
-              Фильтры
+              {t("common.filters")}
             </Button>
             <Dropdown dropdownRender={() => columnPicker} trigger={["click"]}>
-              <Button icon={<TableOutlined />}>Колонки</Button>
+              <Button icon={<TableOutlined />}>{t("common.columns")}</Button>
             </Dropdown>
           </Space>
         </div>
@@ -588,7 +595,7 @@ export default function ManageAccessLogPage() {
               total,
               showSizeChanger: true,
               pageSizeOptions: ["20", "50", "100"],
-              showTotal: (c) => `Всего: ${c}`,
+              showTotal: (c) => t("common.total", { count: c }),
             }}
             onChange={onTableChange}
             scroll={{ x: true }}

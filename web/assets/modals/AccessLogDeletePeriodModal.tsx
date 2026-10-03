@@ -1,6 +1,7 @@
 "use client";
 
 import { scrollableModalProps } from "@/assets/modals/modalConfig";
+import { useTranslation } from "@/contexts/LocaleContext";
 import { DatePicker, Form, Modal } from "antd";
 import type { Dayjs } from "dayjs";
 
@@ -22,14 +23,15 @@ export function AccessLogDeletePeriodModal({
   onSubmit,
 }: AccessLogDeletePeriodModalProps) {
   const [form] = Form.useForm<FormValues>();
+  const { t } = useTranslation();
 
   return (
     <Modal
-      title="Удалить записи за период"
+      title={t("accessLog.deletePeriodTitle")}
       open={open}
-      okText="Удалить"
+      okText={t("common.delete")}
       okType="danger"
-      cancelText="Отмена"
+      cancelText={t("common.cancel")}
       confirmLoading={loading}
       onCancel={() => {
         form.resetFields();
@@ -49,8 +51,8 @@ export function AccessLogDeletePeriodModal({
       <Form form={form} layout="vertical">
         <Form.Item
           name="period"
-          label="Период"
-          rules={[{ required: true, message: "Выберите период" }]}
+          label={t("common.period")}
+          rules={[{ required: true, message: t("accessLog.selectPeriod") }]}
         >
           <DatePicker.RangePicker
             showTime

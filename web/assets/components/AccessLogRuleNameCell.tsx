@@ -4,6 +4,7 @@ import {
   accessLogSystemRuleLabel,
   isSystemAccessLogRuleId,
 } from "@/utils/accessLogExtra";
+import { useTranslation } from "@/contexts/LocaleContext";
 import { Typography } from "antd";
 
 type AccessLogRuleNameCellProps = {
@@ -15,8 +16,10 @@ export function AccessLogRuleNameCell({
   ruleId,
   ruleNames,
 }: AccessLogRuleNameCellProps) {
+  const { t } = useTranslation();
+  const emDash = t("common.emDash");
   if (!ruleId) {
-    return <>—</>;
+    return <>{emDash}</>;
   }
   if (isSystemAccessLogRuleId(ruleId)) {
     return (
@@ -25,7 +28,7 @@ export function AccessLogRuleNameCell({
         className="text-xs"
         title={ruleId}
       >
-        {accessLogSystemRuleLabel(ruleId)}
+        {accessLogSystemRuleLabel(ruleId, t)}
       </Typography.Text>
     );
   }

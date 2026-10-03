@@ -8,6 +8,7 @@ import (
 	"time"
 
 	authmw "oktopus/internal/api/auth/middleware"
+	"oktopus/internal/apperr"
 	"oktopus/internal/api/platform/response"
 	"oktopus/internal/auth"
 	"oktopus/internal/db/user/domain"
@@ -44,14 +45,14 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	body.Username = strings.TrimSpace(body.Username)
 	if body.Username == "" || body.Password == "" {
-		response.Error(w, http.StatusBadRequest, "username and password required")
+		response.Error(w, http.StatusBadRequest, string(apperr.UsernamePasswordRequired))
 		return
 	}
 
 	clientIP := authmw.ClientIP(r)
 	now := time.Now()
 	if h.loginLockout.Blocked(now, clientIP) {
-		response.Error(w, http.StatusTooManyRequests, "login temporarily disabled")
+		response.Error(w, http.StatusTooManyRequests, string(apperr.LoginTemporarilyDisabled))
 		return
 	}
 
@@ -59,20 +60,20 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidCredentials) {
 			h.loginLockout.RecordFailure(time.Now(), clientIP)
-			response.Error(w, http.StatusUnauthorized, "invalid credentials")
+			response.Error(w, http.StatusUnauthorized, string(apperr.InvalidCredentials))
 			return
 		}
 		if errors.Is(err, domain.ErrUserDisabled) {
-			response.Error(w, http.StatusForbidden, "user disabled")
+			response.Error(w, http.StatusForbidden, string(apperr.UserDisabled))
 			return
 		}
-		response.Error(w, http.StatusInternalServerError, "login failed")
+		response.Error(w, http.StatusInternalServerError, string(apperr.LoginFailed))
 		return
 	}
 
 	token, expiresAt, err := auth.IssueToken(h.auth.Secret, user.ID, user.Username)
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, "login failed")
+		response.Error(w, http.StatusInternalServerError, string(apperr.LoginFailed))
 		return
 	}
 	auth.SetSessionCookie(w, token, expiresAt, h.cookieSecure)

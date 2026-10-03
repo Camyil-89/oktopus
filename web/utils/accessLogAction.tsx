@@ -1,5 +1,10 @@
+"use client";
+
 import { Tag } from "antd";
 import type { ReactElement } from "react";
+import { useTranslation } from "@/contexts/LocaleContext";
+import type { MessageKey } from "@/i18n/translate";
+import type { TranslateFn } from "@/i18n/translate";
 import {
   ACCESS_LOG_RULE_AUTH_FAIL,
   ACCESS_LOG_RULE_DEFAULT_DENY,
@@ -19,6 +24,28 @@ export type AccessLogOutcomeKind =
   | "inspect_error"
   | "gateway_error"
   | "deny";
+
+const OUTCOME_LABEL_KEYS: Record<AccessLogOutcomeKind, MessageKey> = {
+  allow: "accessLog.action.allow",
+  auth_fail: "accessLog.action.auth_fail",
+  default_deny: "accessLog.action.default_deny",
+  deny_rule: "accessLog.action.deny_rule",
+  inspect_deny: "accessLog.action.inspect_deny",
+  inspect_error: "accessLog.action.inspect_error",
+  gateway_error: "accessLog.action.gateway_error",
+  deny: "accessLog.action.deny",
+};
+
+const OUTCOME_COLORS: Record<AccessLogOutcomeKind, string> = {
+  allow: "green",
+  auth_fail: "gold",
+  default_deny: "red",
+  deny_rule: "red",
+  inspect_deny: "red",
+  inspect_error: "red",
+  gateway_error: "red",
+  deny: "red",
+};
 
 export function accessLogOutcomeKind(
   action: AccessLogActionCode | number,
@@ -52,28 +79,14 @@ export function accessLogOutcomeKind(
   return "deny";
 }
 
-const OUTCOME_META: Record<
-  AccessLogOutcomeKind,
-  { label: string; color: string }
-> = {
-  allow: { label: "Разрешено", color: "green" },
-  auth_fail: { label: "Ошибка авторизации", color: "gold" },
-  default_deny: { label: "Отказано (по умолчанию)", color: "red" },
-  deny_rule: { label: "Запрещено правилом", color: "red" },
-  inspect_deny: { label: "Запрещено инспекцией", color: "red" },
-  inspect_error: { label: "Отклонено (ошибка инспекции)", color: "red" },
-  gateway_error: { label: "Ошибка шлюза (502)", color: "red" },
-  deny: { label: "Отказано", color: "red" },
-};
-
 export function accessLogOutcomeLabel(
   action: AccessLogActionCode | number,
+  t: TranslateFn,
   decisionRuleRef?: string | null,
   deniedBy?: "acl" | "inspect" | "gateway" | null,
 ): string {
-  return OUTCOME_META[
-    accessLogOutcomeKind(action, decisionRuleRef, deniedBy)
-  ].label;
+  const kind = accessLogOutcomeKind(action, decisionRuleRef, deniedBy);
+  return t(OUTCOME_LABEL_KEYS[kind]);
 }
 
 export function AccessLogActionTag({
@@ -85,9 +98,9 @@ export function AccessLogActionTag({
   decisionRuleRef?: string | null;
   deniedBy?: "acl" | "inspect" | "gateway" | null;
 }): ReactElement {
+  const { t } = useTranslation();
   const kind = accessLogOutcomeKind(action, decisionRuleRef, deniedBy);
-  const { label, color } = OUTCOME_META[kind];
-  return <Tag color={color}>{label}</Tag>;
+  return <Tag color={OUTCOME_COLORS[kind]}>{t(OUTCOME_LABEL_KEYS[kind])}</Tag>;
 }
 
 /** Значение action из агрегаций отчёта (текст "0"/"1", allow/deny). */
@@ -110,9 +123,10 @@ export function AccessLogAggregateActionTag({
 }: {
   action: AccessLogActionCode;
 }): ReactElement {
+  const { t } = useTranslation();
   return action === 1 ? (
-    <Tag color="green">Разрешено</Tag>
+    <Tag color="green">{t("accessLog.aggregateAllowed")}</Tag>
   ) : (
-    <Tag color="red">Запрещено</Tag>
+    <Tag color="red">{t("accessLog.aggregateDenied")}</Tag>
   );
 }

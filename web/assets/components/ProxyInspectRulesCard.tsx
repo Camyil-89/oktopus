@@ -40,20 +40,22 @@ import {
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
+import type { TranslateFn } from "@/i18n/translate";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Row = ProxyInspectRuleDraft & { key: string };
 
-function buildStatusTag(st: ProxyInspectCompileStatus) {
+function buildStatusTag(st: ProxyInspectCompileStatus, t: TranslateFn) {
   switch (st.build_status) {
     case "building":
-      return <Tag color="processing">Компилируется</Tag>;
+      return <Tag color="processing">{t("inspect.compiling")}</Tag>;
     case "error":
-      return <Tag color="error">Ошибка</Tag>;
+      return <Tag color="error">{t("inspect.error")}</Tag>;
     case "ready":
-      return <Tag color="success">Готово</Tag>;
+      return <Tag color="success">{t("inspect.ready")}</Tag>;
     default:
-      return <Tag>Ожидание</Tag>;
+      return <Tag>{t("inspect.pending")}</Tag>;
   }
 }
 
@@ -73,6 +75,8 @@ function rowsSnapshot(rows: Row[]) {
 
 export function ProxyInspectRulesCard() {
   const { message } = App.useApp();
+  const { t } = useTranslation();
+  const formatApiError = useApiErrorMessage();
   const [status, setStatus] = useState<ProxyInspectCompileStatus | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [savedSnapshot, setSavedSnapshot] = useState(() => rowsSnapshot([]));
@@ -114,7 +118,7 @@ export function ProxyInspectRulesCard() {
       setRows(next);
       setSavedSnapshot(rowsSnapshot(next));
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : "Не удалось загрузить");
+      message.error(formatApiError(e, t("inspect.loadFailed")));
     } finally {
       setLoading(false);
     }
@@ -154,7 +158,7 @@ export function ProxyInspectRulesCard() {
       });
       setModalOpen(true);
     } catch {
-      message.error("Не удалось загрузить скрипт");
+      message.error(t("inspect.scriptLoadFailed"));
     }
   };
 
@@ -168,11 +172,11 @@ export function ProxyInspectRulesCard() {
     setScriptValidateLoading(true);
     try {
       await proxyApi.validateProxyInspectScript({ script });
-      message.success("Скрипт корректен");
+      message.success(t("inspect.scriptOk"));
       return true;
     } catch (e) {
       message.error(
-        e instanceof ApiError ? e.message : "Ошибка проверки скрипта",
+        formatApiError(e, t("inspect.scriptValidateFailed")),
       );
       return false;
     } finally {
@@ -192,7 +196,7 @@ export function ProxyInspectRulesCard() {
       await proxyApi.validateProxyInspectScript({ script: values.script });
     } catch (e) {
       message.error(
-        e instanceof ApiError ? e.message : "Исправьте ошибки в Lua",
+        formatApiError(e, t("inspect.fixLua")),
       );
       return;
     } finally {
@@ -258,9 +262,9 @@ export function ProxyInspectRulesCard() {
   const copyAgentPrompt = async () => {
     try {
       await navigator.clipboard.writeText(agentPromptText);
-      message.success("Инструкция скопирована");
+      message.success(t("inspect.promptCopied"));
     } catch {
-      message.error("Не удалось скопировать");
+      message.error(t("common.copyFailed"));
     }
   };
 
@@ -281,10 +285,10 @@ export function ProxyInspectRulesCard() {
         sort_order: i,
       }));
       await proxyApi.syncProxyInspectRules(payload);
-      message.success("Правила инспекции сохранены");
+      message.success(t("inspect.saved"));
       await load();
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : "Ошибка сохранения");
+      message.error(formatApiError(e, t("inspect.saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -292,20 +296,20 @@ export function ProxyInspectRulesCard() {
 
   const columns: ColumnsType<Row> = [
     { title: "№", width: 48, render: (_, __, i) => i + 1 },
-    { title: "Имя", dataIndex: "name" },
+    { title: t("common.name"), dataIndex: "name" },
     {
-      title: "При совпадении",
+      title: t("inspect.onMatch"),
       dataIndex: "action",
       width: 160,
       render: (a: 0 | 1) =>
         a === 0 ? (
-          <Tag color="error">Запретить</Tag>
+          <Tag color="error">{t("inspect.deny")}</Tag>
         ) : (
-          <Tag color="success">Разрешить</Tag>
+          <Tag color="success">{t("inspect.allow")}</Tag>
         ),
     },
     {
-      title: "Вкл",
+      title: t("inspect.enabledCol"),
       width: 56,
       align: "center",
       render: (_, r) => (
@@ -359,8 +363,8 @@ export function ProxyInspectRulesCard() {
         <Alert
           type="warning"
           showIcon
-          message="Инспекция доступна только в режиме MITM"
-          description="Сейчас включён tunnel: исходящий HTTPS не расшифровывается, Lua-правила не выполняются. Переключите connect_mode на MITM в настройках прокси и установите CA на клиентах."
+          message={t("inspect.mitmOnlyTitle")}
+          description={t("inspect.mitmOnlyDesc")}
         />
       ) : null}
       <div
@@ -371,25 +375,25 @@ export function ProxyInspectRulesCard() {
         }
       >
       <Card
-        title="Инспекция исходящих запросов"
+        title={t("inspect.cardTitle")}
         extra={
           <Space wrap>
-            {status ? buildStatusTag(status) : null}
-            {dirty ? <Tag color="warning">Черновик</Tag> : null}
+            {status ? buildStatusTag(status, t) : null}
+            {dirty ? <Tag color="warning">{t("inspect.draft")}</Tag> : null}
             <Button
               icon={<CopyOutlined />}
               onClick={() => void copyAgentPrompt()}
             >
-              Инструкция для ИИ
+              {t("inspect.aiPrompt")}
             </Button>
             <Button
               icon={<DownloadOutlined />}
               onClick={downloadAgentPrompt}
             >
-              Скачать .txt
+              {t("inspect.downloadTxt")}
             </Button>
             <Button icon={<PlusOutlined />} onClick={openCreate}>
-              Правило
+              {t("inspect.rule")}
             </Button>
             <Button
               type="primary"
@@ -397,7 +401,7 @@ export function ProxyInspectRulesCard() {
               disabled={loading || !dirty}
               onClick={() => void persist()}
             >
-              Сохранить и применить
+              {t("inspect.saveApply")}
             </Button>
           </Space>
         }
@@ -422,7 +426,7 @@ export function ProxyInspectRulesCard() {
                 ? "row-hover"
                 : "row-hover [&>td]:opacity-50 [&>td:nth-child(4)]:opacity-100 [&>td:nth-child(5)]:opacity-100"
             }
-            locale={{ emptyText: "Нет правил — нажмите «Правило»" }}
+            locale={{ emptyText: t("inspect.emptyRules") }}
           />
         </PanelTable>
       </Card>
@@ -431,14 +435,14 @@ export function ProxyInspectRulesCard() {
         items={[
           {
             key: "api",
-            label: "Справка по ctx и возврату",
+            label: t("inspect.ctxHelp"),
             children: (
               <pre className="m-0 whitespace-pre-wrap text-sm">{INSPECT_LUA_API_REFERENCE}</pre>
             ),
           },
           {
             key: "examples",
-            label: "Примеры Lua (быстрые)",
+            label: t("inspect.luaExamples"),
             children: (
               <div className="flex flex-col gap-4">
                 {INSPECT_LUA_EXAMPLES.map((ex) => (
@@ -461,7 +465,7 @@ export function ProxyInspectRulesCard() {
                         setModalOpen(true);
                       }}
                     >
-                      Вставить в новое правило
+                      {t("inspect.insertNewRule")}
                     </Button>
                   </div>
                 ))}
@@ -472,18 +476,18 @@ export function ProxyInspectRulesCard() {
       />
 
       <Modal
-        title={editKey ? "Редактирование" : "Новое правило"}
+        title={editKey ? t("inspect.editRule") : t("inspect.newRule")}
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         width={720}
         footer={
           <Space wrap>
-            <Button onClick={() => setModalOpen(false)}>Отмена</Button>
+            <Button onClick={() => setModalOpen(false)}>{t("common.cancel")}</Button>
             <Button
               loading={scriptValidateLoading}
               onClick={() => void validateModalScript()}
             >
-              Проверить код
+              {t("inspect.validateCode")}
             </Button>
             <Button
               type="primary"

@@ -1,30 +1,47 @@
-export const MANAGE_PAGE_TITLES: Record<string, string> = {
-  "/manage": "Главная",
-  "/manage/users": "Пользователи",
-  "/manage/proxy": "Настройки прокси",
-  "/manage/rules": "Правила прокси",
-  "/manage/access-log": "Журнал доступа",
-  "/manage/access-log/reports": "Отчёты журнала",
+import type { TranslateFn } from "@/i18n/translate";
+
+export const MANAGE_NAV_PATHS = [
+  "/manage",
+  "/manage/rules",
+  "/manage/access-log",
+  "/manage/access-log/reports",
+  "/manage/proxy",
+  "/manage/users",
+] as const;
+
+export type ManageNavPath = (typeof MANAGE_NAV_PATHS)[number];
+
+const NAV_TITLE_KEYS: Record<ManageNavPath, Parameters<TranslateFn>[0]> = {
+  "/manage": "nav.home",
+  "/manage/users": "nav.users",
+  "/manage/proxy": "nav.proxySettings",
+  "/manage/rules": "nav.proxyRules",
+  "/manage/access-log": "nav.accessLog",
+  "/manage/access-log/reports": "nav.accessLogReports",
 };
 
-export function managePageTitle(pathname: string): string {
+export function manageNavLabel(path: ManageNavPath, t: TranslateFn): string {
+  return t(NAV_TITLE_KEYS[path]);
+}
+
+export function managePageTitle(pathname: string, t: TranslateFn): string {
   if (pathname === "/manage/users" || pathname.startsWith("/manage/users/")) {
-    return MANAGE_PAGE_TITLES["/manage/users"];
+    return t("nav.users");
   }
   if (pathname === "/manage/rules" || pathname.startsWith("/manage/rules/")) {
-    return MANAGE_PAGE_TITLES["/manage/rules"];
+    return t("nav.proxyRules");
   }
   if (pathname === "/manage/proxy" || pathname.startsWith("/manage/proxy/")) {
-    return MANAGE_PAGE_TITLES["/manage/proxy"];
+    return t("nav.proxySettings");
   }
   if (
     pathname === "/manage/access-log/reports" ||
     pathname.startsWith("/manage/access-log/reports/")
   ) {
-    return MANAGE_PAGE_TITLES["/manage/access-log/reports"];
+    return t("nav.accessLogReports");
   }
   if (pathname === "/manage/access-log") {
-    return MANAGE_PAGE_TITLES["/manage/access-log"];
+    return t("nav.accessLog");
   }
-  return MANAGE_PAGE_TITLES["/manage"];
+  return t("nav.home");
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { App, Button, Collapse, Typography } from "antd";
+import { useTranslation } from "@/contexts/LocaleContext";
 
 type ErrorTraceCollapseProps = {
   trace: string;
@@ -9,16 +10,18 @@ type ErrorTraceCollapseProps = {
 
 export function ErrorTraceCollapse({
   trace,
-  label = "Технические подробности",
+  label,
 }: ErrorTraceCollapseProps) {
   const { message } = App.useApp();
+  const { t } = useTranslation();
+  const collapseLabel = label ?? t("errorTrace.label");
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(trace);
-      message.success("Скопировано");
+      message.success(t("common.copied"));
     } catch {
-      message.error("Не удалось скопировать");
+      message.error(t("common.copyFailed"));
     }
   };
 
@@ -27,7 +30,7 @@ export function ErrorTraceCollapse({
       items={[
         {
           key: "trace",
-          label,
+          label: collapseLabel,
           children: (
             <div className="flex max-h-[min(50vh,20rem)] flex-col gap-3 overflow-y-auto">
               <Button
@@ -36,7 +39,7 @@ export function ErrorTraceCollapse({
                 className="w-fit shrink-0"
                 onClick={() => void copy()}
               >
-                Копировать
+                {t("common.copy")}
               </Button>
               <Typography.Paragraph
                 copyable={{ text: trace }}

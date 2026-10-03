@@ -14,6 +14,7 @@ import {
   AccessLogAggregateActionTag,
   parseAccessLogActionAggregateValue,
 } from "@/utils/accessLogAction";
+import { useTranslation } from "@/contexts/LocaleContext";
 import { Typography } from "antd";
 
 type ReportRuleRefLabelProps = {
@@ -33,6 +34,7 @@ export function ReportRuleRefLabel({
   onOpenRule,
   className,
 }: ReportRuleRefLabelProps) {
+  const { t } = useTranslation();
   const raw = value.trim();
   if (!raw || raw === "—") {
     return <span className={className}>—</span>;
@@ -68,7 +70,7 @@ export function ReportRuleRefLabel({
         className={className}
         title={raw}
       >
-        {accessLogSystemRuleLabel(raw)}
+        {accessLogSystemRuleLabel(raw, t)}
       </Typography.Text>
     );
   }

@@ -1,6 +1,7 @@
 "use client";
 
 import { accessLogDecisionRuleLabel } from "@/utils/accessLogExtra";
+import { useTranslation } from "@/contexts/LocaleContext";
 import { Typography } from "antd";
 
 type AccessLogDecisionRuleCellProps = {
@@ -12,9 +13,11 @@ export function AccessLogDecisionRuleCell({
   decisionRuleRef,
   ruleNames,
 }: AccessLogDecisionRuleCellProps) {
-  const label = accessLogDecisionRuleLabel(decisionRuleRef, ruleNames);
-  if (label === "—") {
-    return <>—</>;
+  const { t } = useTranslation();
+  const label = accessLogDecisionRuleLabel(decisionRuleRef, t, ruleNames);
+  const emDash = t("common.emDash");
+  if (label === emDash) {
+    return <>{emDash}</>;
   }
   const raw = decisionRuleRef?.trim() ?? "";
   return (

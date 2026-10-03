@@ -31,6 +31,7 @@ import { App, Button, DatePicker, Input, Tabs } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import Link from "next/link";
+import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 function defaultRange(): [Dayjs, Dayjs] {
@@ -64,6 +65,8 @@ function buildWidgetQueryMeta(
 
 export default function ManageAccessLogReportsPage() {
   const { message } = App.useApp();
+  const { t } = useTranslation();
+  const formatApiError = useApiErrorMessage();
   const { ruleNames, ruleKinds } = useProxyRuleNameMap();
   const [viewRule, setViewRule] = useState<{
     id: string;
@@ -103,11 +106,7 @@ export default function ManageAccessLogReportsPage() {
       .catch((e) => {
         if (!cancelled) {
           setAiPromptText(null);
-          const msg =
-            e instanceof ApiError
-              ? e.message
-              : "Не удалось подготовить промпт";
-          message.error(msg);
+          message.error(formatApiError(e, t("reports.promptFailed")));
         }
       })
       .finally(() => {
@@ -118,11 +117,11 @@ export default function ManageAccessLogReportsPage() {
     return () => {
       cancelled = true;
     };
-  }, [message]);
+  }, [formatApiError, message, t]);
 
   const summarySpec = useMemo((): AccessLogReportSpec => {
-    const t = rangeToSpecTime(summaryRange);
-    return defaultSummaryReportSpec(t.from, t.to);
+    const range = rangeToSpecTime(summaryRange);
+    return defaultSummaryReportSpec(range.from, range.to);
   }, [summaryRange]);
 
   const runSpec = useCallback(
@@ -140,13 +139,11 @@ export default function ManageAccessLogReportsPage() {
       setSummaryWidgets(widgets);
       summaryLoadedRef.current = true;
     } catch (e) {
-      const msg =
-        e instanceof ApiError ? e.message : "Не удалось загрузить сводку";
-      message.error(msg);
+      message.error(formatApiError(e, t("reports.summaryLoadFailed")));
     } finally {
       setSummaryLoading(false);
     }
-  }, [message, runSpec, summarySpec]);
+  }, [formatApiError, message, runSpec, summarySpec, t]);
 
   useEffect(() => {
     if (activeTab === "summary" && !summaryLoadedRef.current) {
@@ -166,13 +163,9 @@ export default function ManageAccessLogReportsPage() {
       setCustomAppliedSpec(spec);
       setCustomWidgets(widgets);
     } catch (e) {
-      const msg =
-        e instanceof ApiError
-          ? e.message
-          : e instanceof Error
-            ? e.message
-            : "Не удалось выполнить отчёт";
-      message.error(msg);
+      message.error(
+        formatApiError(e, t("reports.runFailed")),
+      );
     } finally {
       setCustomLoading(false);
     }
@@ -184,9 +177,9 @@ export default function ManageAccessLogReportsPage() {
     }
     try {
       await navigator.clipboard.writeText(aiPromptText);
-      message.success("Промпт скопирован");
+      message.success(t("reports.promptCopied"));
     } catch {
-      message.error("Не удалось скопировать");
+      message.error(t("common.copyFailed"));
     }
   };
 
@@ -250,7 +243,7 @@ export default function ManageAccessLogReportsPage() {
       return async (widgetId, params) => {
         const widget = spec.widgets.find((w) => w.id === widgetId);
         if (!widget || widget.type !== "table") {
-          throw new Error("виджет не найден");
+          throw new Error(t("reports.widgetNotFound"));
         }
         const res = await runProxyAccessLogReportTable({
           version: spec.version,
@@ -302,7 +295,7 @@ export default function ManageAccessLogReportsPage() {
           href="/manage/access-log"
           className="text-[12px] text-zinc-500 transition hover:text-teal-300"
         >
-          ← Журнал доступа
+          {t("accessLog.backToLog")}
         </Link>
       </header>
 
@@ -312,7 +305,7 @@ export default function ManageAccessLogReportsPage() {
         items={[
           {
             key: "summary",
-            label: "Сводка",
+            label: t("reports.summaryTab"),
             children: (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-row flex-wrap items-center gap-2">
@@ -331,7 +324,7 @@ export default function ManageAccessLogReportsPage() {
                     loading={summaryLoading}
                     onClick={() => void loadSummary()}
                   >
-                    Обновить
+                    {t("common.refresh")}
                   </Button>
                 </div>
                 <AccessLogReportWidgetGrid
@@ -348,7 +341,7 @@ export default function ManageAccessLogReportsPage() {
           },
           {
             key: "custom",
-            label: "Свой отчёт",
+            label: t("reports.customTab"),
             children: (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-row flex-wrap gap-2">
@@ -357,7 +350,7 @@ export default function ManageAccessLogReportsPage() {
                     loading={customLoading}
                     onClick={() => void runCustom()}
                   >
-                    Выполнить
+                    {t("reports.run")}
                   </Button>
                   <Button
                     icon={<CopyOutlined />}
@@ -365,7 +358,7 @@ export default function ManageAccessLogReportsPage() {
                     disabled={!aiPromptText}
                     onClick={() => void copyPrompt()}
                   >
-                    Промпт для ИИ
+                    {t("reports.aiPrompt")}
                   </Button>
                   <Button
                     icon={<DownloadOutlined />}
@@ -373,7 +366,7 @@ export default function ManageAccessLogReportsPage() {
                     disabled={!aiPromptText}
                     onClick={downloadPrompt}
                   >
-                    Скачать .txt
+                    {t("reports.downloadTxt")}
                   </Button>
                 </div>
                 <Input.TextArea

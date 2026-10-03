@@ -27,6 +27,8 @@ import {
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
+import type { TranslateFn } from "@/i18n/translate";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const POLICY_PLACEHOLDER = `# acl и http_access (как в Squid)
@@ -108,22 +110,24 @@ async function rowsToSyncDrafts(rows: ListRow[]): Promise<ProxyACLNamedListDraft
   );
 }
 
-function compileStatusTag(st: ProxyACLCompileStatus | null) {
+function compileStatusTag(st: ProxyACLCompileStatus | null, t: TranslateFn) {
   if (!st) return null;
   if (st.build_status === "error") {
-    return <Tag color="error">ошибка сборки</Tag>;
+    return <Tag color="error">{t("acl.buildError")}</Tag>;
   }
   if (st.build_status === "building") {
-    return <Tag color="processing">сборка…</Tag>;
+    return <Tag color="processing">{t("acl.building")}</Tag>;
   }
   if (!st.rules_in_sync) {
-    return <Tag color="warning">публикация…</Tag>;
+    return <Tag color="warning">{t("acl.publishing")}</Tag>;
   }
-  return <Tag color="success">опубликовано</Tag>;
+  return <Tag color="success">{t("acl.published")}</Tag>;
 }
 
 export function ProxyACLSquidCard() {
   const { message } = App.useApp();
+  const { t } = useTranslation();
+  const formatApiError = useApiErrorMessage();
   const [loading, setLoading] = useState(true);
   const [policyText, setPolicyText] = useState("");
   const [savedPolicy, setSavedPolicy] = useState("");
@@ -172,13 +176,11 @@ export function ProxyACLSquidCard() {
       setListRows(rows);
       setAclStatus(st);
     } catch (e) {
-      message.error(
-        e instanceof ApiError ? e.message : "Не удалось загрузить ACL",
-      );
+      message.error(formatApiError(e, t("acl.loadFailed")));
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, [formatApiError, message, t]);
 
   useEffect(() => {
     void load();
@@ -237,15 +239,13 @@ export function ProxyACLSquidCard() {
         setAclStatus(await proxyApi.getProxyACLStatus());
         return mapped;
       } catch (e) {
-        message.error(
-          e instanceof ApiError ? e.message : "Ошибка сохранения list",
-        );
+        message.error(formatApiError(e, t("acl.listSaveError")));
         throw e;
       } finally {
         setSavingLists(false);
       }
     },
-    [message],
+    [formatApiError, message, t],
   );
 
   const verifyPolicy = async () => {
@@ -254,14 +254,12 @@ export function ProxyACLSquidCard() {
       const res = await proxyApi.validateProxyACLPolicy(policyText);
       setPolicyDiagnostics(res.diagnostics ?? []);
       if (res.ok) {
-        message.success("Ошибок не найдено");
+        message.success(t("acl.verifyOk"));
       } else {
-        message.warning("В конфиге есть ошибки");
+        message.warning(t("acl.verifyErrors"));
       }
     } catch (e) {
-      message.error(
-        e instanceof ApiError ? e.message : "Не удалось проверить конфиг",
-      );
+      message.error(formatApiError(e, t("acl.verifyFailed")));
     } finally {
       setValidatingPolicy(false);
     }
@@ -273,7 +271,7 @@ export function ProxyACLSquidCard() {
       const pol = await proxyApi.putProxyACLPolicy(policyText);
       setSavedPolicy(pol.config_text);
       setPolicyText(pol.config_text);
-      message.success("Конфиг сохранён");
+      message.success(t("acl.configSaved"));
       setAclStatus(await proxyApi.getProxyACLStatus());
     } catch (e) {
       if (e instanceof ApiError) {
@@ -282,7 +280,7 @@ export function ProxyACLSquidCard() {
           setPolicyDiagnostics(e.diagnostics as ProxyACLPolicyDiagnostic[]);
         }
       } else {
-        message.error("Ошибка сохранения");
+        message.error(t("acl.saveError"));
       }
     } finally {
       setSavingPolicy(false);
@@ -333,9 +331,7 @@ export function ProxyACLSquidCard() {
         setPatternEditorKey(`list-${row.key}-${Date.now()}`);
       })
       .catch((e) => {
-        message.error(
-          e instanceof ApiError ? e.message : "Не удалось загрузить list",
-        );
+        message.error(formatApiError(e, t("acl.listLoadFailed")));
         setListModalOpen(false);
       })
       .finally(() => setListModalLoading(false));
@@ -367,11 +363,9 @@ export function ProxyACLSquidCard() {
         ),
       );
       setAclStatus(await proxyApi.getProxyACLStatus());
-      message.success("Список обновлён");
+      message.success(t("acl.listUpdated"));
     } catch (e) {
-      message.error(
-        e instanceof ApiError ? e.message : "Не удалось опросить URL",
-      );
+      message.error(formatApiError(e, t("acl.pollFailed")));
     } finally {
       setPollingList(false);
     }
@@ -422,7 +416,7 @@ export function ProxyACLSquidCard() {
     }
     try {
       await persistLists(nextRows);
-      message.success("List сохранён");
+      message.success(t("acl.listSaved"));
       setListModalOpen(false);
     } catch {
       /* ошибка уже в message */
@@ -432,40 +426,40 @@ export function ProxyACLSquidCard() {
   const deleteList = (key: string) => {
     const row = listRows.find((r) => r.key === key);
     Modal.confirm({
-      title: "Удалить list?",
+      title: t("acl.deleteListTitle"),
       content: row?.name ? `«${row.name}»` : undefined,
-      okText: "Удалить",
+      okText: t("common.delete"),
       okType: "danger",
-      cancelText: "Отмена",
+      cancelText: t("common.cancel"),
       onOk: async () => {
         const nextRows = listRows.filter((r) => r.key !== key);
         await persistLists(nextRows);
-        message.success("List удалён");
+        message.success(t("acl.listDeleted"));
       },
     });
   };
 
   const listColumns: ColumnsType<ListRow> = [
     {
-      title: "Имя",
+      title: t("common.name"),
       dataIndex: "name",
       key: "name",
       render: (name: string) => name || "—",
     },
     {
-      title: "Тип",
+      title: t("common.type"),
       dataIndex: "list_type",
       key: "list_type",
       width: 100,
     },
     {
-      title: "Строк",
+      title: t("acl.lines"),
       key: "lines",
       width: 90,
       render: (_, row) => row.body_line_count,
     },
     {
-      title: "Превью",
+      title: t("acl.preview"),
       key: "preview",
       ellipsis: true,
       render: (_, row) => row.body_preview || "—",
@@ -493,8 +487,8 @@ export function ProxyACLSquidCard() {
     <div className="flex w-full flex-col gap-4">
       <Card
         loading={loading}
-        title="ACL / http_access"
-        extra={compileStatusTag(aclStatus)}
+        title={t("acl.cardTitle")}
+        extra={compileStatusTag(aclStatus, t)}
       >
         <div className="flex flex-col gap-3">
           <ProxyACLPolicyEditor
@@ -526,7 +520,7 @@ export function ProxyACLSquidCard() {
               loading={validatingPolicy}
               onClick={() => void verifyPolicy()}
             >
-              Проверить
+              {t("common.check")}
             </Button>
             <Button
               type="primary"
@@ -534,7 +528,7 @@ export function ProxyACLSquidCard() {
               disabled={!policyDirty}
               onClick={() => void savePolicy()}
             >
-              Сохранить конфиг
+              {t("acl.saveConfig")}
             </Button>
             {aclStatus?.build_error ? (
               <Typography.Text type="danger">
@@ -547,10 +541,10 @@ export function ProxyACLSquidCard() {
 
       <Card
         loading={loading}
-        title="Lists"
+        title={t("acl.listsTitle")}
         extra={
           <Button icon={<PlusOutlined />} onClick={openCreateList}>
-            Добавить
+            {t("common.add")}
           </Button>
         }
       >
@@ -562,7 +556,7 @@ export function ProxyACLSquidCard() {
               dataSource={listRows}
               pagination={false}
               size="small"
-              locale={{ emptyText: "Нет lists" }}
+              locale={{ emptyText: t("acl.emptyLists") }}
               onRow={(row) => ({
                 onClick: () => openEditList(row),
                 className: "cursor-pointer",

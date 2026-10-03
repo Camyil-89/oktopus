@@ -7,6 +7,7 @@ import {
   ChangePasswordModal,
   CreateUserModal,
 } from "@/assets/modals/UserFormModals";
+import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
 import type { User } from "@/types/user";
 import { App, Button, Input, Space, Table, Tag } from "antd";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
@@ -16,6 +17,8 @@ const PAGE_SIZE = 20;
 
 export default function ManageUsersPage() {
   const { message, modal } = App.useApp();
+  const { t } = useTranslation();
+  const formatApiError = useApiErrorMessage();
   const [data, setData] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -40,13 +43,11 @@ export default function ManageUsersPage() {
       setData(res.results);
       setTotal(res.count);
     } catch (e) {
-      const msg =
-        e instanceof ApiError ? e.message : "Не удалось загрузить список";
-      message.error(msg);
+      message.error(formatApiError(e, t("users.loadFailed")));
     } finally {
       setLoading(false);
     }
-  }, [message, page, search]);
+  }, [formatApiError, message, page, search, t]);
 
   useEffect(() => {
     void load();
@@ -56,7 +57,7 @@ export default function ManageUsersPage() {
     setCreateLoading(true);
     try {
       await usersApi.createUser(values);
-      message.success("Пользователь создан");
+      message.success(t("users.created"));
       setCreateOpen(false);
       setPage(1);
       const res = await usersApi.listUsers({
@@ -67,9 +68,7 @@ export default function ManageUsersPage() {
       setData(res.results);
       setTotal(res.count);
     } catch (e) {
-      const msg =
-        e instanceof ApiError ? e.message : "Не удалось создать пользователя";
-      message.error(msg);
+      message.error(formatApiError(e, t("users.createFailed")));
     } finally {
       setCreateLoading(false);
     }
@@ -82,12 +81,10 @@ export default function ManageUsersPage() {
     setPasswordLoading(true);
     try {
       await usersApi.changeUserPassword(passwordUser.id, values);
-      message.success("Пароль изменён");
+      message.success(t("users.passwordChanged"));
       setPasswordUser(null);
     } catch (e) {
-      const msg =
-        e instanceof ApiError ? e.message : "Не удалось сменить пароль";
-      message.error(msg);
+      message.error(formatApiError(e, t("users.passwordChangeFailed")));
     } finally {
       setPasswordLoading(false);
     }
@@ -97,11 +94,11 @@ export default function ManageUsersPage() {
     const disabling = user.enabled;
     modal.confirm({
       title: disabling
-        ? `Отключить «${user.username}»?`
-        : `Включить «${user.username}»?`,
-      okText: disabling ? "Отключить" : "Включить",
+        ? t("users.disableConfirm", { username: user.username })
+        : t("users.enableConfirm", { username: user.username }),
+      okText: disabling ? t("common.disable") : t("common.enable"),
       okType: disabling ? "danger" : "primary",
-      cancelText: "Отмена",
+      cancelText: t("common.cancel"),
       onOk: async () => {
         try {
           const updated = await usersApi.setUserEnabled(user.id, {
@@ -110,11 +107,11 @@ export default function ManageUsersPage() {
           setData((prev) =>
             prev.map((row) => (row.id === updated.id ? updated : row)),
           );
-          message.success(disabling ? "Пользователь отключён" : "Пользователь включён");
+          message.success(
+            disabling ? t("users.disabled") : t("users.enabled"),
+          );
         } catch (e) {
-          const msg =
-            e instanceof ApiError ? e.message : "Не удалось изменить статус";
-          message.error(msg);
+          message.error(formatApiError(e, t("users.statusChangeFailed")));
         }
       },
     });
@@ -122,19 +119,17 @@ export default function ManageUsersPage() {
 
   const confirmDelete = (user: User) => {
     modal.confirm({
-      title: `Удалить «${user.username}»?`,
-      okText: "Удалить",
+      title: t("users.deleteConfirm", { username: user.username }),
+      okText: t("common.delete"),
       okType: "danger",
-      cancelText: "Отмена",
+      cancelText: t("common.cancel"),
       onOk: async () => {
         try {
           await usersApi.deleteUser(user.id);
-          message.success("Пользователь удалён");
+          message.success(t("users.deleted"));
           await load();
         } catch (e) {
-          const msg =
-            e instanceof ApiError ? e.message : "Не удалось удалить";
-          message.error(msg);
+          message.error(formatApiError(e, t("users.deleteFailed")));
         }
       },
     });
@@ -142,34 +137,34 @@ export default function ManageUsersPage() {
 
   const columns: ColumnsType<User> = [
     {
-      title: "Логин",
+      title: t("common.username"),
       dataIndex: "username",
       key: "username",
     },
     {
-      title: "Статус",
+      title: t("common.status"),
       dataIndex: "enabled",
       key: "enabled",
       render: (enabled: boolean) =>
         enabled ? (
-          <Tag color="success">Активен</Tag>
+          <Tag color="success">{t("users.active")}</Tag>
         ) : (
-          <Tag color="default">Отключён</Tag>
+          <Tag color="default">{t("users.inactive")}</Tag>
         ),
     },
     {
-      title: "Создан",
+      title: t("common.created"),
       dataIndex: "created_at",
       key: "created_at",
       render: (v: string) => new Date(v).toLocaleString(),
     },
     {
-      title: "Действия",
+      title: t("common.actions"),
       key: "actions",
       render: (_, record) => (
         <Space wrap>
           <Button type="link" onClick={() => setPasswordUser(record)}>
-            Пароль
+            {t("common.password")}
           </Button>
           <Button
             type="link"
@@ -177,7 +172,7 @@ export default function ManageUsersPage() {
             disabled={record.protected && record.enabled}
             onClick={() => confirmToggleEnabled(record)}
           >
-            {record.enabled ? "Отключить" : "Включить"}
+            {record.enabled ? t("common.disable") : t("common.enable")}
           </Button>
           <Button
             type="link"
@@ -185,7 +180,7 @@ export default function ManageUsersPage() {
             disabled={record.protected}
             onClick={() => confirmDelete(record)}
           >
-            Удалить
+            {t("common.delete")}
           </Button>
         </Space>
       ),
@@ -200,7 +195,7 @@ export default function ManageUsersPage() {
     <div className="flex w-full flex-col gap-4">
       <div className="flex flex-row flex-wrap justify-between gap-2">
         <Input.Search
-          placeholder="Поиск по логину"
+          placeholder={t("users.searchPlaceholder")}
           allowClear
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
@@ -211,7 +206,7 @@ export default function ManageUsersPage() {
           className="max-w-sm"
         />
         <Button type="primary" onClick={() => setCreateOpen(true)}>
-          Добавить
+          {t("common.add")}
         </Button>
       </div>
 

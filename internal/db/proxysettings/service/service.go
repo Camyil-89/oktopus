@@ -14,6 +14,7 @@ import (
 	proxyaclservice "oktopus/internal/db/proxyacl/service"
 	proxyinspectservice "oktopus/internal/db/proxyinspect/service"
 	proxyaccesslogservice "oktopus/internal/db/proxyaccesslog/service"
+	"oktopus/internal/apperr"
 	"oktopus/internal/id"
 	"oktopus/internal/pki"
 	proxyconfig "oktopus/internal/proxy/config"
@@ -103,7 +104,7 @@ func (s *Service) Update(ctx context.Context, patch UpdateInput) (domain.Setting
 
 	updated, err := s.repo.Update(ctx, next)
 	if err != nil {
-		return domain.Settings{}, err
+		return domain.Settings{}, apperr.Internal(apperr.UpdateProxySettingsFailed, err)
 	}
 	return s.applySettings(ctx, updated)
 }
@@ -125,7 +126,7 @@ func (s *Service) GenerateCA(ctx context.Context, in GenerateCAInput) (domain.Se
 		in.KeyBits = 4096
 	}
 	if in.KeyBits < 2048 {
-		return domain.Settings{}, fmt.Errorf("key_bits must be >= 2048")
+		return domain.Settings{}, apperr.New(apperr.KeyBitsTooSmall)
 	}
 	if in.CommonName == "" {
 		in.CommonName = "Oktopus Proxy CA"
@@ -210,7 +211,7 @@ func (s *Service) CACertPath(ctx context.Context) (string, error) {
 		return "", err
 	}
 	if _, err := os.Stat(st.CACertPath); err != nil {
-		return "", fmt.Errorf("cert not found")
+		return "", apperr.New(apperr.CertNotFound)
 	}
 	return st.CACertPath, nil
 }
@@ -221,7 +222,7 @@ func (s *Service) CAKeyPath(ctx context.Context) (string, error) {
 		return "", err
 	}
 	if _, err := os.Stat(st.CAKeyPath); err != nil {
-		return "", fmt.Errorf("key not found")
+		return "", apperr.New(apperr.KeyNotFound)
 	}
 	return st.CAKeyPath, nil
 }
@@ -278,7 +279,7 @@ func (s *Service) applySettings(ctx context.Context, st domain.Settings) (domain
 		return domain.Settings{}, err
 	}
 	if err := s.applier.Apply(ctx, rt.Config, rt.ACLEngine, rt.InspectRunner); err != nil {
-		return domain.Settings{}, fmt.Errorf("apply proxy config: %w", err)
+		return domain.Settings{}, apperr.MapProxyApply(err)
 	}
 	return st, nil
 }
@@ -361,10 +362,10 @@ func validateSettings(st domain.Settings) error {
 	switch mode {
 	case proxyconfig.ConnectTunnel, proxyconfig.ConnectMITM:
 	default:
-		return fmt.Errorf("invalid connect_mode %q", st.ConnectMode)
+		return apperr.New(apperr.InvalidConnectMode)
 	}
 	if st.Listen == "" {
-		return errors.New("listen is required")
+		return apperr.New(apperr.ListenRequired)
 	}
 	if err := proxyaccesslogservice.ValidateRetentionDays(st.AccessLogRetentionDays); err != nil {
 		return err
@@ -372,10 +373,10 @@ func validateSettings(st domain.Settings) error {
 	if st.AuthEnabled {
 		backend := strings.ToLower(strings.TrimSpace(st.AuthBackend))
 		if backend == "static" && strings.TrimSpace(st.AuthStaticUsers) == "" {
-			return errors.New("auth_static_users required for static backend")
+			return apperr.New(apperr.AuthStaticUsersRequired)
 		}
 		if backend == "ldap" && st.LDAPURL == "" {
-			return errors.New("ldap_url required for ldap backend")
+			return apperr.New(apperr.LDAPURLRequired)
 		}
 	}
 	return nil

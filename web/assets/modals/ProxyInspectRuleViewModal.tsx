@@ -8,6 +8,7 @@ import {
   type ProxyInspectRuleFormValues,
 } from "@/assets/modals/ProxyInspectRuleFormFields";
 import type { ProxyInspectRule } from "@/types/inspect";
+import { useTranslation } from "@/contexts/LocaleContext";
 import { Form } from "antd";
 import { useEffect, useState } from "react";
 
@@ -24,6 +25,7 @@ export function ProxyInspectRuleViewModal({
   initialRule,
   onClose,
 }: ProxyInspectRuleViewModalProps) {
+  const { t } = useTranslation();
   const [form] = Form.useForm<ProxyInspectRuleFormValues>();
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -54,10 +56,10 @@ export function ProxyInspectRuleViewModal({
           return;
         }
         if (e instanceof ApiError && e.status === 404) {
-          setLoadError("Правило не найдено — возможно, его удалили.");
+          setLoadError(t("inspect.ruleNotFound"));
           return;
         }
-        setLoadError("Не удалось загрузить правило.");
+        setLoadError(t("inspect.ruleLoadFailed"));
       })
       .finally(() => {
         if (!cancelled) {
@@ -67,7 +69,7 @@ export function ProxyInspectRuleViewModal({
     return () => {
       cancelled = true;
     };
-  }, [open, ruleId, initialRule, form]);
+  }, [open, ruleId, initialRule, form, t]);
 
   return (
     <ProxyInspectRuleModal

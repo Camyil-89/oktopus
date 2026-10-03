@@ -6,6 +6,7 @@ import {
   type ProxyInspectRuleFormValues,
 } from "@/assets/modals/ProxyInspectRuleFormFields";
 import { OktopusLoading } from "@/assets/components/oktopus/OktopusLoading";
+import { useTranslation } from "@/contexts/LocaleContext";
 import { Button, Modal, Typography } from "antd";
 import type { FormInstance } from "antd";
 
@@ -28,18 +29,19 @@ export function ProxyInspectRuleModal({
   loading,
   errorMessage,
 }: ProxyInspectRuleModalProps) {
+  const { t } = useTranslation();
   const readOnly = mode === "view";
 
   return (
     <Modal
-      title="Просмотр правила инспекции"
+      title={t("inspect.viewTitle")}
       open={open}
       onCancel={onCancel}
       footer={
         readOnly
           ? [
               <Button key="close" type="primary" onClick={onCancel}>
-                Закрыть
+                {t("common.close")}
               </Button>,
             ]
           : undefined

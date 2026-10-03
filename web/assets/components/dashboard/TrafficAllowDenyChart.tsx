@@ -2,6 +2,7 @@
 
 import type { ProxyTrafficBucket } from "@/types/proxy";
 import { SkeletonLoader } from "@/assets/components/SkeletonLoader";
+import { useTranslation } from "@/contexts/LocaleContext";
 import { Tooltip } from "antd";
 import { useMemo } from "react";
 
@@ -65,12 +66,18 @@ function sharePct(part: number, total: number): string {
   return pct < 10 ? `${pct.toFixed(1)}%` : `${Math.round(pct)}%`;
 }
 
-function BucketTooltipContent({ b }: { b: ProxyTrafficBucket }) {
+function BucketTooltipContent({
+  b,
+  totalPrefix,
+}: {
+  b: ProxyTrafficBucket;
+  totalPrefix: string;
+}) {
   return (
     <div className="flex flex-col gap-1.5 font-mono text-[11px] leading-snug">
       <span className="text-zinc-300">{formatBucketRange(b.t)}</span>
       <span>
-        <span className="text-zinc-500">всего </span>
+        <span className="text-zinc-500">{totalPrefix}</span>
         <span className="text-zinc-100">{formatCount(b.requests)}</span>
       </span>
       <span>
@@ -96,6 +103,7 @@ function BucketTooltipContent({ b }: { b: ProxyTrafficBucket }) {
 }
 
 export function TrafficAllowDenyChart({ buckets, loading }: Props) {
+  const { t } = useTranslation();
   const data = buckets?.length ? buckets : [];
 
   const yMax = useMemo(
@@ -153,7 +161,12 @@ export function TrafficAllowDenyChart({ buckets, loading }: Props) {
               return (
                 <Tooltip
                   key={b.t}
-                  title={<BucketTooltipContent b={b} />}
+                  title={
+                    <BucketTooltipContent
+                      b={b}
+                      totalPrefix={t("dashboard.totalPrefix")}
+                    />
+                  }
                   placement="top"
                   mouseEnterDelay={0.05}
                 >
@@ -203,9 +216,9 @@ export function TrafficAllowDenyChart({ buckets, loading }: Props) {
       </div>
       {!loading && data.length > 0 ? (
         <div className="flex justify-between pl-12 font-mono text-[10.5px] text-zinc-500">
-          <span>−5м</span>
-          <span className="text-zinc-600">5 мин · 10 с</span>
-          <span>сейчас</span>
+          <span>{t("dashboard.minus5m")}</span>
+          <span className="text-zinc-600">{t("dashboard.chartBuckets")}</span>
+          <span>{t("dashboard.now")}</span>
         </div>
       ) : null}
     </div>

@@ -1,8 +1,8 @@
 "use client";
 
-import { ApiError } from "@/api/base";
 import { getProxySettings } from "@/api/proxy";
 import { scrollableModalProps } from "@/assets/modals/modalConfig";
+import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
 import { App, Checkbox, Form, InputNumber, Modal } from "antd";
 import { useEffect, useState } from "react";
 
@@ -25,6 +25,8 @@ export function AccessLogRetentionModal({
   onSubmit,
 }: AccessLogRetentionModalProps) {
   const { message } = App.useApp();
+  const { t } = useTranslation();
+  const formatApiError = useApiErrorMessage();
   const [form] = Form.useForm<FormValues>();
   const [loading, setLoading] = useState(false);
   const unlimited = Form.useWatch("unlimited", form);
@@ -46,11 +48,7 @@ export function AccessLogRetentionModal({
         });
       } catch (e) {
         if (!cancelled) {
-          const msg =
-            e instanceof ApiError
-              ? e.message
-              : "Не удалось загрузить настройки";
-          message.error(msg);
+          message.error(formatApiError(e, t("accessLog.retentionLoadFailed")));
         }
       } finally {
         if (!cancelled) {
@@ -61,14 +59,14 @@ export function AccessLogRetentionModal({
     return () => {
       cancelled = true;
     };
-  }, [open, form, message]);
+  }, [open, form, formatApiError, message, t]);
 
   return (
     <Modal
-      title="Хранение записей"
+      title={t("accessLog.retentionTitle")}
       open={open}
-      okText="Сохранить"
-      cancelText="Отмена"
+      okText={t("common.save")}
+      cancelText={t("common.cancel")}
       confirmLoading={saving}
       loading={loading}
       onCancel={() => {
@@ -86,18 +84,18 @@ export function AccessLogRetentionModal({
     >
       <Form form={form} layout="vertical" initialValues={{ unlimited: false, days: 3 }}>
         <Form.Item name="unlimited" valuePropName="checked">
-          <Checkbox>Без ограничения по времени</Checkbox>
+          <Checkbox>{t("accessLog.retentionUnlimited")}</Checkbox>
         </Form.Item>
         {!unlimited && (
           <Form.Item
             name="days"
-            label="Дней хранения"
+            label={t("accessLog.retentionDays")}
             rules={[
-              { required: true, message: "Укажите срок" },
+              { required: true, message: t("accessLog.retentionRequired") },
               {
                 type: "number",
                 min: 1,
-                message: "Минимум 1 день",
+                message: t("accessLog.retentionMin"),
               },
             ]}
           >

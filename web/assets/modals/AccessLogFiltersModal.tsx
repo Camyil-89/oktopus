@@ -6,6 +6,7 @@ import { Button, Checkbox, Collapse, DatePicker, Form, Input, Modal, Select } fr
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import type { AccessLogActionFilter } from "@/utils/accessLogFilters";
+import { useTranslation } from "@/contexts/LocaleContext";
 import { useEffect, useMemo, useState } from "react";
 
 export type AccessLogFiltersValues = {
@@ -116,6 +117,7 @@ export function AccessLogFiltersModal({
   onCancel,
   onApply,
 }: AccessLogFiltersModalProps) {
+  const { t } = useTranslation();
   const [form] = Form.useForm<FormValues>();
   const [collapseOpen, setCollapseOpen] = useState<string[]>([]);
   const [inspectOptions, setInspectOptions] = useState<
@@ -157,7 +159,7 @@ export function AccessLogFiltersModal({
     () => [
       {
         key: "period",
-        label: "Период",
+        label: t("accessLog.filtersPeriod"),
         children: (
           <Form.Item name="period" className={FORM_ITEM_CLASS}>
             <DatePicker.RangePicker
@@ -172,24 +174,24 @@ export function AccessLogFiltersModal({
       },
       {
         key: "rules",
-        label: "Решение и правила",
+        label: t("accessLog.filtersDecision"),
         children: (
           <>
-            <Form.Item name="action" label="Действие" className={FORM_ITEM_CLASS}>
+            <Form.Item name="action" label={t("common.action")} className={FORM_ITEM_CLASS}>
               <Select
                 size="small"
                 allowClear
-                placeholder="Любое"
+                placeholder={t("common.any")}
                 options={[
-                  { value: "1", label: "Разрешено" },
-                  { value: "0", label: "Запрещено" },
-                  { value: "errors", label: "Только с ошибкой" },
+                  { value: "1", label: t("accessLog.filterAllowed") },
+                  { value: "0", label: t("accessLog.filterDenied") },
+                  { value: "errors", label: t("accessLog.filterErrorsOnly") },
                 ]}
               />
             </Form.Item>
             <Form.Item
               name="decision_rule_ref"
-              label="Правило ACL"
+              label={t("accessLog.aclRule")}
               className={FORM_ITEM_CLASS}
             >
               <Input
@@ -201,7 +203,7 @@ export function AccessLogFiltersModal({
             </Form.Item>
             <Form.Item
               name="inspect_rule_id"
-              label="Правило инспекции"
+              label={t("accessLog.inspectRule")}
               className={FORM_ITEM_CLASS}
             >
               <Select
@@ -209,7 +211,7 @@ export function AccessLogFiltersModal({
                 allowClear
                 showSearch
                 optionFilterProp="label"
-                placeholder="Любое"
+                placeholder={t("common.any")}
                 options={inspectOptions}
               />
             </Form.Item>
@@ -218,29 +220,29 @@ export function AccessLogFiltersModal({
       },
       {
         key: "request",
-        label: "Запрос",
+        label: t("accessLog.filtersRequest"),
         children: (
           <>
-            <Form.Item name="user" label="Пользователь" className={FORM_ITEM_CLASS}>
+            <Form.Item name="user" label={t("common.user")} className={FORM_ITEM_CLASS}>
               <Input size="small" allowClear autoComplete="off" />
             </Form.Item>
-            <Form.Item name="source" label="Источник" className={FORM_ITEM_CLASS}>
+            <Form.Item name="source" label={t("common.source")} className={FORM_ITEM_CLASS}>
               <Input size="small" allowClear autoComplete="off" />
             </Form.Item>
-            <Form.Item name="destination" label="Назначение" className={FORM_ITEM_CLASS}>
+            <Form.Item name="destination" label={t("common.destination")} className={FORM_ITEM_CLASS}>
               <Input size="small" allowClear autoComplete="off" />
             </Form.Item>
             <Form.Item name="url" label="URL" className={FORM_ITEM_CLASS}>
               <Input size="small" allowClear autoComplete="off" />
             </Form.Item>
             <Form.Item name="search_only" valuePropName="checked" className="!mb-0">
-              <Checkbox className="text-sm">Только поисковые запросы</Checkbox>
+              <Checkbox className="text-sm">{t("accessLog.searchOnly")}</Checkbox>
             </Form.Item>
           </>
         ),
       },
     ],
-    [inspectOptions],
+    [inspectOptions, t],
   );
 
   const close = () => {
@@ -265,21 +267,21 @@ export function AccessLogFiltersModal({
 
   return (
     <Modal
-      title="Фильтры"
+      title={t("accessLog.filtersTitle")}
       open={open}
       width={480}
       onCancel={close}
       footer={
         <div className="flex flex-row flex-wrap items-center justify-between gap-2">
           <Button size="small" onClick={resetFilters}>
-            Сбросить
+            {t("accessLog.filtersReset")}
           </Button>
           <div className="flex flex-row gap-2">
             <Button size="small" onClick={close}>
-              Отмена
+              {t("common.cancel")}
             </Button>
             <Button size="small" type="primary" onClick={submit}>
-              Найти
+              {t("common.search")}
             </Button>
           </div>
         </div>
