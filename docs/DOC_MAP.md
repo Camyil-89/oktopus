@@ -14,11 +14,12 @@
 | `implementation-examples` | `implementation-examples.html` | — (схемы размещения прокси) |
 | `login` | `login.html` | `/login` |
 | `manage-home` | `manage/index.html` | `/manage` |
-| `manage-rules` | `manage/rules.html` | `/manage/rules` |
+| `manage-instance` | `manage/instance.html` | `/manage/instances/[id]` |
+| `manage-rules` | `manage/rules.html` | `/manage/instances/[id]/rules` |
 | `rules-acl-syntax` | `manage/rules-acl-syntax.html` | — (справочник ACL; промпт для ИИ: `content/prompts/<locale>/rules-acl-syntax.txt`) |
-| `manage-access-log` | `manage/access-log.html` | `/manage/access-log` |
+| `manage-access-log` | `manage/access-log.html` | `/manage/access-log` (и журнал одного инстанса: `…/instances/[id]/access-log`) |
 | `manage-access-log-reports` | `manage/reports.html` | `/manage/reports` |
-| `manage-proxy` | `manage/proxy.html` | `/manage/proxy` |
+| `manage-proxy` | `manage/proxy.html` | `/manage/instances/[id]/settings` |
 | `manage-users` | `manage/users.html` | `/manage/users` |
 
 ## Правка

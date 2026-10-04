@@ -29,7 +29,8 @@ type Manager struct {
 	hooks     *hooks.Hooks
 	log       *log.Logger
 	accessRec accesslog.Recorder
-	instanceID uuid.UUID
+	instanceID   uuid.UUID
+	instanceName string
 
 	mu        sync.Mutex
 	listen    string
@@ -41,6 +42,10 @@ type Manager struct {
 	authCache *auth.AuthCache
 	conns         activeConns
 	accessBatcher *accesslog.Batcher
+
+	appliedCfg     config.Config
+	appliedEngine  *acl.Engine
+	appliedInspect *inspect.Runner
 }
 
 const (
@@ -100,6 +105,42 @@ func (m *Manager) SetInstanceID(id uuid.UUID) {
 	m.instanceID = id
 }
 
+func (m *Manager) SetInstanceName(name string) {
+	m.instanceName = name
+}
+
+func (m *Manager) instanceLabel() string {
+	if m.instanceName != "" {
+		return m.instanceName
+	}
+	if m.instanceID != uuid.Nil {
+		return m.instanceID.String()
+	}
+	return ""
+}
+
+func (m *Manager) logf(format string, args ...interface{}) {
+	if m.log == nil {
+		return
+	}
+	if label := m.instanceLabel(); label != "" {
+		m.log.Printf(label+": "+format, args...)
+		return
+	}
+	m.log.Printf(format, args...)
+}
+
+func (m *Manager) instanceLogger() *log.Logger {
+	if m.log == nil {
+		return log.Default()
+	}
+	label := m.instanceLabel()
+	if label == "" {
+		return m.log
+	}
+	return log.New(m.log.Writer(), label+": ", m.log.Flags())
+}
+
 // SetAccessRecorder задаёт логгер ACL-решений (например accesslog.Batcher).
 func (m *Manager) SetAccessRecorder(rec accesslog.Recorder) {
 	m.accessRec = rec
@@ -128,7 +169,7 @@ func (h reloadableHandler) ServeHTTP(w stdhttp.ResponseWriter, r *stdhttp.Reques
 }
 
 func (m *Manager) recoverHandlerPanic(recovered interface{}) {
-	m.log.Printf("proxy: panic in request handler: %v\n%s", recovered, debug.Stack())
+	m.logf("proxy: panic in request handler: %v\n%s", recovered, debug.Stack())
 	m.markListenRestartAfterPanic()
 	m.triggerListenRestart()
 }
@@ -150,8 +191,14 @@ func (m *Manager) triggerListenRestart() {
 func (m *Manager) Apply(ctx context.Context, cfg config.Config, aclEngine *acl.Engine, inspectRunner *inspect.Runner) error {
 	cfg = cfg.WithDefaults()
 
+	if m.holder.Load() != nil && m.listen == cfg.Listen &&
+		config.RuntimeEqual(m.appliedCfg, cfg) &&
+		m.appliedEngine == aclEngine && m.appliedInspect == inspectRunner {
+		return nil
+	}
+
 	authCache := m.prepareAuthCache(cfg.Auth)
-	newSrv, err := New(cfg, m.instanceID, aclEngine, inspectRunner, m.hooks, m.accessRec, m.log, authCache)
+	newSrv, err := New(cfg, m.instanceID, aclEngine, inspectRunner, m.hooks, m.accessRec, m.instanceLogger(), authCache)
 	if err != nil {
 		m.logStartFailure(err)
 		return err
@@ -184,24 +231,31 @@ func (m *Manager) Apply(ctx context.Context, cfg config.Config, aclEngine *acl.E
 		m.httpSrv = srv
 		m.markListeningReady()
 		m.clearStartError()
+		m.rememberApplied(cfg, aclEngine, inspectRunner)
 		go m.runServe(ln, srv)
 		return nil
 	}
 
 	m.holder.Store(newSrv)
 	m.conns.closeAll()
-	m.logListen(newSrv)
-	m.log.Printf("proxy: configuration reloaded")
+	m.logf("proxy: configuration reloaded")
 	if m.listening.Load() {
 		m.clearStartError()
 	}
+	m.rememberApplied(cfg, aclEngine, inspectRunner)
 	return nil
+}
+
+func (m *Manager) rememberApplied(cfg config.Config, aclEngine *acl.Engine, inspectRunner *inspect.Runner) {
+	m.appliedCfg = cfg
+	m.appliedEngine = aclEngine
+	m.appliedInspect = inspectRunner
 }
 
 func (m *Manager) runServe(ln net.Listener, srv *stdhttp.Server) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			m.log.Printf("proxy: panic in listener: %v\n%s", rec, debug.Stack())
+			m.logf("proxy: panic in listener: %v\n%s", rec, debug.Stack())
 			m.markListenRestartAfterPanic()
 			m.listening.Store(false)
 		}
@@ -230,18 +284,20 @@ func (m *Manager) prepareAuthCache(a config.AuthConfig) *auth.AuthCache {
 }
 
 func (m *Manager) logListen(s *Server) {
-	m.log.Printf("listening on %s (connect=%s)", s.cfg.Listen, s.cfg.Connect)
+	logger := m.instanceLogger()
+	logger.Printf("listening on %s (connect=%s)", s.cfg.Listen, s.cfg.Connect)
 	if s.cfg.Connect == config.ConnectMITM {
-		m.log.Printf("MITM CA: %s", s.cfg.CACertPath)
+		logger.Printf("MITM CA: %s", s.cfg.CACertPath)
 	}
+	LogConnectCAStatus(logger, s.cfg)
 	if s.auth != nil {
-		m.log.Printf("proxy auth: Basic realm=%q backend=%s", s.cfg.Auth.Realm, authBackendLabel(s.cfg.Auth))
+		logger.Printf("proxy auth: Basic realm=%q backend=%s", s.cfg.Auth.Realm, authBackendLabel(s.cfg.Auth))
 		if s.auth.Cache != nil {
-			m.log.Printf("proxy auth cache: ttl=%s", s.auth.Cache.TTL())
+			logger.Printf("proxy auth cache: ttl=%s", s.auth.Cache.TTL())
 		}
 	}
 	if s.aclSource == "database" {
-		m.log.Printf("acl: database")
+		logger.Printf("acl: database")
 	}
 }
 
@@ -278,7 +334,7 @@ func (m *Manager) logStartFailure(err error) {
 		return
 	}
 	m.setStartError(err)
-	m.log.Printf("proxy: не удалось запустить: %s (%v)", apperr.ProxyStartErrorMessage(err), err)
+	m.logf("proxy: не удалось запустить: %s (%v)", apperr.ProxyStartErrorMessage(err), err)
 }
 
 func (m *Manager) clearStartError() {
@@ -348,9 +404,9 @@ func (m *Manager) RunContextWithLoader(ctx context.Context, load RuntimeLoader) 
 			retry := proxyListenRetryInterval
 			if m.consumeListenRestartAfterPanic() {
 				retry = panicRecoveryDelay
-				m.log.Printf("proxy: восстановление после паники через %s", retry)
+				m.logf("proxy: восстановление после паники через %s", retry)
 			} else {
-				m.log.Printf("proxy: повтор запуска...")
+				m.logf("proxy: повтор запуска...")
 			}
 			if !waitFor(ctx, retry) {
 				m.shutdownProxy()
@@ -380,6 +436,9 @@ func (m *Manager) shutdownProxy() {
 		m.httpSrv = nil
 	}
 	m.listening.Store(false)
+	m.appliedCfg = config.Config{}
+	m.appliedEngine = nil
+	m.appliedInspect = nil
 }
 
 func (m *Manager) waitUntilNotListening(ctx context.Context) {

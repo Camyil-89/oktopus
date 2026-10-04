@@ -48,14 +48,21 @@ func (f *Fleet) ApplyFleet(ctx context.Context, runtimes []proxyinstanceservice.
 		if m == nil {
 			m = NewManager(f.hooks, f.log)
 			m.SetInstanceID(rt.InstanceID)
+			m.SetInstanceName(rt.Name)
 			if f.accessRec != nil {
 				m.SetAccessRecorder(stampingRecorder{instanceID: rt.InstanceID, inner: f.accessRec})
 			}
 			f.managers[rt.InstanceID] = m
+		} else if rt.Name != "" {
+			m.SetInstanceName(rt.Name)
 		}
 		if err := m.Apply(ctx, rt.Config, rt.ACLEngine, rt.InspectRunner); err != nil {
 			if f.log != nil {
-				f.log.Printf("proxy: instance %s: %v", rt.InstanceID, err)
+				label := rt.Name
+				if label == "" {
+					label = rt.InstanceID.String()
+				}
+				f.log.Printf("%s: proxy apply: %v", label, err)
 			}
 			continue
 		}

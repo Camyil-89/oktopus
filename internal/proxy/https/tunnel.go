@@ -9,8 +9,11 @@ import (
 
 	"oktopus/internal/pki"
 	"oktopus/internal/proxy/hooks"
+	"oktopus/internal/proxy/instancectx"
 	"oktopus/internal/proxy/observe"
 	"oktopus/internal/proxy/ratelimit"
+
+	"github.com/google/uuid"
 )
 
 // Tunnel — CONNECT + прозрачный TCP (без расшифровки) для разрешённого трафика.
@@ -71,7 +74,11 @@ func (t *Tunnel) serveRelay(ctx context.Context, w stdhttp.ResponseWriter, r *st
 		flow = t.RateLimit.DelayFlowConnect(ctx, hostPort)
 	}
 
-	go Relay(upstream, clientConn, flow, RelayFromClient, true)
-	go Relay(clientConn, upstream, flow, RelayToClient, true)
+	var instID uuid.UUID
+	if id, ok := instancectx.ID(ctx); ok {
+		instID = id
+	}
+	go RelayInstance(upstream, clientConn, flow, RelayFromClient, true, instID)
+	go RelayInstance(clientConn, upstream, flow, RelayToClient, true, instID)
 	return nil
 }

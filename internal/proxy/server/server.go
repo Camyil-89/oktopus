@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	stdhttp "net/http"
@@ -61,17 +62,11 @@ func New(cfg config.Config, instanceID uuid.UUID, engine *acl.Engine, inspectRun
 	ca, caErr := pki.LoadAuthority(cfg.CACertPath, cfg.CAKeyPath)
 	switch cfg.Connect {
 	case config.ConnectTunnel:
-		if caErr != nil {
-			logger.Printf("tunnel: CA not loaded (%v); PORT deny will use CONNECT 403 without in-tab Forbidden page", caErr)
-		} else {
-			ca.LogSummary(logger)
-		}
 		connect = &proxyhttps.Tunnel{Hooks: h, CA: ca, RateLimit: engine}
 	case config.ConnectMITM:
 		if caErr != nil {
 			return nil, fmt.Errorf("mitm requires CA (%s, %s): %w", cfg.CACertPath, cfg.CAKeyPath, caErr)
 		}
-		ca.LogSummary(logger)
 		connect = &proxyhttps.MITM{CA: ca, Hooks: h, AccessLog: accessRec, RateLimit: engine}
 	default:
 		return nil, fmt.Errorf("unknown connect mode: %q", cfg.Connect)
@@ -103,12 +98,34 @@ func New(cfg config.Config, instanceID uuid.UUID, engine *acl.Engine, inspectRun
 	}, nil
 }
 
+// LogConnectCAStatus пишет в лог состояние CA при старте слушателя (tunnel: опционально).
+func LogConnectCAStatus(logger *log.Logger, cfg config.Config) {
+	if logger == nil {
+		return
+	}
+	cfg = cfg.WithDefaults()
+	ca, caErr := pki.LoadAuthority(cfg.CACertPath, cfg.CAKeyPath)
+	switch cfg.Connect {
+	case config.ConnectTunnel:
+		if caErr != nil {
+			logger.Printf("tunnel: CA not loaded (%v); PORT deny will use CONNECT 403 without in-tab Forbidden page", caErr)
+		} else if ca != nil {
+			ca.LogSummary(logger)
+		}
+	case config.ConnectMITM:
+		if ca != nil {
+			ca.LogSummary(logger)
+		}
+	}
+}
+
 // ListenAndServe блокируется до ошибки listener.
 func (s *Server) ListenAndServe() error {
 	s.log.Printf("listening on %s (connect=%s)", s.cfg.Listen, s.cfg.Connect)
 	if s.cfg.Connect == config.ConnectMITM {
 		s.log.Printf("MITM CA: %s", s.cfg.CACertPath)
 	}
+	LogConnectCAStatus(s.log, s.cfg)
 	if s.auth != nil {
 		s.log.Printf("proxy auth: Basic realm=%q backend=%s", s.cfg.Auth.Realm, authBackendLabel(s.cfg.Auth))
 		if s.auth.Cache != nil {
@@ -161,6 +178,9 @@ func (s *Server) ServeHTTP(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	}
 
 	if err := s.http.Serve(ctx, w, r); err != nil {
+		if errors.Is(err, context.Canceled) {
+			return
+		}
 		s.log.Printf("HTTP %s %s: %v", r.Method, r.URL, err)
 		stdhttp.Error(w, err.Error(), stdhttp.StatusBadGateway)
 	}
@@ -247,6 +267,7 @@ func (s *Server) ListenAndServeContext(ctx context.Context) error {
 	if s.cfg.Connect == config.ConnectMITM {
 		s.log.Printf("MITM CA: %s", s.cfg.CACertPath)
 	}
+	LogConnectCAStatus(s.log, s.cfg)
 	if s.auth != nil {
 		s.log.Printf("proxy auth: Basic realm=%q backend=%s", s.cfg.Auth.Realm, authBackendLabel(s.cfg.Auth))
 		if s.auth.Cache != nil {

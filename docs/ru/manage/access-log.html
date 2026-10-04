@@ -73,6 +73,7 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Панель управления</p>
         <div class="flex flex-col gap-0.5">
           <a href="./index.html" class="nav-item"><span class="dot"></span>Главная</a>
+<a href="./instance.html" class="nav-item"><span class="dot"></span>Статистика инстанса</a>
 <a href="./rules.html" class="nav-item"><span class="dot"></span>Правила прокси</a>
 <a href="./access-log.html" class="nav-item active"><span class="dot"></span>Журнал доступа</a>
 <a href="./reports.html" class="nav-item"><span class="dot"></span>Отчёты журнала</a>
@@ -127,7 +128,7 @@
           <article class="doc doc-page">
             <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Панель управления</p>
             <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Журнал доступа</h1>
-            <p class="lead">Раздел <code>/manage/access-log</code> — поиск и просмотр решений прокси: кто, куда, allow или deny, какое правило сработало.</p>
+            <p class="lead">Раздел <code>/manage/access-log</code> — журнал по всем инстансам (в фильтрах можно выбрать <code>instance_id</code>). У каждого прокси также есть свой журнал: <code>/manage/instances/{id}/access-log</code> — те же таблица и фильтры, но только для выбранного listen.</p>
 
             <h2 id="mal-tour">Интерфейс</h2>
             <div class="ui-mock-wrap">
@@ -139,13 +140,12 @@
                   </div>
                   <nav class="ui-mock-nav tour-zone" tabindex="0"
                     data-tour-title="Боковое меню"
-                    data-tour-body="Навигация по панели управления: главная, правила, журнал, отчёты, настройки прокси, пользователи. Внизу — выход из учётной записи.">
+                    data-tour-body="Общие разделы: главная, журнал и отчёты по всем инстансам, пользователи кабинета. Ниже — каждый прокси-инстанс: при открытии появляются подпункты (статистика, правила, настройки, журнал). Выход — внизу.">
                     <div class="ui-mock-nav-item">Главная</div>
-                    <div class="ui-mock-nav-item">Правила прокси</div>
                     <div class="ui-mock-nav-item is-active">Журнал доступа</div>
                     <div class="ui-mock-nav-item">Отчёты журнала</div>
-                    <div class="ui-mock-nav-item">Настройки прокси</div>
                     <div class="ui-mock-nav-item">Пользователи</div>
+                    <div class="ui-mock-nav-item ui-mock-nav-instance">Офис</div>
                   </nav>
                 </aside>
                 <div class="ui-mock-main">
@@ -180,6 +180,9 @@
               <li>Откройте строку, чтобы увидеть детали: правило ACL, задержки, инспекция.</li>
               <li>Для очистки старых записей используйте действие удаления за период (если доступно вашей роли).</li>
             </ol>
+
+            <h2 id="mal-instances">Инстансы</h2>
+            <p>В общем журнале колонка и фильтр по инстансу помогают отделить трафик разных listen. В боковом меню пункт «Журнал доступа» под именем прокси открывает тот же интерфейс уже с привязкой к инстансу.</p>
 
             <h2 id="mal-tip">Зачем это нужно</h2>
             <p>Журнал помогает понять, почему сайт заблокирован, найти аномальный трафик и проверить, что новые правила ACL работают как ожидается.</p>

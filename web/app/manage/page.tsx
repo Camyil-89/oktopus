@@ -1,28 +1,39 @@
 "use client";
 
-import { ApiError } from "@/api/base";
 import * as proxyApi from "@/api/proxy";
 import { DashboardStatCard } from "@/assets/components/dashboard/DashboardStatCard";
 import type { DashboardStatTone } from "@/assets/components/dashboard/DashboardStatCard";
-import { ACLDecideBreakdownTooltip } from "@/assets/components/dashboard/ACLDecideBreakdownTooltip";
-import { InspectBreakdownTooltip } from "@/assets/components/dashboard/InspectBreakdownTooltip";
-import { PolicyBreakdownTooltip } from "@/assets/components/dashboard/PolicyBreakdownTooltip";
-import { TrafficAllowDenyChart } from "@/assets/components/dashboard/TrafficAllowDenyChart";
-import { TrafficThroughputChart } from "@/assets/components/dashboard/TrafficThroughputChart";
-import type { ProxyACLCompileStatus, ProxyRuntimeStatus } from "@/types/proxy";
+import { DashboardRuntimePanel } from "@/assets/components/dashboard/DashboardRuntimePanel";
+import { DashboardTrafficChartsSection } from "@/assets/components/dashboard/DashboardTrafficChartsSection";
+import type {
+  ProxyACLCompileStatus,
+  ProxyInstanceRuntimeStatus,
+  ProxyRuntimeStatus,
+} from "@/types/proxy";
 import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
 import type { TranslateFn } from "@/i18n/translate";
-import { byteUnitLabelsFromT, formatBytes } from "@/utils/formatBytes";
-import { durationUnitLabelsFromT, formatDurationUs } from "@/utils/formatDurationUs";
 import { OktopusLoading } from "@/assets/components/oktopus/OktopusLoading";
 import { mergeTrafficBuckets } from "@/utils/mergeTrafficBuckets";
+import {
+  averageInstanceTraffic,
+  fleetAclSummary,
+} from "@/utils/fleetDashboardMetrics";
 import { CreateProxyInstanceModal } from "@/assets/modals/CreateProxyInstanceModal";
-import { InstanceRuntimeOverview } from "@/assets/components/dashboard/InstanceRuntimeOverview";
-import type { ProxyInstance } from "@/types/proxy";
 import { PlusOutlined } from "@ant-design/icons";
-import { Alert, Button, Tag, Tooltip, Typography } from "antd";
+import { Alert, Button, Typography } from "antd";
+import { ManageFleetInstanceBlock } from "@/assets/components/dashboard/ManageFleetInstanceBlock";
+import { PROXY_INSTANCES_CHANGED_EVENT } from "@/assets/modals/CreateProxyInstanceModal";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  startTransition,
+} from "react";
+import { runtimeStatusFingerprint } from "@/utils/runtimeStatusFingerprint";
+import type { ProxyInstance } from "@/types/proxy";
 
 function aclBuildLabel(st: ProxyACLCompileStatus, t: TranslateFn): string {
   switch (st.build_status) {
@@ -83,7 +94,7 @@ function formatStartupClock(iso?: string, localeTag = "ru-RU"): string {
 }
 
 function aclCompileDurationMs(
-  acl: ProxyACLCompileStatus | undefined,
+  acl: ProxyACLCompileStatus | null | undefined,
 ): number | undefined {
   if (acl?.last_compile_duration_ms != null) {
     return acl.last_compile_duration_ms;
@@ -142,6 +153,42 @@ function StatusDot({ tone }: { tone: DashboardStatTone }) {
   );
 }
 
+function proxyListenHint(instances: ProxyInstanceRuntimeStatus[]) {
+  if (instances.length === 0) {
+    return "—";
+  }
+  return (
+    <>
+      {instances.map((inst, i) => (
+        <span key={inst.id}>
+          {i > 0 ? <span className="text-zinc-600">, </span> : null}
+          <span className={inst.active ? "text-teal-300" : "text-red-300/90"}>
+            {inst.listen}
+          </span>
+        </span>
+      ))}
+    </>
+  );
+}
+
+function instancesCatalogEqual(a: ProxyInstance[], b: ProxyInstance[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  const sa = [...a].sort((x, y) => x.id.localeCompare(y.id));
+  const sb = [...b].sort((x, y) => x.id.localeCompare(y.id));
+  for (let i = 0; i < sa.length; i++) {
+    if (
+      sa[i].id !== sb[i].id ||
+      sa[i].name !== sb[i].name ||
+      sa[i].listen !== sb[i].listen
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function MetricsWindow5mBadge({ label }: { label: string }) {
   return (
     <span className="font-mono text-[11px] text-teal-300/70">{label}</span>
@@ -151,22 +198,38 @@ function MetricsWindow5mBadge({ label }: { label: string }) {
 export default function ManagePage() {
   const { t, localeTag, apiErrorMessage } = useTranslation();
   const formatApiError = useApiErrorMessage();
-  const byteUnits = useMemo(() => byteUnitLabelsFromT(t), [t]);
-  const durationUnits = useMemo(() => durationUnitLabelsFromT(t), [t]);
   const emDash = t("common.emDash");
   const [status, setStatus] = useState<ProxyRuntimeStatus | null>(null);
   const [dbInstances, setDbInstances] = useState<ProxyInstance[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const statusFpRef = useRef<string | null>(null);
 
-  const load = useCallback(async () => {
+  const loadInstances = useCallback(async () => {
     try {
-      const [st, list] = await Promise.all([
-        proxyApi.getProxyRuntimeStatus(),
-        proxyApi.listProxyInstances().catch(() => [] as ProxyInstance[]),
-      ]);
-      setStatus(st);
-      setDbInstances(list ?? []);
+      const list = await proxyApi.listProxyInstances();
+      setDbInstances((prev) => {
+        const next = list ?? [];
+        if (instancesCatalogEqual(prev, next)) {
+          return prev;
+        }
+        return next;
+      });
+    } catch {
+      /* каталог не блокирует дашборд */
+    }
+  }, []);
+
+  const pollRuntime = useCallback(async () => {
+    try {
+      const st = await proxyApi.getProxyRuntimeStatus();
+      const fp = runtimeStatusFingerprint(st);
+      if (fp !== statusFpRef.current) {
+        statusFpRef.current = fp;
+        startTransition(() => {
+          setStatus(st);
+        });
+      }
       setError(null);
     } catch (e) {
       setError(formatApiError(e, t("dashboard.loadFailed")));
@@ -174,15 +237,24 @@ export default function ManagePage() {
   }, [formatApiError, t]);
 
   useEffect(() => {
-    void load();
-    const t = setInterval(() => void load(), 3000);
-    return () => clearInterval(t);
-  }, [load]);
+    void loadInstances();
+    void pollRuntime();
+    const onCatalogChange = () => void loadInstances();
+    window.addEventListener(PROXY_INSTANCES_CHANGED_EVENT, onCatalogChange);
+    const timer = setInterval(() => void pollRuntime(), 3000);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener(PROXY_INSTANCES_CHANGED_EVENT, onCatalogChange);
+    };
+  }, [loadInstances, pollRuntime]);
 
   const instances = status?.instances ?? [];
   const safeDbInstances = dbInstances ?? [];
-  const acl =
-    instances.find((i) => i.active)?.acl ?? instances[0]?.acl;
+  const fleetAcl = useMemo(() => fleetAclSummary(instances), [instances]);
+  const avgRuntimeTraffic = useMemo(
+    () => averageInstanceTraffic(instances),
+    [instances],
+  );
   const traffic = status?.traffic;
   const loading = !status && !error;
   const proxyUp = Boolean(status?.proxy_active);
@@ -214,12 +286,6 @@ export default function ManagePage() {
     return mergeTrafficBuckets(perInstance);
   }, [traffic?.buckets_10s, instances]);
   const startup = status?.startup;
-  const bytesTotalUp =
-    (traffic?.bytes_total_up_allow ?? 0) + (traffic?.bytes_total_up_deny ?? 0);
-  const bytesTotalDown =
-    (traffic?.bytes_total_down_allow ?? 0) +
-    (traffic?.bytes_total_down_deny ?? 0);
-  const bytesTotal = bytesTotalUp + bytesTotalDown;
 
   return (
     <div className="flex w-full flex-col gap-3">
@@ -230,7 +296,10 @@ export default function ManagePage() {
       <CreateProxyInstanceModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onCreated={() => void load()}
+        onCreated={() => {
+          void loadInstances();
+          void pollRuntime();
+        }}
       />
 
       {instances.some((i) => i.proxy_start_error) ? (
@@ -252,23 +321,21 @@ export default function ManagePage() {
           tone={proxyUp ? "success" : "danger"}
           badge={<StatusDot tone={proxyUp ? "success" : "danger"} />}
           value={proxyUp ? "RUNNING" : "STOPPED"}
-          hint={
-            instances.filter((i) => i.active).map((i) => i.listen).join(", ") || "—"
-          }
+          hint={proxyListenHint(instances)}
         />
         <DashboardStatCard
           label={t("dashboard.aclBuild")}
-          loading={loading && !acl}
-          tone={acl ? aclBuildTone(acl) : undefined}
+          loading={loading && !fleetAcl}
+          tone={fleetAcl ? aclBuildTone(fleetAcl) : undefined}
           badge={
-            acl ? <StatusDot tone={aclBuildTone(acl)} /> : undefined
+            fleetAcl ? <StatusDot tone={aclBuildTone(fleetAcl)} /> : undefined
           }
-          value={acl ? aclBuildLabel(acl, t) : emDash}
+          value={fleetAcl ? aclBuildLabel(fleetAcl, t) : emDash}
           hint={
-            acl
+            fleetAcl
               ? t("dashboard.rulesPatterns", {
-                rules: acl.active_logical_rules,
-                patterns: acl.active_patterns,
+                rules: fleetAcl.active_logical_rules,
+                patterns: fleetAcl.active_patterns,
               })
               : undefined
           }
@@ -331,8 +398,8 @@ export default function ManagePage() {
         />
       </div>
 
-      {acl?.build_error ? (
-        <Alert type="error" message={acl.build_error} showIcon />
+      {fleetAcl?.build_error ? (
+        <Alert type="error" message={fleetAcl.build_error} showIcon />
       ) : null}
 
       <div className="rounded-xl border border-white/10 bg-white/5 p-5">
@@ -372,14 +439,14 @@ export default function ManagePage() {
                 {t("dashboard.aclCompile")}
               </span>
               <span className="text-[13px] leading-snug text-teal-200/90">
-                {acl?.build_status === "building"
+                {fleetAcl?.build_status === "building"
                   ? t("dashboard.inProgress")
-                  : formatDurationMs(aclCompileDurationMs(acl), t)}
+                  : formatDurationMs(aclCompileDurationMs(fleetAcl), t)}
               </span>
               <span className="font-mono text-[11px] text-zinc-600">
-                {acl?.build_finished_at
+                {fleetAcl?.build_finished_at
                   ? t("dashboard.aclDoneAt", {
-                    time: formatStartupClock(acl.build_finished_at, localeTag),
+                    time: formatStartupClock(fleetAcl.build_finished_at, localeTag),
                   })
                   : t("dashboard.aclNever")}
               </span>
@@ -389,297 +456,21 @@ export default function ManagePage() {
       </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
-        <div className="rounded-xl border border-white/10 bg-white/[0.05] p-5 lg:col-span-2">
-          <div className="mb-6 flex flex-row flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[13px] font-medium text-zinc-100">{t("dashboard.traffic")}</p>
-              <p className="mt-0.5 font-mono text-[11.5px] text-zinc-500">
-                {t("dashboard.trafficHintChart")}
-              </p>
-            </div>
-            <div className="flex flex-row items-center gap-3 font-mono text-[11px]">
-              <span className="flex flex-row items-center gap-1.5 text-zinc-500">
-                <span className="h-2 w-2 rounded-sm bg-teal-400/75" />
-                allow
-              </span>
-              <span className="flex flex-row items-center gap-1.5 text-zinc-500">
-                <span className="h-2 w-2 rounded-sm bg-red-400/50" />
-                deny
-              </span>
-            </div>
-          </div>
-          {!proxyUp && !loading ? (
-            <Typography.Text type="secondary">
-              {t("dashboard.chartWhenUp")}
-            </Typography.Text>
-          ) : (
-            <TrafficAllowDenyChart buckets={buckets} loading={loading} />
-          )}
-          <div className="mt-8 border-t border-white/8 pt-6">
-            <div className="mb-6 flex flex-row flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[13px] font-medium text-zinc-100">
-                  {t("dashboard.throughput")}
-                </p>
-                <p className="mt-0.5 font-mono text-[11.5px] text-zinc-500">
-                  {t("dashboard.throughputHint")}
-                </p>
-              </div>
-              <div className="flex flex-row items-center gap-3 font-mono text-[11px]">
-                <span className="flex flex-row items-center gap-1.5 text-zinc-500">
-                  <span className="h-2 w-2 rounded-sm bg-amber-400/70" />
-                  {t("dashboard.egress")}
-                </span>
-                <span className="flex flex-row items-center gap-1.5 text-zinc-500">
-                  <span className="h-2 w-2 rounded-sm bg-sky-400/70" />
-                  {t("dashboard.ingress")}
-                </span>
-              </div>
-            </div>
-            {!proxyUp && !loading ? (
-              <Typography.Text type="secondary">
-                {t("dashboard.chartWhenUp")}
-              </Typography.Text>
-            ) : (
-              <TrafficThroughputChart buckets={buckets} loading={loading} />
-            )}
-          </div>
-        </div>
+        <DashboardTrafficChartsSection
+          buckets={buckets}
+          proxyUp={proxyUp}
+          loading={loading}
+        />
 
-        <div className="rounded-xl border border-white/10 bg-white/[0.05] p-5">
-          <p className="text-[13px] font-medium text-zinc-100">Runtime</p>
-          <p className="mb-5 mt-0.5 font-mono text-[11.5px] text-zinc-500">
-            {t("dashboard.runtimeHint")}
-          </p>
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <OktopusLoading size="lg" />
-            </div>
-          ) : (
-            <ul className="flex flex-col gap-3.5 text-[12.5px]">
-              <RuntimeRow
-                label={t("dashboard.connections")}
-                value={
-                  proxyUp && traffic
-                    ? String(traffic.active_connections)
-                    : "—"
-                }
-              />
-              <RuntimeRow
-                label={t("dashboard.wsMitm")}
-                value={
-                  proxyUp && traffic
-                    ? String(traffic.active_websocket_connections ?? 0)
-                    : "—"
-                }
-              />
-              <RuntimeRow
-                label={t("dashboard.rulesInProxy")}
-                value={
-                  acl ? (
-                    acl.rules_in_sync ? (
-                      <Tag color="success" className="!m-0">
-                        {t("dashboard.rulesCurrent")}
-                      </Tag>
-                    ) : (
-                      <Tag color="warning" className="!m-0">
-                        {t("dashboard.rulesStale")}
-                      </Tag>
-                    )
-                  ) : (
-                    "—"
-                  )
-                }
-              />
-              <RuntimeRow
-                label="SNI index / regexp"
-                tooltip={
-                  acl ? (
-                    <div className="flex max-w-[340px] flex-col gap-2 text-[11px]">
-                      <p className="m-0 text-zinc-400">
-                        {t("dashboard.sniTooltip")}
-                      </p>
-                      {acl.sni_regexp_reason_counts &&
-                        Object.keys(acl.sni_regexp_reason_counts).length > 0 ? (
-                        <div className="border-t border-white/10 pt-2 text-zinc-500">
-                          <p className="m-0 mb-1 text-[10px] uppercase tracking-wide">
-                            {t("dashboard.regexpReasons")}
-                          </p>
-                          <ul className="m-0 list-none space-y-0.5 font-mono text-zinc-300">
-                            {Object.entries(acl.sni_regexp_reason_counts).map(
-                              ([k, v]) => (
-                                <li key={k}>
-                                  {k}: {v}
-                                </li>
-                              ),
-                            )}
-                          </ul>
-                        </div>
-                      ) : null}
-                      {acl.sni_regexp_samples &&
-                        acl.sni_regexp_samples.length > 0 ? (
-                        <div className="border-t border-white/10 pt-2 text-zinc-500">
-                          <p className="m-0 mb-1 text-[10px] uppercase tracking-wide">
-                            {t("dashboard.regexpSamples")}
-                          </p>
-                          <ul className="m-0 max-h-40 list-none space-y-1 overflow-y-auto font-mono text-[10px] text-zinc-400">
-                            {acl.sni_regexp_samples.slice(0, 12).map((s) => (
-                              <li key={`${s.reason}:${s.line}`}>
-                                <span className="text-zinc-500">{s.reason}</span>{" "}
-                                {s.line}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : undefined
-                }
-                value={
-                  acl
-                    ? `${acl.active_sni_patterns_indexed ?? "—"} / ${acl.active_sni_patterns_regexp ?? "—"} · slow ${acl.active_slow_rule_slots ?? "—"}`
-                    : "—"
-                }
-              />
-              <RuntimeRow
-                label={t("dashboard.usersSources")}
-                value={
-                  traffic && proxyUp
-                    ? `${traffic.unique_users_5m} / ${traffic.unique_sources_5m}`
-                    : "—"
-                }
-              />
-              <RuntimeRow
-                label={t("dashboard.accessLogQueue")}
-                value={
-                  traffic ? String(traffic.access_log_queue_pending) : "—"
-                }
-              />
-              <RuntimeRow
-                label={t("dashboard.trafficTotal")}
-                tooltip={
-                  traffic && proxyUp ? (
-                    <div className="flex flex-col gap-1.5 font-mono text-[11px]">
-                      <span>
-                        <span className="text-amber-300/90">{t("dashboard.egress")} </span>
-                        {formatBytes(bytesTotalUp, byteUnits)}
-                      </span>
-                      <span>
-                        <span className="text-teal-300">allow </span>
-                        {formatBytes(traffic.bytes_total_up_allow ?? 0, byteUnits)}
-                      </span>
-                      <span>
-                        <span className="text-red-300">deny </span>
-                        {formatBytes(traffic.bytes_total_up_deny ?? 0, byteUnits)}
-                      </span>
-                      <span className="mt-1 border-t border-white/10 pt-1">
-                        <span className="text-sky-300/90">{t("dashboard.ingress")} </span>
-                        {formatBytes(bytesTotalDown, byteUnits)}
-                      </span>
-                      <span>
-                        <span className="text-teal-300">allow </span>
-                        {formatBytes(traffic.bytes_total_down_allow ?? 0, byteUnits)}
-                      </span>
-                      <span>
-                        <span className="text-red-300">deny </span>
-                        {formatBytes(traffic.bytes_total_down_deny ?? 0, byteUnits)}
-                      </span>
-                    </div>
-                  ) : undefined
-                }
-                value={
-                  proxyUp && traffic
-                    ? formatBytes(bytesTotal, byteUnits)
-                    : "—"
-                }
-              />
-            </ul>
-          )}
-          <div className="mt-5 border-t border-white/8 pt-4">
-            <p className="mb-3 font-mono text-[11px] text-zinc-600">
-              {t("dashboard.latencyHint")}
-            </p>
-            {loading ? null : (
-              <ul className="flex flex-col gap-3.5 text-[12.5px]">
-                <RuntimeRow
-                  label={t("dashboard.aclLatency")}
-                  tooltip={
-                    traffic && proxyUp && traffic.decide_breakdown_5m
-                      ? (
-                        <ACLDecideBreakdownTooltip
-                          totalAvgUs={traffic.decide_duration_us_avg_5m}
-                          totalP95Us={traffic.decide_duration_us_p95_5m}
-                          totalP99Us={traffic.decide_duration_us_p99_5m}
-                          breakdown={traffic.decide_breakdown_5m}
-                        />
-                      )
-                      : undefined
-                  }
-                  value={
-                    traffic && proxyUp
-                      ? `${formatDurationUs(traffic.decide_duration_us_avg_5m, emDash, durationUnits)} / ${formatDurationUs(traffic.decide_duration_us_p95_5m, emDash, durationUnits)} / ${formatDurationUs(traffic.decide_duration_us_p99_5m, emDash, durationUnits)}`
-                      : "—"
-                  }
-                />
-                <RuntimeRow
-                  label={t("dashboard.inspectLatency")}
-                  tooltip={
-                    traffic && proxyUp && traffic.inspect_breakdown_5m
-                      ? (
-                        <InspectBreakdownTooltip
-                          totalAvgUs={traffic.inspect_duration_us_avg_5m}
-                          totalP95Us={traffic.inspect_duration_us_p95_5m}
-                          totalP99Us={traffic.inspect_duration_us_p99_5m}
-                          breakdown={traffic.inspect_breakdown_5m}
-                        />
-                      )
-                      : undefined
-                  }
-                  value={
-                    traffic && proxyUp
-                      ? `${formatDurationUs(traffic.inspect_duration_us_avg_5m, emDash, durationUnits)} / ${formatDurationUs(traffic.inspect_duration_us_p95_5m, emDash, durationUnits)} / ${formatDurationUs(traffic.inspect_duration_us_p99_5m, emDash, durationUnits)}`
-                      : "—"
-                  }
-                />
-                <RuntimeRow
-                  label={t("dashboard.policyLatency")}
-                  tooltip={
-                    traffic && proxyUp
-                      ? (
-                        <PolicyBreakdownTooltip
-                          totalAvgUs={traffic.policy_duration_us_avg_5m}
-                          totalP95Us={traffic.policy_duration_us_p95_5m}
-                          totalP99Us={traffic.policy_duration_us_p99_5m}
-                          aclAvgUs={traffic.decide_duration_us_avg_5m}
-                          aclP95Us={traffic.decide_duration_us_p95_5m}
-                          aclP99Us={traffic.decide_duration_us_p99_5m}
-                          inspectAvgUs={traffic.inspect_duration_us_avg_5m}
-                          inspectP95Us={traffic.inspect_duration_us_p95_5m}
-                          inspectP99Us={traffic.inspect_duration_us_p99_5m}
-                          aclBreakdown={traffic.decide_breakdown_5m}
-                          inspectBreakdown={traffic.inspect_breakdown_5m}
-                        />
-                      )
-                      : undefined
-                  }
-                  value={
-                    traffic && proxyUp
-                      ? `${formatDurationUs(traffic.policy_duration_us_avg_5m, emDash, durationUnits)} / ${formatDurationUs(traffic.policy_duration_us_p95_5m, emDash, durationUnits)} / ${formatDurationUs(traffic.policy_duration_us_p99_5m, emDash, durationUnits)}`
-                      : "—"
-                  }
-                />
-              </ul>
-            )}
-          </div>
-          <div className="mt-5 border-t border-white/8 pt-4">
-            <Link
-              href="/manage/access-log"
-              className="text-[12px] text-zinc-500 transition hover:text-teal-300"
-            >
-              {t("accessLog.linkToLog")}
-            </Link>
-          </div>
-        </div>
+        <DashboardRuntimePanel
+          acl={fleetAcl}
+          traffic={avgRuntimeTraffic}
+          proxyUp={proxyUp}
+          loading={loading}
+          hintExtra={t("dashboard.runtimeFleetAvg")}
+          showBreakdownTooltips={false}
+          showAccessLogLink
+        />
       </div>
       <div className="rounded-xl border border-white/10 bg-white/[0.05] p-5">
         <div className="mb-4 flex flex-row flex-wrap items-center justify-between gap-3">
@@ -725,54 +516,17 @@ export default function ManagePage() {
                 );
               }
               return (
-                <div key={meta.id} className="flex flex-col gap-3">
-                  <Link
-                    href={`/manage/instances/${meta.id}`}
-                    className="text-[13px] font-medium text-teal-300 hover:text-teal-200"
-                  >
-                    {meta.name}
-                  </Link>
-                  <InstanceRuntimeOverview inst={runtime} loading={loading} />
-                </div>
+                <ManageFleetInstanceBlock
+                  key={meta.id}
+                  meta={meta}
+                  runtime={runtime}
+                  loading={loading}
+                />
               );
             })}
           </div>
         )}
       </div>
     </div>
-  );
-}
-
-function RuntimeRow({
-  label,
-  value,
-  tooltip,
-}: {
-  label: string;
-  value: ReactNode;
-  tooltip?: ReactNode;
-}) {
-  const valueNode = (
-    <span
-      className={`font-mono text-zinc-200 ${tooltip ? "cursor-help border-b border-dotted border-zinc-600" : ""}`}
-    >
-      {value}
-    </span>
-  );
-  return (
-    <li className="flex flex-row items-center justify-between gap-3">
-      <span className="text-zinc-500">{label}</span>
-      {tooltip ? (
-        <Tooltip
-          title={tooltip}
-          placement="leftTop"
-          styles={{ root: { maxWidth: 320 } }}
-        >
-          {valueNode}
-        </Tooltip>
-      ) : (
-        valueNode
-      )}
-    </li>
   );
 }

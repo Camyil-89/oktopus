@@ -73,6 +73,7 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Панель управления</p>
         <div class="flex flex-col gap-0.5">
           <a href="./index.html" class="nav-item active"><span class="dot"></span>Главная</a>
+<a href="./instance.html" class="nav-item"><span class="dot"></span>Статистика инстанса</a>
 <a href="./rules.html" class="nav-item"><span class="dot"></span>Правила прокси</a>
 <a href="./access-log.html" class="nav-item"><span class="dot"></span>Журнал доступа</a>
 <a href="./reports.html" class="nav-item"><span class="dot"></span>Отчёты журнала</a>
@@ -127,7 +128,7 @@
           <article class="doc doc-page">
             <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Панель управления</p>
             <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Главная</h1>
-            <p class="lead">Маршрут <code>/manage</code> — дашборд состояния прокси. Ниже упрощённый вид страницы; наведите курсор на блок, чтобы увидеть описание.</p>
+            <p class="lead">Маршрут <code>/manage</code> — сводный дашборд по всем прокси-инстансам: агрегированные метрики, запуск процесса и список инстансов с кнопкой создания. Ниже упрощённый макет; наведите на блок для подсказки.</p>
 
             <h2 id="mh-tour">Интерфейс</h2>
             <div class="ui-mock-wrap">
@@ -139,13 +140,12 @@
                   </div>
                   <nav class="ui-mock-nav tour-zone" tabindex="0"
                     data-tour-title="Боковое меню"
-                    data-tour-body="Навигация по панели управления: главная, правила, журнал, отчёты, настройки прокси, пользователи. Внизу — выход из учётной записи.">
+                    data-tour-body="Общие разделы: главная, журнал и отчёты по всем инстансам, пользователи кабинета. Ниже — каждый прокси-инстанс: при открытии появляются подпункты (статистика, правила, настройки, журнал). Выход — внизу.">
                     <div class="ui-mock-nav-item is-active">Главная</div>
-                    <div class="ui-mock-nav-item">Правила прокси</div>
                     <div class="ui-mock-nav-item">Журнал доступа</div>
                     <div class="ui-mock-nav-item">Отчёты журнала</div>
-                    <div class="ui-mock-nav-item">Настройки прокси</div>
                     <div class="ui-mock-nav-item">Пользователи</div>
+                    <div class="ui-mock-nav-item ui-mock-nav-instance">Офис</div>
                   </nav>
                 </aside>
                 <div class="ui-mock-main">
@@ -161,7 +161,7 @@
                     <div class="ui-mock-stats">
                       <div class="ui-mock-stat is-success tour-zone" tabindex="0"
                         data-tour-title="Прокси"
-                        data-tour-body="RUNNING / STOPPED и адрес listen. Данные из GET /api/proxy/status (proxy_active, listen). Обновление каждые ~3 с.">
+                        data-tour-body="RUNNING / STOPPED по fleet: прокси активен, если хотя бы один инстанс слушает. В подсказке — listen каждого инстанса (teal — активен, красный — ошибка). GET /api/proxy/runtime, опрос ~3 с.">
                         <div class="ui-mock-stat-label">Прокси</div>
                         <div class="ui-mock-stat-value">RUNNING</div>
                         <div class="ui-mock-stat-hint">:8080</div>
@@ -219,7 +219,7 @@
                       </div>
                       <div class="ui-mock-panel ui-mock-runtime tour-zone" tabindex="0"
                         data-tour-title="Runtime"
-                        data-tour-body="Текущая нагрузка: активные соединения, WebSocket MITM, синхронность правил с БД, индексы SNI, уникальные пользователи и источники за 5 мин, очередь журнала, суммарный трафик. Ниже — задержки ACL, inspect и политики (avg / p95 / p99). Ссылка ведёт в журнал доступа.">
+                        data-tour-body="Средние по инстансам: соединения, WebSocket MITM, синхронность ACL, SNI, пользователи и источники за 5 мин, очередь журнала, трафик. Задержки ACL / inspect / policy (avg / p95 / p99). На карточке инстанса — те же метрики для одного listen. Ссылка — в общий журнал доступа.">
                         <p class="ui-mock-panel-title">Runtime</p>
                         <p class="ui-mock-panel-sub">нагрузка и ACL</p>
                         <ul>
@@ -229,6 +229,20 @@
                           <li><span class="k">ACL avg / p95 / p99</span><span class="v">0.4 / 1.2 / 2.1 ms</span></li>
                         </ul>
                         <p style="margin:8px 0 0;font-size:9px;color:#52525b;border-top:1px solid rgba(255,255,255,.06);padding-top:6px">→ Журнал доступа</p>
+                      </div>
+                    </div>
+
+                    <div class="ui-mock-panel tour-zone" tabindex="0" style="margin-top:8px"
+                      data-tour-title="Прокси-инстансы"
+                      data-tour-body="Список инстансов из БД. «Добавить инстанс» открывает модалку: имя и адрес listen (например :8080). После создания инстанс появляется в боковом меню; клик по имени — статистика /manage/instances/{id}. Ниже имени — краткий дашборд инстанса (как на его странице).">
+                      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <p class="ui-mock-panel-title" style="margin:0">Прокси-инстансы</p>
+                        <span class="ui-mock-btn ui-mock-btn-accent">+ Добавить инстанс</span>
+                      </div>
+                      <p class="ui-mock-panel-sub">Офис · :8080 · RUNNING</p>
+                      <div class="ui-mock-stats" style="margin-top:6px;grid-template-columns:repeat(2,1fr)">
+                        <div class="ui-mock-stat is-success" style="padding:6px"><div class="ui-mock-stat-label">ACL</div><div class="ui-mock-stat-value" style="font-size:11px">OK</div></div>
+                        <div class="ui-mock-stat" style="padding:6px"><div class="ui-mock-stat-label">1 мин</div><div class="ui-mock-stat-value" style="font-size:11px">420</div></div>
                       </div>
                     </div>
                   </div>
@@ -241,8 +255,12 @@
               </div>
             </div>
 
+            <h2 id="mh-instances">Прокси-инстансы</h2>
+            <p>Каждый инстанс — отдельный listen, свои ACL, инспекция и настройки (tunnel / MITM, CA, авторизация). Именованные <strong>Lists</strong> для ACL общие между инстансами. Создайте первый инстанс кнопкой <strong>Добавить инстанс</strong>: укажите имя и адрес прослушивания. Имя должно быть уникальным; listen не должен пересекаться с другим инстансом.</p>
+            <p>Управление инстансом — через пункт с его именем в боковом меню: <a href="instance.html">статистика</a>, <a href="rules.html">правила</a>, <a href="proxy.html">настройки</a>, журнал доступа по этому listen.</p>
+
             <h2 id="mh-use">Как пользоваться</h2>
-            <p>Открывайте главную после входа в кабинет: здесь видно, жив ли прокси, собрались ли правила ACL и есть ли отклонения в трафике. Данные обновляются автоматически каждые несколько секунд. Если прокси STOPPED — проверьте «Настройки прокси» и логи сервера.</p>
+            <p>После входа откройте главную: сводный RUNNING/STOPPED, сборка ACL по fleet, трафик и runtime. Данные обновляются каждые ~3 с. Если инстанс не стартует — предупреждение с текстом ошибки; проверьте <a href="proxy.html">настройки инстанса</a> и логи сервера.</p>
 
           </article>
 
@@ -252,10 +270,10 @@
           <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Назад</span>
           <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Вход</span>
         </span>
-      </a><a href="./rules.html" class="pager-link group text-right ml-auto">
+      </a><a href="./instance.html" class="pager-link group text-right ml-auto">
         <span class="min-w-0">
           <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Далее</span>
-          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Правила прокси</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Статистика инстанса</span>
         </span>
         <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
       </a></div>

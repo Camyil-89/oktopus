@@ -18,18 +18,15 @@ func (f *Forwarder) serveWebSocketUpgrade(ctx context.Context, w stdhttp.Respons
 	outReq.RequestURI = ""
 	outReq.Header.Del("Proxy-Connection")
 
+	instID := instanceIDFromCtx(ctx)
 	if d := f.Hooks.RunHTTPRequest(ctx, outReq); d.Handled() {
 		denied := !d.Allow
-		w = bytecount.WrapResponseWriterPolicy(w, denied)
-		if denied {
-			bytecount.ObserveRequestLineHeadersDenied(inbound)
-		} else {
-			bytecount.ObserveRequestLineHeaders(inbound)
-		}
+		w = bytecount.WrapResponseWriterPolicyInstance(w, denied, instID)
+		bytecount.ObserveRequestLineHeadersInstance(inbound, instID, denied)
 		d.WriteResponse(w, inbound)
 		return nil
 	}
-	bytecount.ObserveRequestLineHeaders(inbound)
+	bytecount.ObserveRequestLineHeadersInstance(inbound, instID, false)
 
 	sink := &hijackSink{w: w, inbound: inbound}
 	_, err := wsproxy.Proxy(ctx, wsproxy.Config{

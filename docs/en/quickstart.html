@@ -72,6 +72,7 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Control panel</p>
         <div class="flex flex-col gap-0.5">
           <a href="./manage/index.html" class="nav-item"><span class="dot"></span>Home</a>
+<a href="./manage/instance.html" class="nav-item"><span class="dot"></span>Instance statistics</a>
 <a href="./manage/rules.html" class="nav-item"><span class="dot"></span>Proxy rules</a>
 <a href="./manage/access-log.html" class="nav-item"><span class="dot"></span>Access log</a>
 <a href="./manage/reports.html" class="nav-item"><span class="dot"></span>Access log reports</a>
@@ -172,7 +173,7 @@ cd oktopus</code></pre>
             <ol>
               <li>The script prints <strong>UI</strong> URL, admin login, and password from <code>.env</code>.</li>
               <li>Sign in and confirm the proxy is <strong>RUNNING</strong> on <a href="manage/index.html">Home</a>.</li>
-              <li>Configure listen port and mode under <a href="manage/proxy.html">Proxy settings</a>.</li>
+              <li>On <a href="manage/index.html">Home</a>, create a proxy instance (name and listen), then set port, tunnel/MITM, and CA under <a href="manage/proxy.html">instance settings</a>; point clients at that listen address.</li>
             </ol>
 
             <p>Re-running the script recreates <code>.env</code> but keeps DB passwords when Docker volumes already exist.</p>

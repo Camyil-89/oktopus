@@ -72,6 +72,7 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Панель управления</p>
         <div class="flex flex-col gap-0.5">
           <a href="./manage/index.html" class="nav-item"><span class="dot"></span>Главная</a>
+<a href="./manage/instance.html" class="nav-item"><span class="dot"></span>Статистика инстанса</a>
 <a href="./manage/rules.html" class="nav-item"><span class="dot"></span>Правила прокси</a>
 <a href="./manage/access-log.html" class="nav-item"><span class="dot"></span>Журнал доступа</a>
 <a href="./manage/reports.html" class="nav-item"><span class="dot"></span>Отчёты журнала</a>
@@ -172,7 +173,7 @@ cd oktopus</code></pre>
             <ol>
               <li>В конце скрипт выведет <strong>UI</strong> (<code>http://…</code>), логин и пароль администратора из <code>.env</code>.</li>
               <li>Откройте URL в браузере, войдите и на <a href="manage/index.html">главной</a> проверьте, что прокси <strong>RUNNING</strong>.</li>
-              <li>Порт и режим прокси — в <a href="manage/proxy.html">настройках прокси</a>; клиентам укажите listen-адрес из панели.</li>
+              <li>На <a href="manage/index.html">главной</a> создайте прокси-инстанс (имя и listen), затем порт, режим tunnel/MITM и CA — в <a href="manage/proxy.html">настройках инстанса</a>; клиентам укажите его listen-адрес.</li>
             </ol>
 
             <p>При повторном запуске скрипт пересоздаёт <code>.env</code>, но пароли БД сохраняются, если тома Docker уже существуют.</p>

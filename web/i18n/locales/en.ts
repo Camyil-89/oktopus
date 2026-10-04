@@ -231,6 +231,7 @@ export const en: Record<keyof typeof ru, string> = {
   "dashboard.rulesStale": "stale",
   "dashboard.runtime": "Runtime",
   "dashboard.runtimeHint": "load and ACL",
+  "dashboard.runtimeFleetAvg": "average across instances",
   "dashboard.serveStart": "Serve start",
   "dashboard.sliding": "sliding",
   "dashboard.sniIndex": "SNI index / regexp",

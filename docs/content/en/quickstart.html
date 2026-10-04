@@ -46,7 +46,7 @@ cd oktopus</code></pre>
             <ol>
               <li>The script prints <strong>UI</strong> URL, admin login, and password from <code>.env</code>.</li>
               <li>Sign in and confirm the proxy is <strong>RUNNING</strong> on <a href="manage/index.html">Home</a>.</li>
-              <li>Configure listen port and mode under <a href="manage/proxy.html">Proxy settings</a>.</li>
+              <li>On <a href="manage/index.html">Home</a>, create a proxy instance (name and listen), then set port, tunnel/MITM, and CA under <a href="manage/proxy.html">instance settings</a>; point clients at that listen address.</li>
             </ol>
 
             <p>Re-running the script recreates <code>.env</code> but keeps DB passwords when Docker volumes already exist.</p>

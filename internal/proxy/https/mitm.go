@@ -19,6 +19,9 @@ import (
 	proxyhttp "oktopus/internal/proxy/http"
 	"oktopus/internal/proxy/bytecount"
 	"oktopus/internal/proxy/hooks"
+	"oktopus/internal/proxy/instancectx"
+
+	"github.com/google/uuid"
 	"oktopus/internal/proxy/observe"
 	"oktopus/internal/proxy/wsproxy"
 )
@@ -74,7 +77,11 @@ func (m *MITM) serveConnectEstablished(ctx context.Context, w stdhttp.ResponseWr
 func (m *MITM) runSession(ctx context.Context, rawClient net.Conn, bufrw *bufio.ReadWriter, fallbackHost, hostPort string, sessionDenied bool) {
 	defer rawClient.Close()
 
-	conn := bytecount.WrapConnPolicy(newHijackedConn(rawClient, bufrw), sessionDenied)
+	var instID uuid.UUID
+	if id, ok := instancectx.ID(ctx); ok {
+		instID = id
+	}
+	conn := bytecount.WrapConnPolicyInstance(newHijackedConn(rawClient, bufrw), sessionDenied, instID)
 
 	tlsClient := tls.Server(conn, &tls.Config{
 		MinVersion:             tls.VersionTLS12,

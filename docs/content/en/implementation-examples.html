@@ -43,7 +43,7 @@ flowchart TB
               <li><strong>Network:</strong> place the Oktopus server so it is reachable only on the local network; there must be no access from the internet.</li>
               <li><strong>MITM mode:</strong> enable in the panel, generate or upload CA, distribute the root certificate to workstations and servers (GPO, MDM, manual).</li>
               <li><strong>Clients:</strong> system or browser proxy, PAC, or <code>HTTP_PROXY</code> / <code>HTTPS_PROXY</code> pointing at Oktopus.</li>
-              <li><strong>Policy:</strong> ACL and proxy auth when needed; with MITM, use inspect rules on the <a href="manage/rules.html">rules</a> page.</li>
+              <li><strong>Policy:</strong> ACL per instance, proxy auth when needed; with MITM, use inspect on the instance <a href="manage/rules.html">rules</a> page.</li>
               <li><strong>Monitoring:</strong> access log and reports for outbound traffic audit.</li>
             </ul>
 
@@ -71,5 +71,5 @@ flowchart LR
             <ul>
               <li><strong>Best fit:</strong> one Oktopus server inside the perimeter, egress via the border firewall; MITM mode and CA on clients for HTTPS visibility and policy.</li>
               <li><strong>Administration</strong> — via the UI on the same server, only from trusted networks.</li>
-              <li><strong>Next steps:</strong> <a href="quickstart.html">Deployment</a>, <a href="manage/proxy.html">proxy settings</a> (MITM and CA), <a href="manage/rules.html">rules</a>, and <a href="manage/rules-acl-syntax.html">ACL syntax</a>.</li>
+              <li><strong>Next steps:</strong> <a href="quickstart.html">Deployment</a>, create an instance on <a href="manage/index.html">Home</a>, then <a href="manage/proxy.html">settings</a> (MITM and CA), <a href="manage/rules.html">rules</a>, and <a href="manage/rules-acl-syntax.html">ACL syntax</a>.</li>
             </ul>

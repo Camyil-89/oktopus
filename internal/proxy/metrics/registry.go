@@ -98,11 +98,12 @@ func AggregateSnapshots(snaps []Snapshot) Snapshot {
 		out.PolicyDurationUsAvg5m = weightedPolicy / float64(totalDecisions)
 	}
 	out.Buckets10s = mergeBuckets10s(snaps)
-	// bytecount пока process-wide — не суммировать по инстансам.
-	out.BytesTotalUpAllow = snaps[0].BytesTotalUpAllow
-	out.BytesTotalUpDeny = snaps[0].BytesTotalUpDeny
-	out.BytesTotalDownAllow = snaps[0].BytesTotalDownAllow
-	out.BytesTotalDownDeny = snaps[0].BytesTotalDownDeny
+	for _, s := range snaps {
+		out.BytesTotalUpAllow += s.BytesTotalUpAllow
+		out.BytesTotalUpDeny += s.BytesTotalUpDeny
+		out.BytesTotalDownAllow += s.BytesTotalDownAllow
+		out.BytesTotalDownDeny += s.BytesTotalDownDeny
+	}
 	return out
 }
 

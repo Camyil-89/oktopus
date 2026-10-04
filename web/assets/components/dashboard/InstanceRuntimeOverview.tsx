@@ -60,12 +60,15 @@ type InstanceRuntimeOverviewProps = {
   inst: ProxyInstanceRuntimeStatus;
   loading?: boolean;
   instanceName?: string;
+  /** На главной в списке fleet графики уже есть сверху — не дублировать. */
+  showCharts?: boolean;
 };
 
 export function InstanceRuntimeOverview({
   inst,
   loading = false,
   instanceName,
+  showCharts = true,
 }: InstanceRuntimeOverviewProps) {
   const { t, localeTag } = useTranslation();
   const traffic = inst.traffic;
@@ -87,23 +90,15 @@ export function InstanceRuntimeOverview({
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <DashboardStatCard
-          label={t("dashboard.proxy")}
+          label={t("dashboard.proxy") + (instanceName ? `: ${instanceName}` : "")}
           loading={loading}
           tone={proxyUp ? "success" : "danger"}
-          value={
-            instanceName ? (
-              <div className="flex flex-col gap-0.5">
-                <span className="text-lg font-semibold leading-tight text-zinc-50">
-                  {instanceName}
-                </span>
-                <span className="font-mono text-sm font-medium">
-                  {proxyUp ? "RUNNING" : "STOPPED"}
-                </span>
-              </div>
-            ) : (
-              proxyUp ? "RUNNING" : "STOPPED"
-            )
+          badge={
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${proxyUp ? "bg-teal-400" : "bg-red-400"}`}
+            />
           }
+          value={proxyUp ? "RUNNING" : "STOPPED"}
           hint={inst.listen}
         />
         <DashboardStatCard
@@ -129,9 +124,9 @@ export function InstanceRuntimeOverview({
           hint={
             traffic && proxyUp
               ? t("dashboard.reqHint", {
-                  last5s: formatInt(reqLast5s, localeTag),
-                  avg: formatInt(reqPerMinAvg5m, localeTag),
-                })
+                last5s: formatInt(reqLast5s, localeTag),
+                avg: formatInt(reqPerMinAvg5m, localeTag),
+              })
               : undefined
           }
         />
@@ -156,9 +151,9 @@ export function InstanceRuntimeOverview({
           hint={
             traffic
               ? t("dashboard.trafficHint", {
-                  allowPct: formatSharePct(traffic.allowed_5m, totalDecisions),
-                  denyPct: formatSharePct(traffic.denied_5m, totalDecisions),
-                })
+                allowPct: formatSharePct(traffic.allowed_5m, totalDecisions),
+                denyPct: formatSharePct(traffic.denied_5m, totalDecisions),
+              })
               : undefined
           }
         />
@@ -172,30 +167,32 @@ export function InstanceRuntimeOverview({
         <Typography.Text type="danger">{acl.build_error}</Typography.Text>
       ) : null}
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <div className="rounded-xl border border-white/10 bg-white/[0.05] p-5">
-          <p className="text-[13px] font-medium text-zinc-100">{t("dashboard.traffic")}</p>
-          {!proxyUp && !loading ? (
-            <Typography.Text type="secondary">
-              {t("dashboard.chartWhenUp")}
-            </Typography.Text>
-          ) : (
-            <TrafficAllowDenyChart buckets={buckets} loading={loading} />
-          )}
+      {showCharts ? (
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="rounded-xl border border-white/10 bg-white/[0.05] p-5">
+            <p className="text-[13px] font-medium text-zinc-100">{t("dashboard.traffic")}</p>
+            {!proxyUp && !loading ? (
+              <Typography.Text type="secondary">
+                {t("dashboard.chartWhenUp")}
+              </Typography.Text>
+            ) : (
+              <TrafficAllowDenyChart buckets={buckets} loading={loading} />
+            )}
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.05] p-5">
+            <p className="text-[13px] font-medium text-zinc-100">
+              {t("dashboard.throughput")}
+            </p>
+            {!proxyUp && !loading ? (
+              <Typography.Text type="secondary">
+                {t("dashboard.chartWhenUp")}
+              </Typography.Text>
+            ) : (
+              <TrafficThroughputChart buckets={buckets} loading={loading} />
+            )}
+          </div>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/[0.05] p-5">
-          <p className="text-[13px] font-medium text-zinc-100">
-            {t("dashboard.throughput")}
-          </p>
-          {!proxyUp && !loading ? (
-            <Typography.Text type="secondary">
-              {t("dashboard.chartWhenUp")}
-            </Typography.Text>
-          ) : (
-            <TrafficThroughputChart buckets={buckets} loading={loading} />
-          )}
-        </div>
-      </div>
+      ) : null}
     </div>
   );
 }

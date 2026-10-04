@@ -1,6 +1,6 @@
             <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Панель управления</p>
             <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Правила прокси</h1>
-            <p class="lead">Раздел <code>/manage/rules</code> — политика доступа: кто куда может ходить и (в режиме MITM) что делать с содержимым запросов. Наведите на блоки макета ниже.</p>
+            <p class="lead">Раздел <code>/manage/instances/{id}/rules</code> — политика доступа для выбранного инстанса: ACL / http_access и (в MITM) инспекция Lua. Наведите на блоки макета ниже.</p>
 
             <h2 id="mr-tour">Интерфейс</h2>
             <div class="ui-mock-wrap">
@@ -8,7 +8,7 @@
                 __MANAGE_ASIDE__
                 <div class="ui-mock-main">
                   <header class="ui-mock-top">
-                    <h2 class="tour-zone" tabindex="0" data-tour-title="Заголовок" data-tour-body="Заголовок «Правила прокси» из managePageTitle для /manage/rules.">Правила прокси</h2>
+                    <h2 class="tour-zone" tabindex="0" data-tour-title="Заголовок" data-tour-body="Заголовок «Правила прокси» для /manage/instances/{id}/rules; в меню — подпункт выбранного инстанса.">Правила прокси</h2>
                     <span class="ui-mock-lang tour-zone" tabindex="0" data-tour-title="Язык" data-tour-body="Локаль кабинета ru / en.">RU ▾</span>
                   </header>
                   <div class="ui-mock-content">
@@ -40,7 +40,7 @@ http_access deny all</div>
                           data-tour-title="Требуется MITM"
                           data-tour-body="Если прокси в режиме tunnel, карточка затемняется и показывается предупреждение: инспекция возможна только при MITM и доверенном CA на клиентах.">
                           <strong>Нужен режим MITM</strong>
-                          Включите MITM в настройках прокси и установите CA на клиенты.
+                          Включите MITM в <a href="proxy.html">настройках этого инстанса</a> и установите CA на клиенты.
                         </div>
                         <div class="ui-mock-panel tour-zone" tabindex="0"
                           data-tour-title="Правила инспекции"
@@ -87,7 +87,7 @@ http_access deny all</div>
             <ol>
               <li>Откройте вкладку ACL. В редакторе опишите <code>acl</code> и цепочку <code>http_access</code> сверху вниз — срабатывает первое подходящее правило.</li>
               <li>Нажмите проверку конфига (если есть ошибки, они подсветятся в редакторе).</li>
-              <li>Сохраните и дождитесь статуса сборки ACL на главной (карточка «Сборка ACL» → OK).</li>
+              <li>Сохраните и дождитесь статуса сборки ACL на <a href="instance.html">статистике инстанса</a> или на <a href="index.html">главной</a> (карточка «Сборка ACL» → OK).</li>
               <li>При необходимости создайте <strong>Lists</strong> — именованные списки IP, доменов или портов и подключайте их в <code>http_access</code> по имени.</li>
             </ol>
 
@@ -95,4 +95,4 @@ http_access deny all</div>
             <p>Подробный справочник по директивам, типам <code>acl</code> и примерам — на странице <a href="rules-acl-syntax.html">Синтаксис ACL</a> в меню «Справочник».</p>
 
             <h2 id="mr-inspect">Инспекция (кратко)</h2>
-            <p>Добавьте правило с именем, включите его, напишите Lua-скрипт. При совпадении можно разрешить или запретить запрос. Если вкладка сообщает, что нужен MITM — переключите режим в «Настройки прокси» и раздайте корневой сертификат клиентам.</p>
+            <p>Добавьте правило с именем, включите его, напишите Lua-скрипт. При совпадении можно разрешить или запретить запрос. Если вкладка сообщает, что нужен MITM — переключите режим в <a href="proxy.html">настройках инстанса</a> и раздайте корневой сертификат клиентам. У каждого инстанса своя политика ACL и свой набор правил инспекции; общие только именованные Lists.</p>

@@ -43,7 +43,7 @@ flowchart TB
               <li><strong>Сеть:</strong> разместите сервер Oktopus так, чтобы он был доступен только из локальной сети; с интернета к нему доступа быть не должно.</li>
               <li><strong>Режим MITM:</strong> включить в панели, сгенерировать или загрузить CA, раздать корневой сертификат на рабочие места и серверы (GPO, MDM, вручную).</li>
               <li><strong>Клиенты:</strong> системный или браузерный прокси, PAC или <code>HTTP_PROXY</code> / <code>HTTPS_PROXY</code> на адрес Oktopus.</li>
-              <li><strong>Политика:</strong> ACL, при необходимости аутентификация прокси; при MITM — вкладка инспекции в <a href="manage/rules.html">правилах</a>.</li>
+              <li><strong>Политика:</strong> ACL на каждом инстансе, при необходимости аутентификация прокси; при MITM — вкладка инспекции в <a href="manage/rules.html">правилах инстанса</a>.</li>
               <li><strong>Мониторинг:</strong> журнал доступа и отчёты для аудита исходящего трафика.</li>
             </ul>
 
@@ -71,5 +71,5 @@ flowchart LR
             <ul>
               <li><strong>Оптимально:</strong> один сервер Oktopus внутри контура, egress через пограничный firewall; режим MITM и CA на клиентах — для просмотра и политики HTTPS-трафика.</li>
               <li><strong>Администрирование</strong> — через UI на том же сервере, только из доверенных сетей.</li>
-              <li><strong>Дальше:</strong> <a href="quickstart.html">Развёртывание</a>, <a href="manage/proxy.html">настройки прокси</a> (MITM и CA), <a href="manage/rules.html">правила</a> и <a href="manage/rules-acl-syntax.html">синтаксис ACL</a>.</li>
+              <li><strong>Дальше:</strong> <a href="quickstart.html">Развёртывание</a>, на <a href="manage/index.html">главной</a> создайте инстанс, затем <a href="manage/proxy.html">настройки</a> (MITM и CA), <a href="manage/rules.html">правила</a> и <a href="manage/rules-acl-syntax.html">синтаксис ACL</a>.</li>
             </ul>

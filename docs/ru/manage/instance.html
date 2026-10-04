@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Oktopus — Отчёты журнала</title>
+  <title>Oktopus — Статистика инстанса</title>
   <link rel="icon" href="../../assets/icon.svg" type="image/svg+xml">
-  <link rel="alternate" hreflang="ru" href="../ru/manage/reports.html">
-  <link rel="alternate" hreflang="en" href="../en/manage/reports.html">
+  <link rel="alternate" hreflang="ru" href="../ru/manage/instance.html">
+  <link rel="alternate" hreflang="en" href="../en/manage/instance.html">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
   tailwind.config = {
@@ -73,10 +73,10 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Панель управления</p>
         <div class="flex flex-col gap-0.5">
           <a href="./index.html" class="nav-item"><span class="dot"></span>Главная</a>
-<a href="./instance.html" class="nav-item"><span class="dot"></span>Статистика инстанса</a>
+<a href="./instance.html" class="nav-item active"><span class="dot"></span>Статистика инстанса</a>
 <a href="./rules.html" class="nav-item"><span class="dot"></span>Правила прокси</a>
 <a href="./access-log.html" class="nav-item"><span class="dot"></span>Журнал доступа</a>
-<a href="./reports.html" class="nav-item active"><span class="dot"></span>Отчёты журнала</a>
+<a href="./reports.html" class="nav-item"><span class="dot"></span>Отчёты журнала</a>
 <a href="./proxy.html" class="nav-item"><span class="dot"></span>Настройки прокси</a>
 <a href="./users.html" class="nav-item"><span class="dot"></span>Пользователи</a>
         </div>
@@ -111,11 +111,11 @@
         <span class="text-zinc-700">/</span>
         <span class="text-zinc-600">Панель управления</span>
         <span class="text-zinc-700">/</span>
-        <span class="text-zinc-300 truncate">Отчёты журнала</span>
+        <span class="text-zinc-300 truncate">Статистика инстанса</span>
       </nav>
       <div class="ml-auto flex items-center gap-3">
         <div class="flex items-center gap-1 text-[12px] font-mono"><span class="text-zinc-500 border border-teal-400/30 text-teal-300 rounded px-2 py-0.5">RU</span>
-          <a href="../en/manage/reports.html" class="text-zinc-500 border border-white/8 rounded px-2 py-0.5 hover:text-zinc-200 hover:bg-white/5 transition">EN</a></div>
+          <a href="../en/manage/instance.html" class="text-zinc-500 border border-white/8 rounded px-2 py-0.5 hover:text-zinc-200 hover:bg-white/5 transition">EN</a></div>
         <a href="https://github.com/Camyil-89/oktopus" target="_blank" rel="noopener noreferrer"
            class="hidden sm:inline-flex items-center gap-1.5 text-[12px] text-zinc-400 border border-white/8 rounded-lg px-3 py-1.5 hover:bg-white/5 hover:text-zinc-200 transition">GitHub</a>
       </div>
@@ -127,12 +127,12 @@
 
           <article class="doc doc-page">
             <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Панель управления</p>
-            <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Отчёты журнала</h1>
-            <p class="lead">Раздел <code>/manage/reports</code> — сводки и виджеты по журналу за выбранный период.</p>
+            <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Статистика инстанса</h1>
+            <p class="lead">Маршрут <code>/manage/instances/{id}</code> — дашборд одного прокси: те же карточки и графики, что в блоке инстанса на главной, но только для выбранного listen. Откройте инстанс из бокового меню или со <a href="index.html">главной</a>.</p>
 
-            <h2 id="malr-tour">Интерфейс</h2>
+            <h2 id="mi-tour">Интерфейс</h2>
             <div class="ui-mock-wrap">
-              <div class="ui-mock ui-mock--tall" aria-hidden="true">
+              <div class="ui-mock ui-mock--dashboard" aria-hidden="true">
                 <aside class="ui-mock-aside">
                   <div class="ui-mock-brand">
                     <img src="../../assets/icon.svg" alt="">
@@ -143,38 +143,63 @@
                     data-tour-body="Общие разделы: главная, журнал и отчёты по всем инстансам, пользователи кабинета. Ниже — каждый прокси-инстанс: при открытии появляются подпункты (статистика, правила, настройки, журнал). Выход — внизу.">
                     <div class="ui-mock-nav-item">Главная</div>
                     <div class="ui-mock-nav-item">Журнал доступа</div>
-                    <div class="ui-mock-nav-item is-active">Отчёты журнала</div>
+                    <div class="ui-mock-nav-item">Отчёты журнала</div>
                     <div class="ui-mock-nav-item">Пользователи</div>
-                    <div class="ui-mock-nav-item ui-mock-nav-instance">Офис</div>
+                    <div class="ui-mock-nav-item is-active ui-mock-nav-instance">Офис</div>
+                    <div class="ui-mock-nav-sub"><div class="ui-mock-nav-item ui-mock-nav-sub-item is-active">Статистика</div>
+                    <div class="ui-mock-nav-item ui-mock-nav-sub-item">Правила прокси</div>
+                    <div class="ui-mock-nav-item ui-mock-nav-sub-item">Настройки</div>
+                    <div class="ui-mock-nav-item ui-mock-nav-sub-item">Журнал доступа</div></div>
                   </nav>
                 </aside>
                 <div class="ui-mock-main">
                   <header class="ui-mock-top">
-                    <h2>Отчёты журнала</h2>
+                    <h2 class="tour-zone" tabindex="0"
+                      data-tour-title="Заголовок"
+                      data-tour-body="Имя инстанса и раздел «Статистика» (nav.instanceStats).">Офис</h2>
                     <span class="ui-mock-lang">RU ▾</span>
                   </header>
                   <div class="ui-mock-content">
-                    <div class="ui-mock-toolbar tour-zone" tabindex="0" data-tour-title="Период" data-tour-body="Выбор интервала времени и применение к виджетам на странице.">
-                      <span class="ui-mock-field-input" style="flex:1;max-width:140px">Последние 24 ч</span>
-                      <span class="ui-mock-btn ui-mock-btn-accent">Применить</span>
+                    <div class="ui-mock-stats">
+                      <div class="ui-mock-stat is-success tour-zone" tabindex="0"
+                        data-tour-title="Прокси"
+                        data-tour-body="RUNNING/STOPPED и listen только этого инстанса.">
+                        <div class="ui-mock-stat-label">Прокси</div>
+                        <div class="ui-mock-stat-value">RUNNING</div>
+                        <div class="ui-mock-stat-hint">:8080</div>
+                      </div>
+                      <div class="ui-mock-stat is-success tour-zone" tabindex="0"
+                        data-tour-title="Сборка ACL"
+                        data-tour-body="Статус компиляции ACL именно этого инстанса.">
+                        <div class="ui-mock-stat-label">Сборка ACL</div>
+                        <div class="ui-mock-stat-value">OK</div>
+                      </div>
+                      <div class="ui-mock-stat tour-zone" tabindex="0"
+                        data-tour-title="За 1 мин"
+                        data-tour-body="requests_1m для инстанса.">
+                        <div class="ui-mock-stat-label">За 1 мин</div>
+                        <div class="ui-mock-stat-value">620</div>
+                      </div>
+                      <div class="ui-mock-stat tour-zone" tabindex="0"
+                        data-tour-title="Allow / Deny"
+                        data-tour-body="Решения за 5 минут по одному listen.">
+                        <div class="ui-mock-stat-label">Allow / Deny</div>
+                        <div class="ui-mock-stat-value"><span style="color:#5eead4">410</span><span style="color:#52525b"> / </span><span style="color:#fca5a5">12</span></div>
+                      </div>
                     </div>
-                    <div class="ui-mock-stats" style="grid-template-columns:repeat(3,1fr)">
-                      <div class="ui-mock-stat tour-zone" tabindex="0" data-tour-title="Сводка deny" data-tour-body="Доля запретов и счётчики за выбранный период.">
-                        <div class="ui-mock-stat-label">Deny</div>
-                        <div class="ui-mock-stat-value" style="color:#fca5a5">12%</div>
+                    <div class="ui-mock-row2">
+                      <div class="ui-mock-panel ui-mock-charts tour-zone" tabindex="0"
+                        data-tour-title="Графики"
+                        data-tour-body="Трафик allow/deny и пропускная способность за 5 мин — только этот инстанс.">
+                        <p class="ui-mock-panel-title">Трафик · пропускная способность</p>
+                        <div class="ui-mock-chart"><span class="ui-mock-chart-label">5 мин</span></div>
                       </div>
-                      <div class="ui-mock-stat tour-zone" tabindex="0" data-tour-title="Топ хостов" data-tour-body="Самые частые назначения в журнале.">
-                        <div class="ui-mock-stat-label">Топ хост</div>
-                        <div class="ui-mock-stat-value" style="font-size:10px;color:#e4e4e7">cdn.example</div>
+                      <div class="ui-mock-panel ui-mock-runtime tour-zone" tabindex="0"
+                        data-tour-title="Runtime"
+                        data-tour-body="Нагрузка и задержки ACL для инстанса; ссылка на журнал с фильтром по instance.">
+                        <p class="ui-mock-panel-title">Runtime</p>
+                        <ul><li><span class="k">соединения</span><span class="v">12</span></li></ul>
                       </div>
-                      <div class="ui-mock-stat tour-zone" tabindex="0" data-tour-title="Пользователи" data-tour-body="Активность по учётным записям proxy-auth.">
-                        <div class="ui-mock-stat-label">Пользователи</div>
-                        <div class="ui-mock-stat-value" style="color:#fafafa">48</div>
-                      </div>
-                    </div>
-                    <div class="ui-mock-panel ui-mock-fill tour-zone" tabindex="0" data-tour-title="Графики" data-tour-body="Виджеты трендов: allow/deny, объём, топы — зависит от версии кабинета.">
-                      <p class="ui-mock-panel-title">Тренд запросов</p>
-                      <div class="ui-mock-chart"><span class="ui-mock-chart-label">allow / deny</span></div>
                     </div>
                   </div>
                 </div>
@@ -182,31 +207,28 @@
               <div class="ui-tour-hint">
                 <p class="ui-tour-hint-label">Подсказка</p>
                 <p id="ui-tour-title" class="ui-tour-hint-title" data-default-title="Наведите на элемент">Наведите на элемент</p>
-                <p id="ui-tour-body" class="ui-tour-hint-body" data-default-body="Макет /manage/reports.">Макет /manage/reports.</p>
+                <p id="ui-tour-body" class="ui-tour-hint-body" data-default-body="Макет страницы инстанса.">Макет страницы инстанса.</p>
               </div>
             </div>
 
-            <h2 id="malr-use">Как пользоваться</h2>
-            <ol>
-              <li>Выберите отчёт или набор виджетов на странице.</li>
-              <li>Укажите интервал времени и при необходимости фильтры.</li>
-              <li>Используйте графики и таблицы для обзора: топ хостов, доля deny, активность пользователей.</li>
-            </ol>
+            <h2 id="mi-nav">Навигация</h2>
+            <p>В боковом меню при выбранном инстансе доступны: <strong>Статистика</strong> (эта страница), <a href="rules.html">правила прокси</a>, <a href="proxy.html">настройки</a>, журнал доступа по инстансу. Общий журнал по всем listen — в пункте «Журнал доступа» верхнего уровня.</p>
 
-            <p>Для разбора одного инцидента удобнее начать с «Журнал доступа»; отчёты — для регулярного мониторинга и трендов.</p>
+            <h2 id="mi-pending">Нет данных runtime</h2>
+            <p>Если инстанс только создан, может отображаться сообщение, что статус появится после запуска fleet. Проверьте, что процесс прокси на сервере запущен и listen свободен.</p>
 
           </article>
 
-<div class="flex items-center justify-between gap-3 mt-14 pt-6 border-t border-white/5"><a href="./access-log.html" class="pager-link group text-left">
+<div class="flex items-center justify-between gap-3 mt-14 pt-6 border-t border-white/5"><a href="./index.html" class="pager-link group text-left">
         <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
         <span class="min-w-0">
           <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Назад</span>
-          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Журнал доступа</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Главная</span>
         </span>
-      </a><a href="./proxy.html" class="pager-link group text-right ml-auto">
+      </a><a href="./rules.html" class="pager-link group text-right ml-auto">
         <span class="min-w-0">
           <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Далее</span>
-          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Настройки прокси</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Правила прокси</span>
         </span>
         <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
       </a></div>

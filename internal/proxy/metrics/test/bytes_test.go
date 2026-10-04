@@ -2,7 +2,6 @@ package metrics_test
 
 import (
 	"testing"
-	"time"
 
 	"oktopus/internal/proxy/bytecount"
 	"oktopus/internal/proxy/metrics"
@@ -10,11 +9,8 @@ import (
 
 func TestObserveBytesInBuckets(t *testing.T) {
 	t.Parallel()
-	sec := time.Now().Unix()
-	bytecount.Rotate(sec)
 	bytecount.ObserveUp(1000)
 	bytecount.ObserveDown(2000)
-	bytecount.Rotate(sec + 1)
 
 	s := metrics.FreshTrafficSnapshot()
 	var up, down int64

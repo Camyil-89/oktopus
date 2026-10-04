@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"oktopus/internal/proxy/bytecount"
 )
 
 const window = 5 * time.Minute
@@ -75,6 +74,15 @@ type Collector struct {
 	mu           sync.Mutex
 	bySec        map[int64]*secondBucket
 	bytesBySec   map[int64]byteTotals
+	liveByteSec  int64
+	liveUpAllow  int64
+	liveUpDeny   int64
+	liveDownAllow int64
+	liveDownDeny  int64
+	totalUpAllow   uint64
+	totalUpDeny    uint64
+	totalDownAllow uint64
+	totalDownDeny  uint64
 	pruneSec     int64
 	decideRecent decideRing
 	inspectRecent inspectRing
@@ -224,12 +232,12 @@ func (c *Collector) pruneLocked(now time.Time) {
 
 func (c *Collector) snapshot() Snapshot {
 	now := time.Now()
-	bytecount.Rotate(now.Unix())
 	cutoffSec := now.Add(-window).Unix()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.advanceByteSecLocked(now.Unix())
 	c.pruneLocked(now)
 
 	var (
@@ -283,7 +291,10 @@ func (c *Collector) snapshot() Snapshot {
 	policyNs := c.policyRecent.values()
 	avgPolicyUs, policyP95, policyP99, _ := statsFromNs(policyNs)
 
-	upA, upD, downA, downD := bytecount.Totals()
+	upA := c.totalUpAllow
+	upD := c.totalUpDeny
+	downA := c.totalDownAllow
+	downD := c.totalDownDeny
 
 	return Snapshot{
 		RequestsPerSecAvg5m:   float64(totalReq) / window.Seconds(),

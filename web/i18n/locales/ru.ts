@@ -229,6 +229,7 @@ export const ru = {
   "dashboard.rulesStale": "устарели",
   "dashboard.runtime": "Runtime",
   "dashboard.runtimeHint": "нагрузка и ACL",
+  "dashboard.runtimeFleetAvg": "среднее по инстансам",
   "dashboard.serveStart": "Старт serve",
   "dashboard.sliding": "скольз.",
   "dashboard.sniIndex": "SNI index / regexp",

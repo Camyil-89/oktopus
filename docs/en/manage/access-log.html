@@ -73,6 +73,7 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Control panel</p>
         <div class="flex flex-col gap-0.5">
           <a href="./index.html" class="nav-item"><span class="dot"></span>Home</a>
+<a href="./instance.html" class="nav-item"><span class="dot"></span>Instance statistics</a>
 <a href="./rules.html" class="nav-item"><span class="dot"></span>Proxy rules</a>
 <a href="./access-log.html" class="nav-item active"><span class="dot"></span>Access log</a>
 <a href="./reports.html" class="nav-item"><span class="dot"></span>Access log reports</a>
@@ -127,7 +128,7 @@
           <article class="doc doc-page">
             <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Control panel</p>
             <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Access log</h1>
-            <p class="lead">Route <code>/manage/access-log</code> — search and inspect allow/deny decisions.</p>
+            <p class="lead">Route <code>/manage/access-log</code> — access log across all instances (filter by <code>instance_id</code>). Each proxy also has <code>/manage/instances/{id}/access-log</code> with the same UI scoped to one listen.</p>
 
             <h2 id="mal-tour">Interface</h2>
             <div class="ui-mock-wrap">
@@ -139,13 +140,12 @@
                   </div>
                   <nav class="ui-mock-nav tour-zone" tabindex="0"
                     data-tour-title="Sidebar"
-                    data-tour-body="Console navigation: home, rules, access log, reports, proxy settings, users. Sign out is at the bottom.">
+                    data-tour-body="Global sections: home, access log and reports across instances, console users. Below — each proxy instance; when opened, sub-items appear (statistics, rules, settings, log). Sign out is at the bottom.">
                     <div class="ui-mock-nav-item">Home</div>
-                    <div class="ui-mock-nav-item">Proxy rules</div>
                     <div class="ui-mock-nav-item is-active">Access log</div>
                     <div class="ui-mock-nav-item">Access log reports</div>
-                    <div class="ui-mock-nav-item">Proxy settings</div>
                     <div class="ui-mock-nav-item">Users</div>
+                    <div class="ui-mock-nav-item ui-mock-nav-instance">Office</div>
                   </nav>
                 </aside>
                 <div class="ui-mock-main">
@@ -176,6 +176,9 @@
 
             <h2 id="mal-use">How to use</h2>
             <p>Set time range and filters, open a row for details (rule, latency, inspect). Use purge actions if your role allows removing old entries.</p>
+
+            <h2 id="mal-instances">Instances</h2>
+            <p>The global log includes an instance column and filter. The Access log sub-item under an instance name in the sidebar opens the same UI pre-scoped to that listen.</p>
 
           </article>
 

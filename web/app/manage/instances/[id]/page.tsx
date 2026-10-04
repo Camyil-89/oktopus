@@ -1,7 +1,7 @@
 "use client";
 
 import * as proxyApi from "@/api/proxy";
-import { InstanceRuntimeOverview } from "@/assets/components/dashboard/InstanceRuntimeOverview";
+import { InstanceRuntimeDashboardLayout } from "@/assets/components/dashboard/InstanceRuntimeDashboardLayout";
 import type { ProxyInstance, ProxyInstanceRuntimeStatus } from "@/types/proxy";
 import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
 import { Alert } from "antd";
@@ -90,9 +90,12 @@ export default function InstanceDashboardPage() {
     [row, instanceId, meta?.listen],
   );
 
-  if (!initialLoadDone && !error) {
+  const layoutInst = row ?? overviewInst;
+  const layoutLoading = !initialLoadDone && !error;
+
+  if (layoutLoading && !error) {
     return (
-      <InstanceRuntimeOverview
+      <InstanceRuntimeDashboardLayout
         inst={overviewInst}
         loading
         instanceName={meta?.name}
@@ -108,20 +111,15 @@ export default function InstanceDashboardPage() {
           {row?.proxy_start_error ? (
             <Alert type="warning" message={row.proxy_start_error} showIcon />
           ) : null}
-          {row ? (
-            <InstanceRuntimeOverview
-              inst={row}
-              instanceName={meta.name}
-            />
-          ) : (
-            <>
-              <InstanceRuntimeOverview
-                inst={overviewInst}
-                instanceName={meta.name}
-              />
-              <Alert type="info" message={t("instance.runtimePending")} showIcon />
-            </>
-          )}
+          <InstanceRuntimeDashboardLayout
+            inst={layoutInst}
+            loading={false}
+            instanceName={meta.name}
+            showAccessLogLink
+          />
+          {!row ? (
+            <Alert type="info" message={t("instance.runtimePending")} showIcon />
+          ) : null}
         </>
       ) : (
         <Alert type="info" message={t("instance.notFound")} showIcon />

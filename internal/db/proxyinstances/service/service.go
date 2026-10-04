@@ -32,6 +32,7 @@ type FleetApplier interface {
 // InstanceRuntime — один слушатель прокси.
 type InstanceRuntime struct {
 	InstanceID    uuid.UUID
+	Name          string
 	Config        proxyconfig.Config
 	ACLEngine     *acl.Engine
 	InspectRunner *inspect.Runner
@@ -336,6 +337,7 @@ func (s *Service) runtimeForInstance(ctx context.Context, inst domain.Instance) 
 	}
 	return InstanceRuntime{
 		InstanceID:    inst.ID,
+		Name:          inst.Name,
 		Config:        ToProxyConfig(inst),
 		ACLEngine:     engine,
 		InspectRunner: inspectRunner,

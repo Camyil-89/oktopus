@@ -73,6 +73,7 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Панель управления</p>
         <div class="flex flex-col gap-0.5">
           <a href="./index.html" class="nav-item"><span class="dot"></span>Главная</a>
+<a href="./instance.html" class="nav-item"><span class="dot"></span>Статистика инстанса</a>
 <a href="./rules.html" class="nav-item"><span class="dot"></span>Правила прокси</a>
 <a href="./access-log.html" class="nav-item"><span class="dot"></span>Журнал доступа</a>
 <a href="./reports.html" class="nav-item"><span class="dot"></span>Отчёты журнала</a>
@@ -127,7 +128,7 @@
           <article class="doc doc-page">
             <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Панель управления</p>
             <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Настройки прокси</h1>
-            <p class="lead">Раздел <code>/manage/proxy</code> — порт прослушивания, режим работы, сертификаты и страницы, которые видит пользователь при блокировке.</p>
+            <p class="lead">Раздел <code>/manage/instances/{id}/settings</code> — настройки выбранного прокси-инстанса: listen, включение, режим tunnel/MITM, CA, авторизация и страницы отказа.</p>
 
             <h2 id="mp-tour">Интерфейс</h2>
             <div class="ui-mock-wrap">
@@ -139,18 +140,21 @@
                   </div>
                   <nav class="ui-mock-nav tour-zone" tabindex="0"
                     data-tour-title="Боковое меню"
-                    data-tour-body="Навигация по панели управления: главная, правила, журнал, отчёты, настройки прокси, пользователи. Внизу — выход из учётной записи.">
+                    data-tour-body="Общие разделы: главная, журнал и отчёты по всем инстансам, пользователи кабинета. Ниже — каждый прокси-инстанс: при открытии появляются подпункты (статистика, правила, настройки, журнал). Выход — внизу.">
                     <div class="ui-mock-nav-item">Главная</div>
-                    <div class="ui-mock-nav-item">Правила прокси</div>
                     <div class="ui-mock-nav-item">Журнал доступа</div>
                     <div class="ui-mock-nav-item">Отчёты журнала</div>
-                    <div class="ui-mock-nav-item is-active">Настройки прокси</div>
                     <div class="ui-mock-nav-item">Пользователи</div>
+                    <div class="ui-mock-nav-item is-active ui-mock-nav-instance">Офис</div>
+                    <div class="ui-mock-nav-sub"><div class="ui-mock-nav-item ui-mock-nav-sub-item">Статистика</div>
+                    <div class="ui-mock-nav-item ui-mock-nav-sub-item">Правила прокси</div>
+                    <div class="ui-mock-nav-item ui-mock-nav-sub-item is-active">Настройки</div>
+                    <div class="ui-mock-nav-item ui-mock-nav-sub-item">Журнал доступа</div></div>
                   </nav>
                 </aside>
                 <div class="ui-mock-main">
                   <header class="ui-mock-top">
-                    <h2 class="tour-zone" tabindex="0" data-tour-title="Заголовок" data-tour-body="Страница «Настройки прокси» — /manage/proxy.">Настройки прокси</h2>
+                    <h2 class="tour-zone" tabindex="0" data-tour-title="Заголовок" data-tour-body="Страница настроек инстанса — /manage/instances/{id}/settings; пункт «Настройки» в боковом меню под именем прокси.">Настройки</h2>
                     <span class="ui-mock-lang">RU ▾</span>
                   </header>
                   <div class="ui-mock-content ui-mock-scroll">
@@ -174,7 +178,7 @@
               <div class="ui-tour-hint">
                 <p class="ui-tour-hint-label">Подсказка</p>
                 <p id="ui-tour-title" class="ui-tour-hint-title" data-default-title="Наведите на элемент">Наведите на элемент</p>
-                <p id="ui-tour-body" class="ui-tour-hint-body" data-default-body="Макет /manage/proxy.">Макет /manage/proxy.</p>
+                <p id="ui-tour-body" class="ui-tour-hint-body" data-default-body="Макет настроек инстанса.">Макет настроек инстанса.</p>
               </div>
             </div>
 
@@ -188,8 +192,11 @@
             <h2 id="mp-pages">Страницы отказа</h2>
             <p>Можно настроить HTML-страницу при блокировке и при ошибке шлюза — чтобы пользователь видел понятное сообщение вместо обрыва соединения.</p>
 
+            <h2 id="mp-instance">Инстанс</h2>
+            <p>Можно переименовать инстанс, изменить listen (если порт свободен), отключить прокси переключателем <strong>enabled</strong> или удалить инстанс (ACL и инспекция удаляются; записи журнала сохраняются). Новый инстанс создаётся на <a href="index.html">главной</a>.</p>
+
             <h2 id="mp-after">После изменений</h2>
-            <p>Сохраните настройки и проверьте на главной, что прокси в состоянии RUNNING. При смене режима на MITM убедитесь, что клиенты доверяют CA.</p>
+            <p>Сохраните настройки и проверьте на <a href="instance.html">статистике инстанса</a> или на главной, что listen в RUNNING. При смене режима на MITM убедитесь, что клиенты доверяют CA.</p>
 
           </article>
 
