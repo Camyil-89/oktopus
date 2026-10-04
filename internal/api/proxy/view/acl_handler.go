@@ -29,7 +29,11 @@ func (h *ACLHandler) Status(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	st, err := h.acl.CompileStatus(r.Context())
+	instanceID, ok := parseInstanceID(w, r)
+	if !ok {
+		return
+	}
+	st, err := h.acl.CompileStatus(r.Context(), instanceID)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, "acl status failed")
 		return
@@ -47,7 +51,11 @@ func (h *ACLHandler) Evaluate(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	result := h.acl.Evaluate(r.Context(), proxyaclservice.EvaluateInput{
+	instanceID, ok := parseInstanceID(w, r)
+	if !ok {
+		return
+	}
+	result := h.acl.Evaluate(r.Context(), instanceID, proxyaclservice.EvaluateInput{
 		SNI:      body.SNI,
 		Path:     body.Path,
 		SrcIP:    body.SrcIP,
@@ -99,7 +107,11 @@ func (h *ACLHandler) GetPolicy(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	pol, err := h.acl.GetPolicy(r.Context())
+	instanceID, ok := parseInstanceID(w, r)
+	if !ok {
+		return
+	}
+	pol, err := h.acl.GetPolicy(r.Context(), instanceID)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, "get acl policy failed")
 		return
@@ -120,7 +132,11 @@ func (h *ACLHandler) PutPolicy(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	pol, err := h.acl.SetPolicyAndPublish(r.Context(), body.ConfigText)
+	instanceID, ok := parseInstanceID(w, r)
+	if !ok {
+		return
+	}
+	pol, err := h.acl.SetPolicyAndPublish(r.Context(), instanceID, body.ConfigText)
 	if err != nil {
 		response.ErrorWithDiagnostics(w, http.StatusBadRequest, err.Error(), proxyaclservice.DiagnosticsFromError(err))
 		return

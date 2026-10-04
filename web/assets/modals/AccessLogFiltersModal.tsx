@@ -1,7 +1,12 @@
 "use client";
 
 import { scrollableModalProps } from "@/assets/modals/modalConfig";
-import { listProxyInspectRules } from "@/api/proxy";
+import {
+  listAllProxyInspectRules,
+  listProxyInspectRules,
+  listProxyInstances,
+} from "@/api/proxy";
+import type { ProxyInstance } from "@/types/proxy";
 import { Button, Checkbox, Collapse, DatePicker, Form, Input, Modal, Select } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
@@ -11,6 +16,7 @@ import { useTranslation } from "@/contexts/LocaleContext";
 import { useEffect, useMemo, useState } from "react";
 
 export type AccessLogFiltersValues = {
+  instance_id: string;
   id: string;
   user: string;
   source: string;
@@ -27,6 +33,7 @@ export type AccessLogFiltersValues = {
 };
 
 export const ACCESS_LOG_EMPTY_FILTERS: AccessLogFiltersValues = {
+  instance_id: "",
   id: "",
   user: "",
   source: "",
@@ -49,6 +56,8 @@ type FormValues = Omit<AccessLogFiltersValues, "from" | "to"> & {
 };
 
 type AccessLogFiltersModalProps = {
+  /** Если задан — только правила этого инстанса; иначе все инстансы. */
+  instanceId?: string;
   open: boolean;
   initialValues: AccessLogFiltersValues;
   onCancel: () => void;
@@ -99,12 +108,16 @@ function collapseKeysForFilters(values: AccessLogFiltersValues): string[] {
   ) {
     keys.push("request");
   }
+  if (values.instance_id) {
+    keys.push("instance");
+  }
   return keys;
 }
 
 function filtersFromForm(values: FormValues): AccessLogFiltersValues {
   const period = values.period;
   return {
+    instance_id: values.instance_id ?? "",
     id: values.id?.trim() ?? "",
     user: values.user?.trim() ?? "",
     source: values.source?.trim() ?? "",
@@ -122,6 +135,7 @@ function filtersFromForm(values: FormValues): AccessLogFiltersValues {
 }
 
 export function AccessLogFiltersModal({
+  instanceId,
   open,
   initialValues,
   onCancel,
@@ -133,6 +147,11 @@ export function AccessLogFiltersModal({
   const [inspectOptions, setInspectOptions] = useState<
     { value: string; label: string }[]
   >([]);
+  const [instanceOptions, setInstanceOptions] = useState<
+    { value: string; label: string }[]
+  >([]);
+
+  const scopedToInstance = Boolean(instanceId);
 
   useEffect(() => {
     if (open) {
@@ -146,7 +165,10 @@ export function AccessLogFiltersModal({
       return;
     }
     let cancelled = false;
-    void listProxyInspectRules()
+    const loadRules = instanceId
+      ? () => listProxyInspectRules(instanceId)
+      : () => listAllProxyInspectRules();
+    void loadRules()
       .then((inspect) => {
         if (cancelled) {
           return;
@@ -163,10 +185,58 @@ export function AccessLogFiltersModal({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, instanceId]);
+
+  useEffect(() => {
+    if (!open || scopedToInstance) {
+      return;
+    }
+    let cancelled = false;
+    void listProxyInstances()
+      .then((list: ProxyInstance[]) => {
+        if (cancelled) {
+          return;
+        }
+        setInstanceOptions(
+          list.map((i) => ({ value: i.id, label: i.name || i.listen })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setInstanceOptions([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, scopedToInstance]);
 
   const collapseItems = useMemo(
     () => [
+      ...(!scopedToInstance
+        ? [
+            {
+              key: "instance",
+              label: t("accessLog.filtersInstance"),
+              children: (
+                <Form.Item
+                  name="instance_id"
+                  label={t("accessLog.col.instance")}
+                  className={FORM_ITEM_CLASS}
+                >
+                  <Select
+                    size="small"
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder={t("common.any")}
+                    options={instanceOptions}
+                  />
+                </Form.Item>
+              ),
+            },
+          ]
+        : []),
       {
         key: "period",
         label: t("accessLog.filtersPeriod"),
@@ -286,7 +356,7 @@ export function AccessLogFiltersModal({
         ),
       },
     ],
-    [inspectOptions, t],
+    [inspectOptions, instanceOptions, scopedToInstance, t],
   );
 
   const close = () => {

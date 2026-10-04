@@ -64,6 +64,13 @@ func listWhere(f repository.ListFilter) (string, []any) {
 		parts = append(parts, "action = ?")
 		args = append(args, uint8(f.Action))
 	}
+	if inst := strings.TrimSpace(f.InstanceID); inst != "" {
+		parsed, err := uuid.Parse(inst)
+		if err == nil {
+			parts = append(parts, "instance_id = ?")
+			args = append(args, parsed)
+		}
+	}
 	if id := strings.TrimSpace(f.ID); id != "" {
 		parsed, err := uuid.Parse(id)
 		if err == nil {

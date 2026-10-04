@@ -9,7 +9,7 @@ import (
 
 func parseFlags(args []string) (poclib.RunOpts, error) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
-	o := poclib.RunOpts{ProxyAddr: "127.0.0.1:8080"}
+	o := poclib.RunOpts{ProxyAddr: setup.TestInstanceDialAddr}
 	o.API = setup.DefaultAPIFlags()
 	fs.StringVar(&o.ProxyAddr, "proxy", o.ProxyAddr, "прокси")
 	fs.StringVar(&o.API.APIBase, "api", o.API.APIBase, "API")

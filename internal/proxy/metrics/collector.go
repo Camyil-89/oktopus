@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"math"
 	"sort"
 	"sync"
@@ -105,23 +106,23 @@ func Percentile95(values []int64) int64 {
 }
 
 // ObserveDecision регистрирует одно ACL-решение (CONNECT или HTTP).
-func ObserveDecision(allow bool, spend time.Duration, parts DecideParts, user, source string) {
-	defaultCollector.observe(allow, spend, parts, user, source, false)
+func ObserveDecision(ctx context.Context, allow bool, spend time.Duration, parts DecideParts, user, source string) {
+	collectorFromContext(ctx).observe(allow, spend, parts, user, source, false)
 }
 
 // ObserveDecisionWithPolicy — ACL + policy total за один захват mutex (CONNECT hot path).
-func ObserveDecisionWithPolicy(allow bool, spend time.Duration, parts DecideParts, user, source string) {
-	defaultCollector.observe(allow, spend, parts, user, source, true)
+func ObserveDecisionWithPolicy(ctx context.Context, allow bool, spend time.Duration, parts DecideParts, user, source string) {
+	collectorFromContext(ctx).observe(allow, spend, parts, user, source, true)
 }
 
 // ObserveInspect регистрирует один проход Lua-инспекции (HTTP после ACL allow).
-func ObserveInspect(spend time.Duration, parts InspectParts) {
-	defaultCollector.observeInspect(spend, parts)
+func ObserveInspect(ctx context.Context, spend time.Duration, parts InspectParts) {
+	collectorFromContext(ctx).observeInspect(spend, parts)
 }
 
 // ObservePolicyTotal — полное время политики на запрос: ACL (+ inspect на HTTP allow в MITM).
-func ObservePolicyTotal(spend time.Duration) {
-	defaultCollector.observePolicy(spend)
+func ObservePolicyTotal(ctx context.Context, spend time.Duration) {
+	collectorFromContext(ctx).observePolicy(spend)
 }
 
 func (c *Collector) observe(allow bool, spend time.Duration, parts DecideParts, user, source string, withPolicy bool) {

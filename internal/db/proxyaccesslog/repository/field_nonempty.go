@@ -8,6 +8,7 @@ import (
 )
 
 var reportColumnFields = map[string]struct{}{
+	"instance_id":         {},
 	"destination_address": {},
 	"source_address":      {},
 	"user":                {},

@@ -3,6 +3,7 @@ import type { AccessLogSegment } from "@/utils/accessLogSegment";
 
 export type ProxyAccessLogRow = {
   id: string;
+  instance_id: string;
   created_at: string;
   source_address: string;
   destination_address: string;
@@ -26,6 +27,7 @@ export type ProxyAccessLogListResponse = {
 export type ListProxyAccessLogParams = {
   page?: number;
   page_size?: number;
+  instance_id?: string;
   id?: string;
   user?: string;
   source?: string;

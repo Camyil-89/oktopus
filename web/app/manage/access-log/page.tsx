@@ -4,8 +4,8 @@ import { ApiError } from "@/api/base";
 import {
   deleteProxyAccessLogByPeriod,
   listProxyAccessLog,
-  listProxyInspectRules,
-  patchProxySettings,
+  listAllProxyInspectRules,
+  patchHostSettings,
 } from "@/api/proxy";
 import { AccessLogDecisionRuleCell } from "@/assets/components/AccessLogDecisionRuleCell";
 import { AccessLogRuleNameCell } from "@/assets/components/AccessLogRuleNameCell";
@@ -60,6 +60,7 @@ import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import Link from "next/link";
 import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
 import type { MessageKey } from "@/i18n/translate";
+import { useProxyInstanceNameMap } from "@/assets/hooks/useProxyInstanceNameMap";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -67,6 +68,7 @@ const MAX_PAGE_SIZE = 100;
 
 type ColumnKey =
   | "created_at"
+  | "instance"
   | "source_address"
   | "destination_address"
   | "user"
@@ -81,6 +83,7 @@ type ColumnKey =
 
 const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = [
   "created_at",
+  "instance",
   "source_address",
   "destination_address",
   "user",
@@ -92,6 +95,7 @@ const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = [
 
 const COLUMN_LABEL_KEYS: Record<ColumnKey, MessageKey> = {
   created_at: "accessLog.col.created_at",
+  instance: "accessLog.col.instance",
   source_address: "accessLog.col.source_address",
   destination_address: "accessLog.col.destination_address",
   user: "accessLog.col.user",
@@ -132,6 +136,7 @@ function loadFiltersFromStorage(): AccessLogFiltersValues {
       action = "";
     }
     return {
+      instance_id: typeof p.instance_id === "string" ? p.instance_id : "",
       id: typeof p.id === "string" ? p.id : "",
       user: typeof p.user === "string" ? p.user : "",
       source: typeof p.source === "string" ? p.source : "",
@@ -222,6 +227,7 @@ function accessLogListParams(
     ...attackParams,
     decision_rule_ref: filters.decision_rule_ref || undefined,
     inspect_rule_id: filters.inspect_rule_id || undefined,
+    instance_id: filters.instance_id || undefined,
   };
 }
 
@@ -229,6 +235,7 @@ export default function ManageAccessLogPage() {
   const { message, modal } = App.useApp();
   const { t } = useTranslation();
   const formatApiError = useApiErrorMessage();
+  const instanceNames = useProxyInstanceNameMap();
   const columnLabels = useMemo(
     () =>
       Object.fromEntries(
@@ -306,7 +313,7 @@ export default function ManageAccessLogPage() {
   );
 
   useEffect(() => {
-    void listProxyInspectRules()
+    void listAllProxyInspectRules()
       .then((inspect) => {
         const m = new Map<string, string>();
         for (const r of inspect) {
@@ -437,7 +444,7 @@ export default function ManageAccessLogPage() {
   const saveRetention = async (body: { access_log_retention_days: number }) => {
     setSettingsSaving(true);
     try {
-      await patchProxySettings(body);
+      await patchHostSettings(body);
       message.success(t("common.saved"));
       setSettingsOpen(false);
     } catch (e) {
@@ -455,6 +462,15 @@ export default function ManageAccessLogPage() {
         dataIndex: "created_at",
         width: 190,
         render: (v: string) => new Date(v).toLocaleString(),
+      },
+      {
+        key: "instance",
+        title: columnLabels.instance,
+        dataIndex: "instance_id",
+        width: 140,
+        ellipsis: true,
+        render: (id: string) =>
+          instanceNames.get(id) ?? (id ? id.slice(0, 8) : "—"),
       },
       {
         key: "source_address",
@@ -549,7 +565,7 @@ export default function ManageAccessLogPage() {
         },
       },
     ],
-    [columnLabels, ruleNames, t],
+    [columnLabels, instanceNames, ruleNames, t],
   );
 
   const tableColumns = useMemo(
@@ -584,7 +600,7 @@ export default function ManageAccessLogPage() {
     <div className="flex w-full flex-col gap-4">
       <header className="flex flex-row flex-wrap items-center justify-between gap-3">
         <Link
-          href="/manage/access-log/reports"
+          href="/manage/reports"
           className="text-[12px] text-zinc-500 transition hover:text-teal-300"
         >
           {t("accessLog.reportsLink")}
@@ -621,6 +637,7 @@ export default function ManageAccessLogPage() {
         open={detailRow !== null}
         onClose={() => setDetailRow(null)}
         ruleNames={ruleNames}
+        instanceNames={instanceNames}
       />
 
       <AccessLogFiltersModal

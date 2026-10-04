@@ -58,7 +58,7 @@ func (c *Client) EnableProxyStaticAuth(connectMode, staticUsers string) (listen 
 		return "", fmt.Errorf("static users list empty")
 	}
 	return c.patchProxyAuthAndWait(map[string]interface{}{
-		"proxy_enabled":     true,
+		"enabled":           true,
 		"connect_mode":      connectMode,
 		"auth_enabled":      true,
 		"auth_backend":      "static",
@@ -73,7 +73,7 @@ func (c *Client) EnableProxyLDAPAuth(connectMode string) (listen string, err err
 		return "", err
 	}
 	return c.patchProxyAuthAndWait(map[string]interface{}{
-		"proxy_enabled":      true,
+		"enabled":            true,
 		"connect_mode":       connectMode,
 		"auth_enabled":       true,
 		"auth_backend":       "ldap",
@@ -93,12 +93,19 @@ func normalizeConnectMode(connectMode string) (string, error) {
 }
 
 func (c *Client) patchProxyAuthAndWait(body map[string]interface{}) (listen string, err error) {
+	if _, err := c.EnsureTestInstance(); err != nil {
+		return "", err
+	}
 	if mode, ok := body["connect_mode"].(string); ok {
 		if err := c.EnsureCAForConnectMode(mode); err != nil {
 			return "", fmt.Errorf("ca: %w", err)
 		}
 	}
-	if err := c.patchJSON("/api/proxy/settings", body); err != nil {
+	path, err := c.instanceAPIPath("")
+	if err != nil {
+		return "", err
+	}
+	if err := c.patchJSON(path, body); err != nil {
 		return "", err
 	}
 	return c.waitProxyActive(30 * time.Second)
@@ -107,19 +114,19 @@ func (c *Client) patchProxyAuthAndWait(body map[string]interface{}) (listen stri
 func (c *Client) waitProxyActive(timeout time.Duration) (listen string, err error) {
 	deadline := time.Now().Add(timeout)
 	for {
-		st, err := c.ProxyStatus()
+		inst, err := c.instanceRuntime()
 		if err != nil {
 			return "", err
 		}
-		if st.ProxyActive {
-			listen = strings.TrimSpace(st.Listen)
+		if inst.Active {
+			listen = dialAddrForListen(inst.Listen)
 			if listen == "" {
 				return "", fmt.Errorf("proxy listen empty")
 			}
 			return listen, nil
 		}
-		if st.ProxyStartError != "" {
-			return "", fmt.Errorf("proxy not active: %s", st.ProxyStartError)
+		if inst.ProxyStartError != "" {
+			return "", fmt.Errorf("proxy not active: %s", inst.ProxyStartError)
 		}
 		if time.Now().After(deadline) {
 			return "", fmt.Errorf("timeout waiting for proxy active")

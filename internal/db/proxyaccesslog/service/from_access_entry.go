@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 	"oktopus/internal/proxy/accesslog"
 )
 
-func fromAccessEntry(e accesslog.Entry) domain.Entry {
+func fromAccessEntry(e accesslog.Entry) (domain.Entry, error) {
 	var user *string
 	if e.User != nil && *e.User != "" {
 		user = e.User
@@ -28,8 +29,13 @@ func fromAccessEntry(e accesslog.Entry) domain.Entry {
 	if logID == uuid.Nil {
 		logID = id.MustNew()
 	}
+	instID := e.InstanceID
+	if instID == uuid.Nil {
+		return domain.Entry{}, fmt.Errorf("access log entry: instance_id is required")
+	}
 	return domain.Entry{
 		ID:                 logID,
+		InstanceID:         instID,
 		CreatedAt:          at.UTC(),
 		SourceAddress:      e.SourceAddress,
 		DestinationAddress: e.DestinationAddress,
@@ -41,7 +47,7 @@ func fromAccessEntry(e accesslog.Entry) domain.Entry {
 		DeniedBy:           deniedBy,
 		DecisionRuleRef:    decisionRuleRefFromEntry(e),
 		Extra:              buildExtraJSON(e),
-	}
+	}, nil
 }
 
 func decisionRuleRefFromEntry(e accesslog.Entry) string {

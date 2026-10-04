@@ -75,6 +75,10 @@ func RunEvaluateSuite(s Suite, args []string) int {
 		log.Printf("%s: login: %v", s.Name, err)
 		return 1
 	}
+	if _, err := client.EnsureTestInstance(); err != nil {
+		log.Printf("%s: test instance: %v", s.Name, err)
+		return 1
+	}
 	if s.ProxyLDAP {
 		if err := setup.CheckLDAPDevReachable(); err != nil {
 			log.Printf("%s: %v", s.Name, err)
@@ -164,6 +168,10 @@ func RunCompileSuite(s CompileSuite, args []string) int {
 	}
 	if err := client.Login(api.APIUser, api.APIPass); err != nil {
 		log.Printf("%s: login: %v", s.Name, err)
+		return 1
+	}
+	if _, err := client.EnsureTestInstance(); err != nil {
+		log.Printf("%s: test instance: %v", s.Name, err)
 		return 1
 	}
 	if failed := validatePolicy(client, s.Name, policy); failed {

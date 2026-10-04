@@ -44,6 +44,7 @@ var PolicyNoteInspectRuleID = uuid.MustParse("00000000-0000-4000-8000-0000000000
 // Entry — одна запись решения ACL по запросу или CONNECT.
 type Entry struct {
 	ID                 uuid.UUID // если задан — id строки в proxy_access_log (иначе генерируется при flush)
+	InstanceID         uuid.UUID
 	At                 time.Time
 	RuleRef            string // UUID инспекции, текст http_access/ssl_verify или system_* → decision_rule_ref
 	SourceAddress      string

@@ -40,6 +40,22 @@ http_access deny localnet
 http_access allow all
 `;
 
+function normalizePolicyText(s: string): string {
+  return s.replace(/\r\n/g, "\n").trimEnd();
+}
+
+function effectivePolicyText(s: string): string {
+  const n = normalizePolicyText(s);
+  if (!n || n === normalizePolicyText(POLICY_PLACEHOLDER)) {
+    return "";
+  }
+  return n;
+}
+
+function displayPolicyText(raw: string): string {
+  return raw.trim() ? raw : POLICY_PLACEHOLDER;
+}
+
 /** Строка таблицы; body только если загружен/редактирован локально. */
 type ListRow = ProxyACLNamedListSummary & {
   key: string;
@@ -126,12 +142,14 @@ function compileStatusTag(st: ProxyACLCompileStatus | null, t: TranslateFn) {
 }
 
 type ProxyACLSquidCardProps = {
+  instanceId: string;
   onUnsavedChange?: (state: RulesSectionUnsaved) => void;
 };
 
 export function ProxyACLSquidCard({
+  instanceId,
   onUnsavedChange,
-}: ProxyACLSquidCardProps = {}) {
+}: ProxyACLSquidCardProps) {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const formatApiError = useApiErrorMessage();
@@ -170,15 +188,13 @@ export function ProxyACLSquidCard({
   const load = useCallback(async () => {
     try {
       const [pol, lists, st] = await Promise.all([
-        proxyApi.getProxyACLPolicy(),
+        proxyApi.getProxyACLPolicy(instanceId),
         proxyApi.listProxyACLNamedLists(),
-        proxyApi.getProxyACLStatus(),
+        proxyApi.getProxyACLStatus(instanceId),
       ]);
-      const text = pol.config_text?.trim()
-        ? pol.config_text
-        : POLICY_PLACEHOLDER;
-      setPolicyText(text);
-      setSavedPolicy(text);
+      const raw = pol.config_text ?? "";
+      setSavedPolicy(raw);
+      setPolicyText(displayPolicyText(raw));
       const rows = mapSummaryToRows(lists);
       setListRows(rows);
       setAclStatus(st);
@@ -187,13 +203,13 @@ export function ProxyACLSquidCard({
     } finally {
       setLoading(false);
     }
-  }, [formatApiError, message, t]);
+  }, [formatApiError, instanceId, message, t]);
 
   useEffect(() => {
     void load();
     const t = setInterval(async () => {
       try {
-        const st = await proxyApi.getProxyACLStatus();
+        const st = await proxyApi.getProxyACLStatus(instanceId);
         setAclStatus(st);
         if (st.compile_diagnostics?.length) {
           setPolicyDiagnostics(st.compile_diagnostics);
@@ -203,13 +219,13 @@ export function ProxyACLSquidCard({
       }
     }, 2000);
     return () => clearInterval(t);
-  }, [load]);
+  }, [instanceId, load]);
 
   useEffect(() => {
     if (loading) return;
     const timer = setTimeout(() => {
       void proxyApi
-        .validateProxyACLPolicy(policyText)
+        .validateProxyACLPolicy(instanceId, policyText)
         .then((res) => {
           setPolicyDiagnostics(res.diagnostics ?? []);
         })
@@ -218,11 +234,13 @@ export function ProxyACLSquidCard({
         });
     }, 400);
     return () => clearTimeout(timer);
-  }, [policyText, loading]);
+  }, [instanceId, policyText, loading]);
 
   const policyDirty = useMemo(
-    () => policyText !== savedPolicy,
-    [policyText, savedPolicy],
+    () =>
+      !loading &&
+      effectivePolicyText(policyText) !== effectivePolicyText(savedPolicy),
+    [loading, policyText, savedPolicy],
   );
   const listMetas = useMemo(
     () =>
@@ -243,7 +261,7 @@ export function ProxyACLSquidCard({
         const out = await proxyApi.syncProxyACLNamedLists(drafts);
         const mapped = mapSummaryToRows(out);
         setListRows(mapped);
-        setAclStatus(await proxyApi.getProxyACLStatus());
+        setAclStatus(await proxyApi.getProxyACLStatus(instanceId));
         return mapped;
       } catch (e) {
         message.error(formatApiError(e, t("acl.listSaveError")));
@@ -258,7 +276,7 @@ export function ProxyACLSquidCard({
   const verifyPolicy = async () => {
     setValidatingPolicy(true);
     try {
-      const res = await proxyApi.validateProxyACLPolicy(policyText);
+      const res = await proxyApi.validateProxyACLPolicy(instanceId, policyText);
       setPolicyDiagnostics(res.diagnostics ?? []);
       if (res.ok) {
         message.success(t("acl.verifyOk"));
@@ -275,11 +293,13 @@ export function ProxyACLSquidCard({
   const savePolicy = useCallback(async (): Promise<boolean> => {
     setSavingPolicy(true);
     try {
-      const pol = await proxyApi.putProxyACLPolicy(policyText);
-      setSavedPolicy(pol.config_text);
-      setPolicyText(pol.config_text);
+      const raw = effectivePolicyText(policyText);
+      const pol = await proxyApi.putProxyACLPolicy(instanceId, raw);
+      const saved = pol.config_text ?? "";
+      setSavedPolicy(saved);
+      setPolicyText(displayPolicyText(saved));
       message.success(t("acl.configSaved"));
-      setAclStatus(await proxyApi.getProxyACLStatus());
+      setAclStatus(await proxyApi.getProxyACLStatus(instanceId));
       return true;
     } catch (e) {
       if (e instanceof ApiError) {
@@ -294,10 +314,10 @@ export function ProxyACLSquidCard({
     } finally {
       setSavingPolicy(false);
     }
-  }, [formatApiError, message, policyText, t]);
+  }, [formatApiError, instanceId, message, policyText, t]);
 
   const discardPolicy = useCallback(() => {
-    setPolicyText(savedPolicy);
+    setPolicyText(displayPolicyText(savedPolicy));
   }, [savedPolicy]);
 
   useEffect(() => {
@@ -383,7 +403,7 @@ export function ProxyACLSquidCard({
           r.key === editingListKey ? { ...r, ...summary } : r,
         ),
       );
-      setAclStatus(await proxyApi.getProxyACLStatus());
+      setAclStatus(await proxyApi.getProxyACLStatus(instanceId));
       message.success(t("acl.listUpdated"));
     } catch (e) {
       message.error(formatApiError(e, t("acl.pollFailed")));
@@ -518,7 +538,7 @@ export function ProxyACLSquidCard({
             listNames={listNames}
             listMetas={listMetas}
             diagnostics={policyDiagnostics}
-            resetKey={savedPolicy.slice(0, 32)}
+            resetKey={instanceId}
           />
           {policyDiagnostics.length > 0 ? (
             <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">

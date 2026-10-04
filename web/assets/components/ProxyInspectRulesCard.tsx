@@ -85,12 +85,14 @@ function rowsFromSnapshot(snapshot: string): Row[] {
 }
 
 type ProxyInspectRulesCardProps = {
+  instanceId: string;
   onUnsavedChange?: (state: RulesSectionUnsaved) => void;
 };
 
 export function ProxyInspectRulesCard({
+  instanceId,
   onUnsavedChange,
-}: ProxyInspectRulesCardProps = {}) {
+}: ProxyInspectRulesCardProps) {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const formatApiError = useApiErrorMessage();
@@ -117,9 +119,9 @@ export function ProxyInspectRulesCard({
     setLoading(true);
     try {
       const [st, list, settings] = await Promise.all([
-        proxyApi.getProxyInspectStatus(),
-        proxyApi.listProxyInspectRules(),
-        proxyApi.getProxySettings(),
+        proxyApi.getProxyInspectStatus(instanceId),
+        proxyApi.listProxyInspectRules(instanceId),
+        proxyApi.getProxyInstance(instanceId),
       ]);
       setConnectMode(settings.connect_mode);
       setStatus(st);
@@ -182,7 +184,7 @@ export function ProxyInspectRulesCard({
     }
     setScriptValidateLoading(true);
     try {
-      await proxyApi.validateProxyInspectScript({ script });
+      await proxyApi.validateProxyInspectScript(instanceId, { script });
       message.success(t("inspect.scriptOk"));
       return true;
     } catch (e) {
@@ -204,7 +206,7 @@ export function ProxyInspectRulesCard({
     }
     setScriptValidateLoading(true);
     try {
-      await proxyApi.validateProxyInspectScript({ script: values.script });
+      await proxyApi.validateProxyInspectScript(instanceId, { script: values.script });
     } catch (e) {
       message.error(
         formatApiError(e, t("inspect.fixLua")),
@@ -295,7 +297,7 @@ export function ProxyInspectRulesCard({
         enabled: r.enabled,
         sort_order: i,
       }));
-      await proxyApi.syncProxyInspectRules(payload);
+      await proxyApi.syncProxyInspectRules(instanceId, payload);
       message.success(t("inspect.saved"));
       await load();
       return true;

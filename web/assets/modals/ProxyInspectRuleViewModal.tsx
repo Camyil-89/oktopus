@@ -1,7 +1,7 @@
 "use client";
 
 import { ApiError } from "@/api/base";
-import { getProxyInspectRule } from "@/api/proxy";
+import { findProxyInspectRule, getProxyInspectRule } from "@/api/proxy";
 import { ProxyInspectRuleModal } from "@/assets/modals/ProxyInspectRuleModal";
 import {
   proxyInspectRuleToFormValues,
@@ -15,6 +15,8 @@ import { useEffect, useState } from "react";
 type ProxyInspectRuleViewModalProps = {
   open: boolean;
   ruleId: string | null;
+  /** Если не задан — правило ищется по всем инстансам. */
+  instanceId?: string;
   initialRule?: ProxyInspectRule | null;
   onClose: () => void;
 };
@@ -22,6 +24,7 @@ type ProxyInspectRuleViewModalProps = {
 export function ProxyInspectRuleViewModal({
   open,
   ruleId,
+  instanceId,
   initialRule,
   onClose,
 }: ProxyInspectRuleViewModalProps) {
@@ -45,7 +48,10 @@ export function ProxyInspectRuleViewModal({
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
-    void getProxyInspectRule(ruleId)
+    const load = instanceId
+      ? () => getProxyInspectRule(instanceId, ruleId)
+      : () => findProxyInspectRule(ruleId);
+    void load()
       .then((r) => {
         if (!cancelled) {
           form.setFieldsValue(proxyInspectRuleToFormValues(r));
@@ -69,7 +75,7 @@ export function ProxyInspectRuleViewModal({
     return () => {
       cancelled = true;
     };
-  }, [open, ruleId, initialRule, form, t]);
+  }, [open, ruleId, instanceId, initialRule, form, t]);
 
   return (
     <ProxyInspectRuleModal

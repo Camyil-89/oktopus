@@ -7,7 +7,10 @@ import (
 	stdhttp "net/http"
 	"time"
 
+	"github.com/google/uuid"
+
 	"oktopus/internal/pki"
+	"oktopus/internal/proxy/instancectx"
 	"oktopus/internal/proxy/accesslog"
 	"oktopus/internal/proxy/acl"
 	"oktopus/internal/proxy/auth"
@@ -22,7 +25,8 @@ import (
 
 // Server маршрутизирует http:// и CONNECT (https) в соответствующие пакеты.
 type Server struct {
-	cfg       config.Config
+	cfg        config.Config
+	instanceID uuid.UUID
 	aclSource string
 	log       *log.Logger
 	auth      *auth.Gate
@@ -33,7 +37,7 @@ type Server struct {
 
 // New создаёт сервер. hooks может быть nil. engine — опубликованный ACL из БД.
 // accessRec логирует каждое ACL-решение; nil — без записи.
-func New(cfg config.Config, engine *acl.Engine, inspectRunner *inspect.Runner, h *hooks.Hooks, accessRec accesslog.Recorder, logger *log.Logger, authCache *auth.AuthCache) (*Server, error) {
+func New(cfg config.Config, instanceID uuid.UUID, engine *acl.Engine, inspectRunner *inspect.Runner, h *hooks.Hooks, accessRec accesslog.Recorder, logger *log.Logger, authCache *auth.AuthCache) (*Server, error) {
 	cfg = cfg.WithDefaults()
 	if logger == nil {
 		logger = log.Default()
@@ -84,7 +88,8 @@ func New(cfg config.Config, engine *acl.Engine, inspectRunner *inspect.Runner, h
 		}
 	}
 	return &Server{
-		cfg:       cfg,
+		cfg:        cfg,
+		instanceID: instanceID,
 		aclSource: aclSource,
 		log:       logger,
 		auth:      gate,
@@ -133,6 +138,9 @@ func (s *Server) ServeHTTP(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	ctx, ok := s.auth.Require(w, r)
 	if !ok {
 		return
+	}
+	if s.instanceID != uuid.Nil {
+		ctx = instancectx.WithID(ctx, s.instanceID)
 	}
 	r = r.WithContext(ctx)
 
@@ -226,7 +234,7 @@ func Run(cfg config.Config, engine *acl.Engine, h *hooks.Hooks, accessRec access
 
 // RunContext запускает прокси до отмены ctx или ошибки listener.
 func RunContext(ctx context.Context, cfg config.Config, engine *acl.Engine, h *hooks.Hooks, accessRec accesslog.Recorder, logger *log.Logger) error {
-	srv, err := New(cfg, engine, nil, h, accessRec, logger, nil)
+	srv, err := New(cfg, uuid.Nil, engine, nil, h, accessRec, logger, nil)
 	if err != nil {
 		return err
 	}

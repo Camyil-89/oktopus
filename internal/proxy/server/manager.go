@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
+
 	"oktopus/internal/apperr"
 	"oktopus/internal/proxy/accesslog"
 	"oktopus/internal/proxy/acl"
@@ -27,6 +29,7 @@ type Manager struct {
 	hooks     *hooks.Hooks
 	log       *log.Logger
 	accessRec accesslog.Recorder
+	instanceID uuid.UUID
 
 	mu        sync.Mutex
 	listen    string
@@ -93,6 +96,10 @@ func NewManager(h *hooks.Hooks, logger *log.Logger) *Manager {
 	}
 }
 
+func (m *Manager) SetInstanceID(id uuid.UUID) {
+	m.instanceID = id
+}
+
 // SetAccessRecorder задаёт логгер ACL-решений (например accesslog.Batcher).
 func (m *Manager) SetAccessRecorder(rec accesslog.Recorder) {
 	m.accessRec = rec
@@ -144,7 +151,7 @@ func (m *Manager) Apply(ctx context.Context, cfg config.Config, aclEngine *acl.E
 	cfg = cfg.WithDefaults()
 
 	authCache := m.prepareAuthCache(cfg.Auth)
-	newSrv, err := New(cfg, aclEngine, inspectRunner, m.hooks, m.accessRec, m.log, authCache)
+	newSrv, err := New(cfg, m.instanceID, aclEngine, inspectRunner, m.hooks, m.accessRec, m.log, authCache)
 	if err != nil {
 		m.logStartFailure(err)
 		return err
@@ -285,7 +292,12 @@ func (m *Manager) markListeningReady() {
 
 // ProxyTraffic возвращает метрики нагрузки для API.
 func (m *Manager) ProxyTraffic() metrics.Snapshot {
-	snap := metrics.SnapshotTraffic()
+	var snap metrics.Snapshot
+	if m.instanceID != uuid.Nil {
+		snap = metrics.DefaultRegistry().Collector(m.instanceID).TrafficSnapshot()
+	} else {
+		snap = metrics.SnapshotTraffic()
+	}
 	snap.ActiveConnections = m.conns.count()
 	snap.ActiveWebSocketConnections = metrics.ActiveWebSocketConnections()
 	if m.accessBatcher != nil {

@@ -9,8 +9,9 @@ import (
 )
 
 type RulesRepository interface {
-	GetPolicy(ctx context.Context) (domain.Policy, error)
-	SetPolicy(ctx context.Context, configText string) (domain.Policy, error)
+	GetPolicy(ctx context.Context, instanceID uuid.UUID) (domain.Policy, error)
+	SetPolicy(ctx context.Context, instanceID uuid.UUID, configText string) (domain.Policy, error)
+	ListPolicyInstanceIDs(ctx context.Context) ([]uuid.UUID, error)
 	ListNamedLists(ctx context.Context) ([]domain.NamedList, error)
 	ListNamedListsSummary(ctx context.Context) ([]domain.NamedListSummary, error)
 	GetNamedList(ctx context.Context, id uuid.UUID) (domain.NamedList, error)

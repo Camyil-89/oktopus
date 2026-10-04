@@ -1,7 +1,7 @@
 "use client";
 
 import { ApiError } from "@/api/base";
-import { getProxyInspectRule } from "@/api/proxy";
+import { findProxyInspectRule, getProxyInspectRule } from "@/api/proxy";
 import { AccessLogPolicyAnomalyPanel } from "@/assets/modals/AccessLogPolicyAnomalyPanel";
 import { scrollableModalProps } from "@/assets/modals/modalConfig";
 import { ProxyInspectRuleViewModal } from "@/assets/modals/ProxyInspectRuleViewModal";
@@ -31,9 +31,14 @@ type AccessLogDetailModalProps = {
   open: boolean;
   onClose: () => void;
   ruleNames?: ReadonlyMap<string, string>;
+  instanceNames?: ReadonlyMap<string, string>;
 };
 
-function useInspectRule(open: boolean, ruleId: string | undefined) {
+function useInspectRule(
+  open: boolean,
+  ruleId: string | undefined,
+  instanceId: string | undefined,
+) {
   const [rule, setRule] = useState<{ id: string; name: string } | null>(null);
   const [ruleMissing, setRuleMissing] = useState(false);
   const [ruleLoading, setRuleLoading] = useState(false);
@@ -49,7 +54,10 @@ function useInspectRule(open: boolean, ruleId: string | undefined) {
     setRuleLoading(true);
     setRule(null);
     setRuleMissing(false);
-    void getProxyInspectRule(ruleId)
+    const load = instanceId
+      ? () => getProxyInspectRule(instanceId, ruleId)
+      : () => findProxyInspectRule(ruleId);
+    void load()
       .then((r: ProxyInspectRule) => {
         if (!cancelled) {
           setRule({ id: r.id, name: r.name });
@@ -73,7 +81,7 @@ function useInspectRule(open: boolean, ruleId: string | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [open, ruleId]);
+  }, [open, ruleId, instanceId]);
 
   return { rule, ruleMissing, ruleLoading };
 }
@@ -128,6 +136,7 @@ export function AccessLogDetailModal({
   open,
   onClose,
   ruleNames,
+  instanceNames,
 }: AccessLogDetailModalProps) {
   const { t } = useTranslation();
   const emDash = t("common.emDash");
@@ -140,7 +149,7 @@ export function AccessLogDetailModal({
   const inspectRuleId = rowNorm?.inspect_rule_id ?? undefined;
   const decisionRef = rowNorm?.decision_rule_ref?.trim() ?? "";
 
-  const inspect = useInspectRule(open, inspectRuleId);
+  const inspect = useInspectRule(open, inspectRuleId, rowNorm?.instance_id);
   const [inspectViewOpen, setInspectViewOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
 
@@ -176,6 +185,11 @@ export function AccessLogDetailModal({
   const generalTab = rowNorm ? (
     <Descriptions column={1} bordered size="small">
       <Descriptions.Item label="ID">{rowNorm.id}</Descriptions.Item>
+      <Descriptions.Item label={t("accessLog.col.instance")}>
+        {instanceNames?.get(rowNorm.instance_id) ??
+          rowNorm.instance_id ??
+          emDash}
+      </Descriptions.Item>
       <Descriptions.Item label={t("common.time")}>
         {new Date(rowNorm.created_at).toLocaleString()}
       </Descriptions.Item>
@@ -257,12 +271,11 @@ export function AccessLogDetailModal({
         onCancel={onClose}
         footer={null}
         width={720}
-        {...scrollableModalProps}
+        destroyOnClose={scrollableModalProps.destroyOnClose}
         styles={{
-          ...scrollableModalProps.styles,
           body: {
-            ...scrollableModalProps.styles?.body,
             maxHeight: ACCESS_LOG_DETAIL_BODY_MAX_HEIGHT,
+            overflowY: "auto",
           },
         }}
       >
@@ -298,6 +311,7 @@ export function AccessLogDetailModal({
       <ProxyInspectRuleViewModal
         open={inspectViewOpen}
         ruleId={inspectRuleId ?? null}
+        instanceId={rowNorm?.instance_id}
         initialRule={null}
         onClose={() => setInspectViewOpen(false)}
       />

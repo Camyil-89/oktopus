@@ -37,12 +37,19 @@ type AnalyzeResult struct {
 	} `json:"diagnostics"`
 }
 
-// PublishPolicy публикует текст политики (нужен предварительный Login).
+// PublishPolicy публикует текст политики на тестовый инстанс (нужен Login).
 func (c *Client) PublishPolicy(aclText string) error {
+	if _, err := c.EnsureTestInstance(); err != nil {
+		return err
+	}
+	path, err := c.instanceAPIPath("/acl/policy")
+	if err != nil {
+		return err
+	}
 	var pol struct {
 		ConfigText string `json:"config_text"`
 	}
-	if err := c.putJSON("/api/proxy/acl/policy", map[string]string{
+	if err := c.putJSON(path, map[string]string{
 		"config_text": aclText,
 	}, &pol); err != nil {
 		return err
@@ -51,16 +58,30 @@ func (c *Client) PublishPolicy(aclText string) error {
 }
 
 func (c *Client) Evaluate(in EvaluateInput) (EvaluateResult, error) {
+	if _, err := c.EnsureTestInstance(); err != nil {
+		return EvaluateResult{}, err
+	}
+	path, err := c.instanceAPIPath("/acl/evaluate")
+	if err != nil {
+		return EvaluateResult{}, err
+	}
 	var out EvaluateResult
-	if err := c.postJSON("/api/proxy/acl/evaluate", in, &out); err != nil {
+	if err := c.postJSON(path, in, &out); err != nil {
 		return EvaluateResult{}, err
 	}
 	return out, nil
 }
 
 func (c *Client) ValidatePolicy(configText string) (AnalyzeResult, error) {
+	if _, err := c.EnsureTestInstance(); err != nil {
+		return AnalyzeResult{}, err
+	}
+	path, err := c.instanceAPIPath("/acl/policy/validate")
+	if err != nil {
+		return AnalyzeResult{}, err
+	}
 	var out AnalyzeResult
-	if err := c.postJSON("/api/proxy/acl/policy/validate", map[string]string{
+	if err := c.postJSON(path, map[string]string{
 		"config_text": configText,
 	}, &out); err != nil {
 		return AnalyzeResult{}, err

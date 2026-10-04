@@ -8,6 +8,7 @@ import (
 )
 
 type ListFilter struct {
+	InstanceID      string // UUID инстанса прокси (пусто — все)
 	ID              string // UUID записи журнала
 	User            string
 	Source          string

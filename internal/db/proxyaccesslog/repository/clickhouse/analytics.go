@@ -16,6 +16,7 @@ import (
 const maxReportRange = 31 * 24 * time.Hour
 
 var groupBySQL = map[string]string{
+	"instance_id":         "toString(al.instance_id)",
 	"destination_address": "al.destination_address",
 	"source_address":      "al.source_address",
 	"user":                "coalesce(al.user_name, '')",
@@ -513,6 +514,13 @@ func buildReportWhere(from, to time.Time, f repository.ReportFilters, q reposito
 	if f.Action == 0 || f.Action == 1 {
 		conditions = append(conditions, "al.action = ?")
 		args = append(args, uint8(f.Action))
+	}
+	if inst := strings.TrimSpace(f.InstanceID); inst != "" {
+		parsed, err := uuid.Parse(inst)
+		if err == nil {
+			conditions = append(conditions, "al.instance_id = ?")
+			args = append(args, parsed)
+		}
 	}
 	if ref := strings.TrimSpace(f.DecisionRuleRef); ref != "" {
 		conditions = append(conditions, "al.decision_rule_ref = ?")

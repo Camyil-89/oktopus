@@ -46,8 +46,8 @@ type CompileStatusDTO struct {
 type Service struct {
 	repo        repository.RulesRepository
 	reloader    Reloader
-	rt          *compileRuntime
-	publishWake chan struct{}
+	runtimes    sync.Map
+	publishWake chan uuid.UUID
 	reloadMu    sync.Mutex
 	lastReload  time.Time
 }
@@ -55,8 +55,7 @@ type Service struct {
 func New(repo repository.RulesRepository) *Service {
 	s := &Service{
 		repo:        repo,
-		rt:          newCompileRuntime(),
-		publishWake: make(chan struct{}, 1),
+		publishWake: make(chan uuid.UUID, 64),
 	}
 	go s.runPublisher()
 	return s
@@ -67,39 +66,32 @@ func (s *Service) BindReloader(r Reloader) {
 }
 
 func (s *Service) BootstrapCompile(ctx context.Context) error {
-	rules, err := s.repo.List(ctx)
+	ids, err := s.repo.ListInstanceIDs(ctx)
 	if err != nil {
 		return err
 	}
-	rev := revisionFromRules(rules)
-	s.rt.setConfigRevision(rev)
-	runner, err := compileRunner(rules)
-	if err != nil {
-		s.rt.finishBuild(nil, rev, err)
-		return err
+	for _, id := range ids {
+		if err := s.BootstrapInstance(ctx, id); err != nil {
+			return err
+		}
 	}
-	s.rt.finishBuild(runner, rev, nil)
 	return nil
 }
 
-func (s *Service) ActiveRunner() *inspect.Runner {
-	return s.rt.activeRunner()
+func (s *Service) ListSummary(ctx context.Context, instanceID uuid.UUID) ([]domain.RuleSummary, error) {
+	return s.repo.ListSummaryByInstance(ctx, instanceID)
 }
 
-func (s *Service) ListSummary(ctx context.Context) ([]domain.RuleSummary, error) {
-	return s.repo.ListSummary(ctx)
-}
-
-func (s *Service) List(ctx context.Context) ([]domain.Rule, error) {
-	return s.repo.List(ctx)
+func (s *Service) List(ctx context.Context, instanceID uuid.UUID) ([]domain.Rule, error) {
+	return s.repo.ListByInstance(ctx, instanceID)
 }
 
 func (s *Service) GetRule(ctx context.Context, ruleID uuid.UUID) (domain.Rule, error) {
 	return s.repo.GetByID(ctx, ruleID)
 }
 
-func (s *Service) CompileStatus(ctx context.Context) (CompileStatusDTO, error) {
-	rules, err := s.repo.List(ctx)
+func (s *Service) CompileStatus(ctx context.Context, instanceID uuid.UUID) (CompileStatusDTO, error) {
+	rules, err := s.repo.ListByInstance(ctx, instanceID)
 	if err != nil {
 		return CompileStatusDTO{}, err
 	}
@@ -109,7 +101,7 @@ func (s *Service) CompileStatus(ctx context.Context) (CompileStatusDTO, error) {
 			enabled++
 		}
 	}
-	return s.rt.status(enabled), nil
+	return s.runtimeFor(instanceID).status(enabled), nil
 }
 
 // ValidateScript проверяет Lua без сохранения.
@@ -126,8 +118,8 @@ type SyncRuleInput struct {
 	SortOrder int
 }
 
-func (s *Service) SyncAndPublish(ctx context.Context, inputs []SyncRuleInput) ([]domain.RuleSummary, error) {
-	existing, err := s.repo.List(ctx)
+func (s *Service) SyncAndPublish(ctx context.Context, instanceID uuid.UUID, inputs []SyncRuleInput) ([]domain.RuleSummary, error) {
+	existing, err := s.repo.ListByInstance(ctx, instanceID)
 	if err != nil {
 		return nil, err
 	}
@@ -135,26 +127,26 @@ func (s *Service) SyncAndPublish(ctx context.Context, inputs []SyncRuleInput) ([
 	for _, r := range existing {
 		existingScripts[r.ID] = r.Script
 	}
-	rules, err := normalizeSyncInputs(inputs, existingScripts)
+	rules, err := normalizeSyncInputs(instanceID, inputs, existingScripts)
 	if err != nil {
 		return nil, err
 	}
 	if err := validateRulesCompile(rules); err != nil {
 		return nil, err
 	}
-	if err := s.repo.ReplaceAll(ctx, rules); err != nil {
+	if err := s.repo.ReplaceAllForInstance(ctx, instanceID, rules); err != nil {
 		return nil, err
 	}
-	list, err := s.repo.ListSummary(ctx)
+	list, err := s.repo.ListSummaryByInstance(ctx, instanceID)
 	if err != nil {
 		return nil, err
 	}
-	s.rt.setConfigRevision(revisionFromRules(rules))
-	s.requestPublish()
+	s.runtimeFor(instanceID).setConfigRevision(revisionFromRules(rules))
+	s.requestPublishInstance(instanceID)
 	return list, nil
 }
 
-func normalizeSyncInputs(inputs []SyncRuleInput, existingScripts map[uuid.UUID]string) ([]domain.Rule, error) {
+func normalizeSyncInputs(instanceID uuid.UUID, inputs []SyncRuleInput, existingScripts map[uuid.UUID]string) ([]domain.Rule, error) {
 	out := make([]domain.Rule, 0, len(inputs))
 	for i, in := range inputs {
 		name := strings.TrimSpace(in.Name)
@@ -185,8 +177,9 @@ func normalizeSyncInputs(inputs []SyncRuleInput, existingScripts map[uuid.UUID]s
 			return nil, fmt.Errorf("rule %q: invalid action", name)
 		}
 		out = append(out, domain.Rule{
-			ID:        ruleID,
-			Name:      name,
+			ID:         ruleID,
+			InstanceID: instanceID,
+			Name:       name,
 			Script:    script,
 			Action:    action,
 			Enabled:   in.Enabled,
@@ -256,18 +249,12 @@ func revisionFromRules(rules []domain.Rule) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func (s *Service) requestPublish() {
-	select {
-	case s.publishWake <- struct{}{}:
-	default:
-	}
-}
-
 func (s *Service) runPublisher() {
-	for range s.publishWake {
+	for instanceID := range s.publishWake {
 		for {
-			err := s.attemptPublish()
-			if err == nil && s.rt.getConfigRevision() == s.rt.getActiveRevision() {
+			err := s.attemptPublish(instanceID)
+			rt := s.runtimeFor(instanceID)
+			if err == nil && rt.getConfigRevision() == rt.getActiveRevision() {
 				break
 			}
 			time.Sleep(publishRetryInterval)
@@ -275,22 +262,23 @@ func (s *Service) runPublisher() {
 	}
 }
 
-func (s *Service) attemptPublish() error {
+func (s *Service) attemptPublish(instanceID uuid.UUID) error {
 	ctx := context.Background()
-	prevRev := s.rt.getActiveRevision()
-	s.rt.beginBuild()
-	rules, err := s.repo.List(ctx)
+	rt := s.runtimeFor(instanceID)
+	prevRev := rt.getActiveRevision()
+	rt.beginBuild()
+	rules, err := s.repo.ListByInstance(ctx, instanceID)
 	if err != nil {
-		s.rt.finishBuild(nil, "", err)
+		rt.finishBuild(nil, "", err)
 		return err
 	}
 	rev := revisionFromRules(rules)
 	runner, err := compileRunner(rules)
 	if err != nil {
-		s.rt.finishBuild(nil, rev, err)
+		rt.finishBuild(nil, rev, err)
 		return err
 	}
-	s.rt.finishBuild(runner, rev, nil)
+	rt.finishBuild(runner, rev, nil)
 	if rev == prevRev {
 		return nil
 	}
@@ -307,7 +295,6 @@ func (s *Service) reloadProxyThrottled(ctx context.Context) error {
 		time.Sleep(wait)
 	}
 	if err := s.reloader.ReloadProxy(ctx); err != nil {
-		s.rt.setReloadError(fmt.Errorf("reload proxy: %w", err).Error())
 		return err
 	}
 	s.lastReload = time.Now()

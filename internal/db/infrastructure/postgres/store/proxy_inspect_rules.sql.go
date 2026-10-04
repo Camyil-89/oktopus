@@ -12,47 +12,36 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const countProxyInspectRules = `-- name: CountProxyInspectRules :one
-SELECT count(*)::bigint AS count FROM proxy_inspect_rules
+const countProxyInspectRulesByInstance = `-- name: CountProxyInspectRulesByInstance :one
+SELECT count(*)::bigint AS count FROM proxy_inspect_rules WHERE instance_id = $1
 `
 
-func (q *Queries) CountProxyInspectRules(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countProxyInspectRules)
+func (q *Queries) CountProxyInspectRulesByInstance(ctx context.Context, instanceID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countProxyInspectRulesByInstance, instanceID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
-const deleteAllProxyInspectRules = `-- name: DeleteAllProxyInspectRules :exec
+const deleteProxyInspectRulesByInstanceExcept = `-- name: DeleteProxyInspectRulesByInstanceExcept :exec
 DELETE FROM proxy_inspect_rules
+WHERE instance_id = $1
+  AND (cardinality($2::uuid[]) = 0 OR NOT (id = ANY ($2::uuid[])))
 `
 
-func (q *Queries) DeleteAllProxyInspectRules(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, deleteAllProxyInspectRules)
-	return err
+type DeleteProxyInspectRulesByInstanceExceptParams struct {
+	InstanceID uuid.UUID   `json:"instance_id"`
+	KeepIds    []uuid.UUID `json:"keep_ids"`
 }
 
-const deleteProxyInspectRulesExcept = `-- name: DeleteProxyInspectRulesExcept :exec
-DELETE FROM proxy_inspect_rules
-WHERE cardinality($1::uuid[]) = 0
-   OR NOT (id = ANY ($1::uuid[]))
-`
-
-func (q *Queries) DeleteProxyInspectRulesExcept(ctx context.Context, keepIds []uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteProxyInspectRulesExcept, keepIds)
+func (q *Queries) DeleteProxyInspectRulesByInstanceExcept(ctx context.Context, arg DeleteProxyInspectRulesByInstanceExceptParams) error {
+	_, err := q.db.Exec(ctx, deleteProxyInspectRulesByInstanceExcept, arg.InstanceID, arg.KeepIds)
 	return err
 }
 
 const getProxyInspectRule = `-- name: GetProxyInspectRule :one
 SELECT
-    id,
-    name,
-    script,
-    action,
-    enabled,
-    sort_order,
-    created_at,
-    updated_at
+    id, instance_id, name, script, action, enabled, sort_order, created_at, updated_at
 FROM proxy_inspect_rules
 WHERE id = $1
 `
@@ -62,6 +51,7 @@ func (q *Queries) GetProxyInspectRule(ctx context.Context, id uuid.UUID) (ProxyI
 	var i ProxyInspectRule
 	err := row.Scan(
 		&i.ID,
+		&i.InstanceID,
 		&i.Name,
 		&i.Script,
 		&i.Action,
@@ -73,76 +63,40 @@ func (q *Queries) GetProxyInspectRule(ctx context.Context, id uuid.UUID) (ProxyI
 	return i, err
 }
 
-const insertProxyInspectRule = `-- name: InsertProxyInspectRule :one
-INSERT INTO proxy_inspect_rules (
-    id,
-    name,
-    script,
-    action,
-    enabled,
-    sort_order
-) VALUES (
-    $1, $2, $3, $4, $5, $6
-)
-RETURNING
-    id,
-    name,
-    script,
-    action,
-    enabled,
-    sort_order,
-    created_at,
-    updated_at
+const listProxyInspectRuleInstanceIDs = `-- name: ListProxyInspectRuleInstanceIDs :many
+SELECT DISTINCT instance_id FROM proxy_inspect_rules
 `
 
-type InsertProxyInspectRuleParams struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Script    string    `json:"script"`
-	Action    int16     `json:"action"`
-	Enabled   bool      `json:"enabled"`
-	SortOrder int32     `json:"sort_order"`
+func (q *Queries) ListProxyInspectRuleInstanceIDs(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listProxyInspectRuleInstanceIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var instance_id uuid.UUID
+		if err := rows.Scan(&instance_id); err != nil {
+			return nil, err
+		}
+		items = append(items, instance_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-func (q *Queries) InsertProxyInspectRule(ctx context.Context, arg InsertProxyInspectRuleParams) (ProxyInspectRule, error) {
-	row := q.db.QueryRow(ctx, insertProxyInspectRule,
-		arg.ID,
-		arg.Name,
-		arg.Script,
-		arg.Action,
-		arg.Enabled,
-		arg.SortOrder,
-	)
-	var i ProxyInspectRule
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Script,
-		&i.Action,
-		&i.Enabled,
-		&i.SortOrder,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const listProxyInspectRules = `-- name: ListProxyInspectRules :many
+const listProxyInspectRulesByInstance = `-- name: ListProxyInspectRulesByInstance :many
 SELECT
-    id,
-    name,
-    script,
-    action,
-    enabled,
-    sort_order,
-    created_at,
-    updated_at
+    id, instance_id, name, script, action, enabled, sort_order, created_at, updated_at
 FROM proxy_inspect_rules
+WHERE instance_id = $1
 ORDER BY sort_order ASC, created_at ASC
 `
 
-func (q *Queries) ListProxyInspectRules(ctx context.Context) ([]ProxyInspectRule, error) {
-	rows, err := q.db.Query(ctx, listProxyInspectRules)
+func (q *Queries) ListProxyInspectRulesByInstance(ctx context.Context, instanceID uuid.UUID) ([]ProxyInspectRule, error) {
+	rows, err := q.db.Query(ctx, listProxyInspectRulesByInstance, instanceID)
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +106,7 @@ func (q *Queries) ListProxyInspectRules(ctx context.Context) ([]ProxyInspectRule
 		var i ProxyInspectRule
 		if err := rows.Scan(
 			&i.ID,
+			&i.InstanceID,
 			&i.Name,
 			&i.Script,
 			&i.Action,
@@ -170,22 +125,18 @@ func (q *Queries) ListProxyInspectRules(ctx context.Context) ([]ProxyInspectRule
 	return items, nil
 }
 
-const listProxyInspectRulesSummary = `-- name: ListProxyInspectRulesSummary :many
+const listProxyInspectRulesSummaryByInstance = `-- name: ListProxyInspectRulesSummaryByInstance :many
 SELECT
-    id,
-    name,
-    action,
-    enabled,
-    sort_order,
-    length(script) AS script_length,
-    created_at,
-    updated_at
+    id, instance_id, name, action, enabled, sort_order,
+    length(script) AS script_length, created_at, updated_at
 FROM proxy_inspect_rules
+WHERE instance_id = $1
 ORDER BY sort_order ASC, created_at ASC
 `
 
-type ListProxyInspectRulesSummaryRow struct {
+type ListProxyInspectRulesSummaryByInstanceRow struct {
 	ID           uuid.UUID          `json:"id"`
+	InstanceID   uuid.UUID          `json:"instance_id"`
 	Name         string             `json:"name"`
 	Action       int16              `json:"action"`
 	Enabled      bool               `json:"enabled"`
@@ -195,17 +146,18 @@ type ListProxyInspectRulesSummaryRow struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
-func (q *Queries) ListProxyInspectRulesSummary(ctx context.Context) ([]ListProxyInspectRulesSummaryRow, error) {
-	rows, err := q.db.Query(ctx, listProxyInspectRulesSummary)
+func (q *Queries) ListProxyInspectRulesSummaryByInstance(ctx context.Context, instanceID uuid.UUID) ([]ListProxyInspectRulesSummaryByInstanceRow, error) {
+	rows, err := q.db.Query(ctx, listProxyInspectRulesSummaryByInstance, instanceID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListProxyInspectRulesSummaryRow{}
+	items := []ListProxyInspectRulesSummaryByInstanceRow{}
 	for rows.Next() {
-		var i ListProxyInspectRulesSummaryRow
+		var i ListProxyInspectRulesSummaryByInstanceRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.InstanceID,
 			&i.Name,
 			&i.Action,
 			&i.Enabled,
@@ -226,17 +178,13 @@ func (q *Queries) ListProxyInspectRulesSummary(ctx context.Context) ([]ListProxy
 
 const upsertProxyInspectRule = `-- name: UpsertProxyInspectRule :one
 INSERT INTO proxy_inspect_rules (
-    id,
-    name,
-    script,
-    action,
-    enabled,
-    sort_order
+    id, instance_id, name, script, action, enabled, sort_order
 ) VALUES (
-    $1, $2, $3, $4, $5, $6
+    $1, $2, $3, $4, $5, $6, $7
 )
 ON CONFLICT (id) DO UPDATE
 SET
+    instance_id = EXCLUDED.instance_id,
     name = EXCLUDED.name,
     script = EXCLUDED.script,
     action = EXCLUDED.action,
@@ -244,28 +192,23 @@ SET
     sort_order = EXCLUDED.sort_order,
     updated_at = now()
 RETURNING
-    id,
-    name,
-    script,
-    action,
-    enabled,
-    sort_order,
-    created_at,
-    updated_at
+    id, instance_id, name, script, action, enabled, sort_order, created_at, updated_at
 `
 
 type UpsertProxyInspectRuleParams struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Script    string    `json:"script"`
-	Action    int16     `json:"action"`
-	Enabled   bool      `json:"enabled"`
-	SortOrder int32     `json:"sort_order"`
+	ID         uuid.UUID `json:"id"`
+	InstanceID uuid.UUID `json:"instance_id"`
+	Name       string    `json:"name"`
+	Script     string    `json:"script"`
+	Action     int16     `json:"action"`
+	Enabled    bool      `json:"enabled"`
+	SortOrder  int32     `json:"sort_order"`
 }
 
 func (q *Queries) UpsertProxyInspectRule(ctx context.Context, arg UpsertProxyInspectRuleParams) (ProxyInspectRule, error) {
 	row := q.db.QueryRow(ctx, upsertProxyInspectRule,
 		arg.ID,
+		arg.InstanceID,
 		arg.Name,
 		arg.Script,
 		arg.Action,
@@ -275,6 +218,7 @@ func (q *Queries) UpsertProxyInspectRule(ctx context.Context, arg UpsertProxyIns
 	var i ProxyInspectRule
 	err := row.Scan(
 		&i.ID,
+		&i.InstanceID,
 		&i.Name,
 		&i.Script,
 		&i.Action,

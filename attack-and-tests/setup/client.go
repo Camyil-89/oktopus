@@ -20,8 +20,9 @@ const (
 
 // Client — сессия UI/API (cookie после login).
 type Client struct {
-	BaseURL string
-	HTTP    *http.Client
+	BaseURL        string
+	HTTP           *http.Client
+	testInstanceID string
 }
 
 // NewClient создаёт клиент с cookie-jar.
@@ -59,61 +60,33 @@ func (c *Client) Login(username, password string) error {
 
 // ApplyProxyTestProfile включает прокси, auth и режим CONNECT, публикует ACL.
 func (c *Client) ApplyProxyTestProfile(connectMode, aclText string) (listen string, err error) {
+	if _, err := c.EnsureTestInstance(); err != nil {
+		return "", err
+	}
 	connectMode = strings.TrimSpace(strings.ToLower(connectMode))
 	if connectMode != "mitm" && connectMode != "tunnel" {
 		return "", fmt.Errorf("connect_mode must be mitm or tunnel, got %q", connectMode)
 	}
-	if err := c.EnsureCAForConnectMode(connectMode); err != nil {
-		return "", fmt.Errorf("ca: %w", err)
-	}
 	users := ProxyAuthUser + ":" + ProxyAuthPass
-	if err := c.patchJSON("/api/proxy/settings", map[string]interface{}{
-		"proxy_enabled":     true,
-		"connect_mode":      connectMode,
-		"auth_enabled":      true,
-		"auth_static_users": users,
-		"auth_backend":      "static",
-	}); err != nil {
-		return "", fmt.Errorf("proxy settings: %w", err)
-	}
-	var pol struct {
-		ConfigText string `json:"config_text"`
-		UpdatedAt  string `json:"updated_at"`
-	}
-	if err := c.putJSON("/api/proxy/acl/policy", map[string]string{
-		"config_text": aclText,
-	}, &pol); err != nil {
-		return "", fmt.Errorf("acl policy: %w", err)
-	}
-	if err := c.WaitACLReady(20 * time.Second); err != nil {
-		return "", err
-	}
-	st, err := c.ProxyStatus()
+	listen, err = c.EnableProxyStaticAuth(connectMode, users)
 	if err != nil {
 		return "", err
 	}
-	if !st.ProxyActive {
-		if st.ProxyStartError != "" {
-			return "", fmt.Errorf("proxy not active: %s", st.ProxyStartError)
-		}
-		return "", fmt.Errorf("proxy not active (check listen / serve)")
-	}
-	listen = strings.TrimSpace(st.Listen)
-	if listen == "" {
-		return "", fmt.Errorf("proxy listen empty in status")
+	if err := c.PublishPolicy(aclText); err != nil {
+		return "", fmt.Errorf("acl policy: %w", err)
 	}
 	return listen, nil
 }
 
-// WaitACLReady ждёт успешной публикации ACL.
+// WaitACLReady ждёт успешной публикации ACL тестового инстанса.
 func (c *Client) WaitACLReady(timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
-		st, err := c.ProxyStatus()
+		inst, err := c.instanceRuntime()
 		if err != nil {
 			return err
 		}
-		acl := st.ACL
+		acl := inst.ACL
 		if acl.BuildStatus == "error" && acl.BuildError != "" {
 			return fmt.Errorf("acl build error: %s", acl.BuildError)
 		}
@@ -133,18 +106,26 @@ type CAStatusDTO struct {
 	ValidUntil    string `json:"valid_until,omitempty"`
 }
 
-// CAStatus — установлен ли CA на сервере прокси.
+// CAStatus — установлен ли CA на тестовом инстансе.
 func (c *Client) CAStatus() (CAStatusDTO, error) {
+	path, err := c.instanceAPIPath("/ca/status")
+	if err != nil {
+		return CAStatusDTO{}, err
+	}
 	var out CAStatusDTO
-	if err := c.getJSON("/api/proxy/ca/status", &out); err != nil {
+	if err := c.getJSON(path, &out); err != nil {
 		return CAStatusDTO{}, err
 	}
 	return out, nil
 }
 
-// GenerateCA создаёт корневой CA через API (config/ca.crt, config/ca.key на сервере).
+// GenerateCA создаёт корневой CA через API (config/<instance-id>/ca.* на сервере).
 func (c *Client) GenerateCA() error {
-	if err := c.postJSON("/api/proxy/ca/generate", map[string]interface{}{}, nil); err != nil {
+	path, err := c.instanceAPIPath("/ca/generate")
+	if err != nil {
+		return err
+	}
+	if err := c.postJSON(path, map[string]interface{}{}, nil); err != nil {
 		return fmt.Errorf("POST ca/generate: %w", err)
 	}
 	return nil
@@ -152,6 +133,9 @@ func (c *Client) GenerateCA() error {
 
 // EnsureCA генерирует CA, если cert/key ещё не установлены.
 func (c *Client) EnsureCA() error {
+	if _, err := c.EnsureTestInstance(); err != nil {
+		return err
+	}
 	st, err := c.CAStatus()
 	if err != nil {
 		return err
@@ -176,7 +160,11 @@ func (c *Client) DownloadCACert(path string) error {
 	if err := c.EnsureCA(); err != nil {
 		return err
 	}
-	req, err := http.NewRequest(http.MethodGet, c.BaseURL+"/api/proxy/ca/cert", nil)
+	certPath, err := c.instanceAPIPath("/ca/cert")
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodGet, c.BaseURL+certPath, nil)
 	if err != nil {
 		return err
 	}
@@ -199,15 +187,21 @@ func (c *Client) DownloadCACert(path string) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-type ProxyStatusDTO struct {
-	ProxyActive     bool   `json:"proxy_active"`
+type InstanceStatusDTO struct {
+	ID              string `json:"id"`
 	Listen          string `json:"listen"`
+	Active          bool   `json:"active"`
 	ProxyStartError string `json:"proxy_start_error"`
 	ACL             struct {
 		BuildStatus string `json:"build_status"`
 		BuildError  string `json:"build_error"`
 		RulesInSync bool   `json:"rules_in_sync"`
 	} `json:"acl"`
+}
+
+type ProxyStatusDTO struct {
+	ProxyActive bool                `json:"proxy_active"`
+	Instances   []InstanceStatusDTO `json:"instances"`
 }
 
 func (c *Client) ProxyStatus() (ProxyStatusDTO, error) {

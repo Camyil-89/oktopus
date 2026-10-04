@@ -15,11 +15,9 @@ import (
 	apiconfig "oktopus/internal/api/config"
 	"oktopus/internal/api"
 	"oktopus/internal/db"
-	"oktopus/internal/db/proxysettings/service"
+	proxyinstancesservice "oktopus/internal/db/proxyinstances/service"
 	proxyserver "oktopus/internal/proxy/server"
 	"oktopus/internal/proxy"
-	"oktopus/internal/proxy/acl"
-	"oktopus/internal/proxy/inspect"
 	"oktopus/internal/proxy/accesslog"
 	"oktopus/internal/proxy/forbidden"
 	"oktopus/internal/proxy/gateway"
@@ -72,28 +70,23 @@ func runServe(args []string) int {
 		logger.Printf("serve: gateway page: %v", err)
 	}
 	hooks := proxy.DefaultLogHooks(logger)
-	mgr := proxy.NewManager(hooks, logger)
+	fleet := proxy.NewFleet(hooks, logger)
 	accessBatcher := accesslog.NewBatcher(func(flushCtx context.Context, batch []accesslog.Entry) error {
 		return rt.ProxyAccessLog.FlushAccessLog(flushCtx, batch)
 	}, accesslog.BatcherConfig{
 		OnFlushError: func(err error) { logger.Printf("access log flush: %v", err) },
 	})
 	defer accessBatcher.Close()
-	mgr.SetAccessRecorder(accessBatcher)
+	fleet.SetAccessRecorder(accessBatcher)
 	go rt.ProxyAccessLog.RunRetentionLoop(ctx, 0)
-	rt.ProxySettings.BindApplier(mgr)
-	rt.ProxySettings.BindInspect(rt.ProxyInspect)
-	rt.ProxyACL.BindReloader(&proxyHotReloader{settings: rt.ProxySettings, mgr: mgr})
-	rt.ProxyInspect.BindReloader(&proxyHotReloader{settings: rt.ProxySettings, mgr: mgr})
+	rt.ProxyInstances.BindApplier(fleet)
+	rt.ProxyInstances.BindInspect(rt.ProxyInspect)
+	rt.ProxyACL.BindReloader(&proxyHotReloader{instances: rt.ProxyInstances})
+	rt.ProxyInspect.BindReloader(&proxyHotReloader{instances: rt.ProxyInstances})
 
 	loadCtx, loadCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	proxySettings, err := rt.ProxySettings.Get(loadCtx)
-	_, errRT := rt.ProxySettings.LoadProxyRuntime(loadCtx)
+	_, errRT := rt.ProxyInstances.LoadFleetRuntime(loadCtx)
 	loadCancel()
-	if err != nil {
-		log.Printf("serve: proxy settings: %v", err)
-		return 1
-	}
 	if errRT != nil {
 		log.Printf("serve: proxy runtime: %v", errRT)
 		return 1
@@ -111,7 +104,7 @@ func runServe(args []string) int {
 	go func() {
 		defer wg.Done()
 		runServiceLoop(ctx, logger, "api", errCh, nil, func() error {
-			srv := api.NewServer(apiCfg, rt, mgr)
+			srv := api.NewServer(apiCfg, rt, fleet)
 			return srv.ListenAndServe(ctx, signalAPIReady)
 		})
 	}()
@@ -127,14 +120,8 @@ func runServe(args []string) int {
 		if ctx.Err() != nil {
 			return
 		}
-		runServiceLoop(ctx, logger, "proxy", errCh, func() { mgr.Stop() }, func() error {
-			if !proxySettings.ProxyEnabled {
-				startup.AllowRemoteListPollStartup()
-				mgr.Stop()
-				<-ctx.Done()
-				return nil
-			}
-			return mgr.RunContextWithLoader(ctx, loadProxyRuntime(rt.ProxySettings, mgr))
+		runServiceLoop(ctx, logger, "proxy", errCh, func() { fleet.Stop() }, func() error {
+			return fleet.RunContextWithLoader(ctx, loadProxyFleet(rt.ProxyInstances))
 		})
 	}()
 
@@ -153,7 +140,6 @@ func runServe(args []string) int {
 	return 0
 }
 
-// runServiceLoop выполняет fn до отмены ctx; при панике пишет в лог и повторяет.
 func runServiceLoop(ctx context.Context, logger *log.Logger, name string, errCh chan error, onPanic func(), fn func() error) {
 	for {
 		if ctx.Err() != nil {
@@ -191,22 +177,17 @@ func runServiceLoop(ctx context.Context, logger *log.Logger, name string, errCh 
 	}
 }
 
-func loadProxyRuntime(settings *service.Service, mgr *proxy.Manager) proxyserver.RuntimeLoader {
-	return func(ctx context.Context) (proxy.Config, *acl.Engine, *inspect.Runner, error) {
-		st, err := settings.Get(ctx)
+func loadProxyFleet(instances *proxyinstancesservice.Service) proxyserver.FleetRuntimeLoader {
+	return func(ctx context.Context) ([]proxyinstancesservice.InstanceRuntime, error) {
+		runtimes, err := instances.LoadFleetRuntime(ctx)
 		if err != nil {
-			return proxy.Config{}, nil, nil, err
+			return nil, err
 		}
-		if !st.ProxyEnabled {
-			mgr.Stop()
+		if len(runtimes) == 0 {
 			startup.AllowRemoteListPollStartup()
-			return proxy.Config{}, nil, nil, proxyserver.ErrRuntimeDeferred
+			return nil, proxyserver.ErrRuntimeDeferred
 		}
-		rt, err := settings.LoadProxyRuntime(ctx)
-		if err != nil {
-			return proxy.Config{}, nil, nil, err
-		}
-		return rt.Config, rt.ACLEngine, rt.InspectRunner, nil
+		return runtimes, nil
 	}
 }
 
@@ -222,22 +203,9 @@ func waitFor(ctx context.Context, d time.Duration) bool {
 }
 
 type proxyHotReloader struct {
-	settings *service.Service
-	mgr      *proxy.Manager
+	instances *proxyinstancesservice.Service
 }
 
 func (r *proxyHotReloader) ReloadProxy(ctx context.Context) error {
-	st, err := r.settings.Get(ctx)
-	if err != nil {
-		return err
-	}
-	if !st.ProxyEnabled {
-		r.mgr.Stop()
-		return nil
-	}
-	rt, err := r.settings.LoadProxyRuntime(ctx)
-	if err != nil {
-		return err
-	}
-	return r.mgr.Apply(ctx, rt.Config, rt.ACLEngine, rt.InspectRunner)
+	return r.instances.ReloadFleet(ctx)
 }

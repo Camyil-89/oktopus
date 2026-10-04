@@ -74,8 +74,8 @@ certs/
 config/oktopus.local.json
 
 # CA и ключи прокси (config/)
+config/**/*.key
 config/*.crt
-config/*.key
 config/forbidden.actual.html
 
 *.exe

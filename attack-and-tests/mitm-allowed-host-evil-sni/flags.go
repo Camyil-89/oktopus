@@ -25,7 +25,7 @@ type runOpts struct {
 func parseRunFlags(args []string) (runOpts, error) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	o := runOpts{
-		proxyAddr:   "127.0.0.1:8080",
+		proxyAddr:   setup.TestInstanceDialAddr,
 		caFile:      "config/ca.crt",
 		connectHost: "localhost:9443",
 		tlsSNI:      "internal.blocked",

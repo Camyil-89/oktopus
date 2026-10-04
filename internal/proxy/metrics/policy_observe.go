@@ -12,5 +12,5 @@ func ObserveHTTPPolicyFromACLContext(ctx context.Context) {
 	if !ok {
 		return
 	}
-	ObservePolicyTotal(dec.Spend)
+	ObservePolicyTotal(ctx, dec.Spend)
 }

@@ -39,12 +39,16 @@ func Test_buildExtraJSON_googleNonSearchPath(t *testing.T) {
 
 func Test_fromAccessEntry_ruleColumns(t *testing.T) {
 	aclID := uuid.MustParse("018f0000-0000-7000-8000-000000000001")
-	row := fromAccessEntry(accesslog.Entry{
+	row, err := fromAccessEntry(accesslog.Entry{
+		InstanceID: uuid.MustParse("018f0000-0000-7000-8000-000000000099"),
 		RuleRef:    aclID.String(),
 		ACLRuleRef: aclID.String(),
 		DeniedBy:   accesslog.DeniedByACL,
 		Action:     accesslog.ActionDeny,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if row.DecisionRuleRef != aclID.String() {
 		t.Fatalf("decision: %q", row.DecisionRuleRef)
 	}

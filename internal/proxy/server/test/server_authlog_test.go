@@ -5,6 +5,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"oktopus/internal/proxy/accesslog"
 	"oktopus/internal/proxy/acl"
 	"oktopus/internal/proxy/config"
@@ -34,7 +36,7 @@ func TestServeHTTPAuthFailRecordsDenyWithSystemRule(t *testing.T) {
 			Enabled:     true,
 			StaticUsers: "u:p",
 		},
-	}, acl.EmptyEngine(), nil, &hooks.Hooks{}, rec, nil, nil)
+	}, uuid.Nil, acl.EmptyEngine(), nil, &hooks.Hooks{}, rec, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +71,7 @@ func TestServeHTTPACLDenyRecordsDeny(t *testing.T) {
 			Enabled:     true,
 			StaticUsers: "u:p",
 		},
-	}, acl.EmptyEngine(), nil, &hooks.Hooks{}, rec, nil, nil)
+	}, uuid.Nil, acl.EmptyEngine(), nil, &hooks.Hooks{}, rec, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

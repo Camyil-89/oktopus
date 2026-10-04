@@ -19,6 +19,8 @@ func DefaultAPIFlags() APIFlags {
 	}
 }
 
+// PoC используют отдельный инстанс 127.0.0.1:9000 — см. EnsureTestInstance.
+
 // POCDirFromCaller возвращает каталог PoC относительно cwd (attack-and-tests/<name>).
 func POCDirFromCaller(subdir string) string {
 	return filepath.Join("attack-and-tests", subdir)

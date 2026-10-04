@@ -9,17 +9,22 @@ import { InspectBreakdownTooltip } from "@/assets/components/dashboard/InspectBr
 import { PolicyBreakdownTooltip } from "@/assets/components/dashboard/PolicyBreakdownTooltip";
 import { TrafficAllowDenyChart } from "@/assets/components/dashboard/TrafficAllowDenyChart";
 import { TrafficThroughputChart } from "@/assets/components/dashboard/TrafficThroughputChart";
-import type { ProxyRuntimeStatus } from "@/types/proxy";
+import type { ProxyACLCompileStatus, ProxyRuntimeStatus } from "@/types/proxy";
 import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
 import type { TranslateFn } from "@/i18n/translate";
 import { byteUnitLabelsFromT, formatBytes } from "@/utils/formatBytes";
 import { durationUnitLabelsFromT, formatDurationUs } from "@/utils/formatDurationUs";
 import { OktopusLoading } from "@/assets/components/oktopus/OktopusLoading";
-import { Alert, Tag, Tooltip, Typography } from "antd";
+import { mergeTrafficBuckets } from "@/utils/mergeTrafficBuckets";
+import { CreateProxyInstanceModal } from "@/assets/modals/CreateProxyInstanceModal";
+import { InstanceRuntimeOverview } from "@/assets/components/dashboard/InstanceRuntimeOverview";
+import type { ProxyInstance } from "@/types/proxy";
+import { PlusOutlined } from "@ant-design/icons";
+import { Alert, Button, Tag, Tooltip, Typography } from "antd";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
-function aclBuildLabel(st: ProxyRuntimeStatus["acl"], t: TranslateFn): string {
+function aclBuildLabel(st: ProxyACLCompileStatus, t: TranslateFn): string {
   switch (st.build_status) {
     case "building":
       return t("dashboard.aclBuilding");
@@ -32,7 +37,7 @@ function aclBuildLabel(st: ProxyRuntimeStatus["acl"], t: TranslateFn): string {
   }
 }
 
-function aclBuildTone(st: ProxyRuntimeStatus["acl"]): DashboardStatTone {
+function aclBuildTone(st: ProxyACLCompileStatus): DashboardStatTone {
   switch (st.build_status) {
     case "ready":
       return "success";
@@ -78,7 +83,7 @@ function formatStartupClock(iso?: string, localeTag = "ru-RU"): string {
 }
 
 function aclCompileDurationMs(
-  acl: ProxyRuntimeStatus["acl"] | undefined,
+  acl: ProxyACLCompileStatus | undefined,
 ): number | undefined {
   if (acl?.last_compile_duration_ms != null) {
     return acl.last_compile_duration_ms;
@@ -150,12 +155,18 @@ export default function ManagePage() {
   const durationUnits = useMemo(() => durationUnitLabelsFromT(t), [t]);
   const emDash = t("common.emDash");
   const [status, setStatus] = useState<ProxyRuntimeStatus | null>(null);
+  const [dbInstances, setDbInstances] = useState<ProxyInstance[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const st = await proxyApi.getProxyRuntimeStatus();
+      const [st, list] = await Promise.all([
+        proxyApi.getProxyRuntimeStatus(),
+        proxyApi.listProxyInstances().catch(() => [] as ProxyInstance[]),
+      ]);
       setStatus(st);
+      setDbInstances(list ?? []);
       setError(null);
     } catch (e) {
       setError(formatApiError(e, t("dashboard.loadFailed")));
@@ -168,7 +179,10 @@ export default function ManagePage() {
     return () => clearInterval(t);
   }, [load]);
 
-  const acl = status?.acl;
+  const instances = status?.instances ?? [];
+  const safeDbInstances = dbInstances ?? [];
+  const acl =
+    instances.find((i) => i.active)?.acl ?? instances[0]?.acl;
   const traffic = status?.traffic;
   const loading = !status && !error;
   const proxyUp = Boolean(status?.proxy_active);
@@ -183,7 +197,22 @@ export default function ManagePage() {
   const reqLast5s = traffic
     ? Math.round(traffic.requests_per_sec_now_5s * 5)
     : 0;
-  const buckets = traffic?.buckets_10s ?? [];
+  const buckets = useMemo(() => {
+    const fleet = traffic?.buckets_10s ?? [];
+    if (fleet.length > 0) {
+      return fleet;
+    }
+    const perInstance = instances
+      .map((i) => i.traffic?.buckets_10s ?? [])
+      .filter((b) => b.length > 0);
+    if (perInstance.length === 0) {
+      return [];
+    }
+    if (perInstance.length === 1) {
+      return perInstance[0];
+    }
+    return mergeTrafficBuckets(perInstance);
+  }, [traffic?.buckets_10s, instances]);
   const startup = status?.startup;
   const bytesTotalUp =
     (traffic?.bytes_total_up_allow ?? 0) + (traffic?.bytes_total_up_deny ?? 0);
@@ -198,12 +227,21 @@ export default function ManagePage() {
         <Alert type="error" message={error} showIcon />
       ) : null}
 
-      {!proxyUp && status?.proxy_start_error ? (
+      <CreateProxyInstanceModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => void load()}
+      />
+
+      {instances.some((i) => i.proxy_start_error) ? (
         <Alert
           type="warning"
           showIcon
           message={t("dashboard.proxyDown")}
-          description={apiErrorMessage(status.proxy_start_error)}
+          description={instances
+            .filter((i) => i.proxy_start_error)
+            .map((i) => `${i.listen}: ${apiErrorMessage(i.proxy_start_error!)}`)
+            .join("; ")}
         />
       ) : null}
 
@@ -214,7 +252,9 @@ export default function ManagePage() {
           tone={proxyUp ? "success" : "danger"}
           badge={<StatusDot tone={proxyUp ? "success" : "danger"} />}
           value={proxyUp ? "RUNNING" : "STOPPED"}
-          hint={status?.listen || "—"}
+          hint={
+            instances.filter((i) => i.active).map((i) => i.listen).join(", ") || "—"
+          }
         />
         <DashboardStatCard
           label={t("dashboard.aclBuild")}
@@ -227,9 +267,9 @@ export default function ManagePage() {
           hint={
             acl
               ? t("dashboard.rulesPatterns", {
-                  rules: acl.active_logical_rules,
-                  patterns: acl.active_patterns,
-                })
+                rules: acl.active_logical_rules,
+                patterns: acl.active_patterns,
+              })
               : undefined
           }
         />
@@ -251,9 +291,9 @@ export default function ManagePage() {
           hint={
             traffic && proxyUp
               ? t("dashboard.reqHint", {
-                  last5s: formatInt(reqLast5s, localeTag),
-                  avg: formatInt(reqPerMinAvg5m, localeTag),
-                })
+                last5s: formatInt(reqLast5s, localeTag),
+                avg: formatInt(reqPerMinAvg5m, localeTag),
+              })
               : undefined
           }
         />
@@ -283,9 +323,9 @@ export default function ManagePage() {
           hint={
             traffic
               ? t("dashboard.trafficHint", {
-                  allowPct: formatSharePct(traffic.allowed_5m, totalDecisions),
-                  denyPct: formatSharePct(traffic.denied_5m, totalDecisions),
-                })
+                allowPct: formatSharePct(traffic.allowed_5m, totalDecisions),
+                denyPct: formatSharePct(traffic.denied_5m, totalDecisions),
+              })
               : undefined
           }
         />
@@ -339,8 +379,8 @@ export default function ManagePage() {
               <span className="font-mono text-[11px] text-zinc-600">
                 {acl?.build_finished_at
                   ? t("dashboard.aclDoneAt", {
-                      time: formatStartupClock(acl.build_finished_at, localeTag),
-                    })
+                    time: formatStartupClock(acl.build_finished_at, localeTag),
+                  })
                   : t("dashboard.aclNever")}
               </span>
             </li>
@@ -460,7 +500,7 @@ export default function ManagePage() {
                         {t("dashboard.sniTooltip")}
                       </p>
                       {acl.sni_regexp_reason_counts &&
-                      Object.keys(acl.sni_regexp_reason_counts).length > 0 ? (
+                        Object.keys(acl.sni_regexp_reason_counts).length > 0 ? (
                         <div className="border-t border-white/10 pt-2 text-zinc-500">
                           <p className="m-0 mb-1 text-[10px] uppercase tracking-wide">
                             {t("dashboard.regexpReasons")}
@@ -477,7 +517,7 @@ export default function ManagePage() {
                         </div>
                       ) : null}
                       {acl.sni_regexp_samples &&
-                      acl.sni_regexp_samples.length > 0 ? (
+                        acl.sni_regexp_samples.length > 0 ? (
                         <div className="border-t border-white/10 pt-2 text-zinc-500">
                           <p className="m-0 mb-1 text-[10px] uppercase tracking-wide">
                             {t("dashboard.regexpSamples")}
@@ -566,13 +606,13 @@ export default function ManagePage() {
                   tooltip={
                     traffic && proxyUp && traffic.decide_breakdown_5m
                       ? (
-                          <ACLDecideBreakdownTooltip
-                            totalAvgUs={traffic.decide_duration_us_avg_5m}
-                            totalP95Us={traffic.decide_duration_us_p95_5m}
-                            totalP99Us={traffic.decide_duration_us_p99_5m}
-                            breakdown={traffic.decide_breakdown_5m}
-                          />
-                        )
+                        <ACLDecideBreakdownTooltip
+                          totalAvgUs={traffic.decide_duration_us_avg_5m}
+                          totalP95Us={traffic.decide_duration_us_p95_5m}
+                          totalP99Us={traffic.decide_duration_us_p99_5m}
+                          breakdown={traffic.decide_breakdown_5m}
+                        />
+                      )
                       : undefined
                   }
                   value={
@@ -586,13 +626,13 @@ export default function ManagePage() {
                   tooltip={
                     traffic && proxyUp && traffic.inspect_breakdown_5m
                       ? (
-                          <InspectBreakdownTooltip
-                            totalAvgUs={traffic.inspect_duration_us_avg_5m}
-                            totalP95Us={traffic.inspect_duration_us_p95_5m}
-                            totalP99Us={traffic.inspect_duration_us_p99_5m}
-                            breakdown={traffic.inspect_breakdown_5m}
-                          />
-                        )
+                        <InspectBreakdownTooltip
+                          totalAvgUs={traffic.inspect_duration_us_avg_5m}
+                          totalP95Us={traffic.inspect_duration_us_p95_5m}
+                          totalP99Us={traffic.inspect_duration_us_p99_5m}
+                          breakdown={traffic.inspect_breakdown_5m}
+                        />
+                      )
                       : undefined
                   }
                   value={
@@ -606,20 +646,20 @@ export default function ManagePage() {
                   tooltip={
                     traffic && proxyUp
                       ? (
-                          <PolicyBreakdownTooltip
-                            totalAvgUs={traffic.policy_duration_us_avg_5m}
-                            totalP95Us={traffic.policy_duration_us_p95_5m}
-                            totalP99Us={traffic.policy_duration_us_p99_5m}
-                            aclAvgUs={traffic.decide_duration_us_avg_5m}
-                            aclP95Us={traffic.decide_duration_us_p95_5m}
-                            aclP99Us={traffic.decide_duration_us_p99_5m}
-                            inspectAvgUs={traffic.inspect_duration_us_avg_5m}
-                            inspectP95Us={traffic.inspect_duration_us_p95_5m}
-                            inspectP99Us={traffic.inspect_duration_us_p99_5m}
-                            aclBreakdown={traffic.decide_breakdown_5m}
-                            inspectBreakdown={traffic.inspect_breakdown_5m}
-                          />
-                        )
+                        <PolicyBreakdownTooltip
+                          totalAvgUs={traffic.policy_duration_us_avg_5m}
+                          totalP95Us={traffic.policy_duration_us_p95_5m}
+                          totalP99Us={traffic.policy_duration_us_p99_5m}
+                          aclAvgUs={traffic.decide_duration_us_avg_5m}
+                          aclP95Us={traffic.decide_duration_us_p95_5m}
+                          aclP99Us={traffic.decide_duration_us_p99_5m}
+                          inspectAvgUs={traffic.inspect_duration_us_avg_5m}
+                          inspectP95Us={traffic.inspect_duration_us_p95_5m}
+                          inspectP99Us={traffic.inspect_duration_us_p99_5m}
+                          aclBreakdown={traffic.decide_breakdown_5m}
+                          inspectBreakdown={traffic.inspect_breakdown_5m}
+                        />
+                      )
                       : undefined
                   }
                   value={
@@ -640,6 +680,64 @@ export default function ManagePage() {
             </Link>
           </div>
         </div>
+      </div>
+      <div className="rounded-xl border border-white/10 bg-white/[0.05] p-5">
+        <div className="mb-4 flex flex-row flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[13px] font-medium text-zinc-100">
+              {t("instance.fleetTitle")}
+            </p>
+          </div>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setCreateOpen(true)}
+          >
+            {t("instance.add")}
+          </Button>
+        </div>
+        {safeDbInstances.length === 0 && !loading ? (
+          <Typography.Text type="secondary">{t("instance.fleetEmpty")}</Typography.Text>
+        ) : (
+          <div className="flex flex-col gap-6">
+            {safeDbInstances.map((meta) => {
+              const runtime =
+                instances.find((i) => i.id === meta.id) ?? null;
+              if (!runtime) {
+                return (
+                  <div
+                    key={meta.id}
+                    className="rounded-lg border border-white/8 bg-black/20 p-4"
+                  >
+                    <Link
+                      href={`/manage/instances/${meta.id}`}
+                      className="text-[13px] font-medium text-teal-300 hover:text-teal-200"
+                    >
+                      {meta.name}
+                    </Link>
+                    <Typography.Text type="secondary" className="ml-2 font-mono text-[11px]">
+                      {meta.listen}
+                    </Typography.Text>
+                    <Typography.Paragraph type="secondary" className="!mb-0 mt-2 text-[12px]">
+                      {t("instance.runtimePending")}
+                    </Typography.Paragraph>
+                  </div>
+                );
+              }
+              return (
+                <div key={meta.id} className="flex flex-col gap-3">
+                  <Link
+                    href={`/manage/instances/${meta.id}`}
+                    className="text-[13px] font-medium text-teal-300 hover:text-teal-200"
+                  >
+                    {meta.name}
+                  </Link>
+                  <InstanceRuntimeOverview inst={runtime} loading={loading} />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

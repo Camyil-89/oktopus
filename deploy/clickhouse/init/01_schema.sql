@@ -3,6 +3,7 @@ CREATE DATABASE IF NOT EXISTS oktopus;
 CREATE TABLE IF NOT EXISTS oktopus.proxy_access_log
 (
     id UUID,
+    instance_id UUID,
     created_at DateTime64(3, 'UTC'),
     source_address String,
     destination_address String,

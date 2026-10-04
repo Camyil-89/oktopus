@@ -42,6 +42,7 @@ func (h *AccessLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filter := repository.ListFilter{
+		InstanceID:      strings.TrimSpace(r.URL.Query().Get("instance_id")),
 		ID:              strings.TrimSpace(r.URL.Query().Get("id")),
 		User:            strings.TrimSpace(r.URL.Query().Get("user")),
 		Source:          strings.TrimSpace(r.URL.Query().Get("source")),
@@ -84,6 +85,12 @@ func (h *AccessLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	if filter.InspectRuleID != "" {
 		if _, err := uuid.Parse(filter.InspectRuleID); err != nil {
 			response.Error(w, http.StatusBadRequest, "invalid inspect_rule_id")
+			return
+		}
+	}
+	if filter.InstanceID != "" {
+		if _, err := uuid.Parse(filter.InstanceID); err != nil {
+			response.Error(w, http.StatusBadRequest, "invalid instance_id")
 			return
 		}
 	}
@@ -212,6 +219,7 @@ type accessLogListResponse struct {
 
 type accessLogRowResponse struct {
 	ID                 string          `json:"id"`
+	InstanceID         string          `json:"instance_id"`
 	CreatedAt          string          `json:"created_at"`
 	SourceAddress      string          `json:"source_address"`
 	DestinationAddress string          `json:"destination_address"`
@@ -241,6 +249,7 @@ func toAccessLogRow(row domain.Entry) accessLogRowResponse {
 	}
 	return accessLogRowResponse{
 		ID:                 row.ID.String(),
+		InstanceID:         row.InstanceID.String(),
 		CreatedAt:          row.CreatedAt.UTC().Format(time.RFC3339),
 		SourceAddress:      row.SourceAddress,
 		DestinationAddress: row.DestinationAddress,

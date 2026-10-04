@@ -30,9 +30,9 @@
     { "id": "manage-access-log", "docPath": "manage/access-log.html", "webRoute": "/manage/access-log", "sources": ["web/app/manage/access-log/page.tsx"] },
     {
       "id": "manage-access-log-reports",
-      "docPath": "manage/access-log/reports.html",
-      "webRoute": "/manage/access-log/reports",
-      "sources": ["web/app/manage/access-log/reports/page.tsx"]
+      "docPath": "manage/reports.html",
+      "webRoute": "/manage/reports",
+      "sources": ["web/app/manage/reports/page.tsx"]
     },
     { "id": "manage-proxy", "docPath": "manage/proxy.html", "webRoute": "/manage/proxy", "sources": ["web/app/manage/proxy/page.tsx"] },
     { "id": "manage-users", "docPath": "manage/users.html", "webRoute": "/manage/users", "sources": ["web/app/manage/users/page.tsx"] }

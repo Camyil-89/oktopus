@@ -45,7 +45,7 @@ const PAGES = [
   { id: "manage-rules", file: "manage/rules.html" },
   { id: "rules-acl-syntax", file: "manage/rules-acl-syntax.html" },
   { id: "manage-access-log", file: "manage/access-log.html" },
-  { id: "manage-access-log-reports", file: "manage/access-log/reports.html" },
+  { id: "manage-access-log-reports", file: "manage/reports.html" },
   { id: "manage-proxy", file: "manage/proxy.html" },
   { id: "manage-users", file: "manage/users.html" },
 ];

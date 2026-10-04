@@ -214,25 +214,43 @@ func (s *Service) applyRemoteListBody(ctx context.Context, list domain.NamedList
 	if _, err := s.repo.UpdateNamedListBody(ctx, list.ID, canonicalNew); err != nil {
 		return false, false, err
 	}
-	pol, _ := s.repo.GetPolicy(ctx)
-	refLists, _ := referencedNamedLists(ctx, s.repo, pol.ConfigText)
-	rev := revisionFromSquid(pol.ConfigText, refLists)
-	s.rt.setConfigRevision(rev)
-	if rev == s.rt.getActiveRevision() {
-		return true, false, nil
+	ids, _ := s.repo.ListPolicyInstanceIDs(ctx)
+	publishedAny := false
+	for _, instanceID := range ids {
+		pol, _ := s.repo.GetPolicy(ctx, instanceID)
+		refLists, _ := referencedNamedLists(ctx, instancePolicySource{s.repo, instanceID}, pol.ConfigText)
+		rev := revisionFromSquid(pol.ConfigText, refLists)
+		rt := s.runtimeFor(instanceID)
+		rt.setConfigRevision(rev)
+		if rev != rt.getActiveRevision() {
+			s.requestPublishInstance(instanceID)
+			publishedAny = true
+		}
 	}
-	s.requestPublish()
-	return true, true, nil
+	return true, publishedAny, nil
 }
 
 func validateSquidCompileWithListBody(ctx context.Context, s *Service, list domain.NamedList, body string) error {
-	pol, err := s.repo.GetPolicy(ctx)
+	ids, err := s.repo.ListPolicyInstanceIDs(ctx)
+	if err != nil {
+		return err
+	}
+	for _, instanceID := range ids {
+		if err := validateSquidCompileWithListBodyForInstance(ctx, s, instanceID, list, body); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateSquidCompileWithListBodyForInstance(ctx context.Context, s *Service, instanceID uuid.UUID, list domain.NamedList, body string) error {
+	pol, err := s.repo.GetPolicy(ctx, instanceID)
 	if err != nil {
 		return err
 	}
 	cfg, _ := squid.ParsePolicyConfig(pol.ConfigText)
 	if cfg == nil {
-		return validateSquidCompile(ctx, &policyValidateRepo{s: s})
+		return validateSquidCompile(ctx, &policyValidateRepo{s: s, instanceID: instanceID})
 	}
 	needed := false
 	for _, name := range squid.ListNamesToMergeFromDB(cfg) {
@@ -244,7 +262,7 @@ func validateSquidCompileWithListBody(ctx context.Context, s *Service, list doma
 	if !needed {
 		return nil
 	}
-	refLists, err := referencedNamedLists(ctx, s.repo, pol.ConfigText)
+	refLists, err := referencedNamedLists(ctx, instancePolicySource{s.repo, instanceID}, pol.ConfigText)
 	if err != nil {
 		return err
 	}
@@ -254,5 +272,5 @@ func validateSquidCompileWithListBody(ctx context.Context, s *Service, list doma
 			break
 		}
 	}
-	return validateSquidCompile(ctx, &policyValidateRepo{s: s, draftLists: refLists, hasLists: true})
+	return validateSquidCompile(ctx, &policyValidateRepo{s: s, instanceID: instanceID, draftLists: refLists, hasLists: true})
 }

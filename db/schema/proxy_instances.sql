@@ -1,6 +1,7 @@
-CREATE TABLE proxy_settings (
+CREATE TABLE proxy_instances (
     id UUID PRIMARY KEY,
-    proxy_enabled BOOLEAN NOT NULL DEFAULT false,
+    name TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT false,
     listen TEXT NOT NULL,
     connect_mode TEXT NOT NULL,
     ca_cert_path TEXT NOT NULL,
@@ -14,8 +15,11 @@ CREATE TABLE proxy_settings (
     ldap_base_dn TEXT NOT NULL,
     ldap_bind_dn TEXT NOT NULL,
     ldap_bind_password TEXT NOT NULL,
-    access_log_retention_days INTEGER NOT NULL DEFAULT 3
-        CHECK (access_log_retention_days = 0 OR access_log_retention_days >= 1),
+    sort_order INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT proxy_instances_listen_unique UNIQUE (listen),
+    CONSTRAINT proxy_instances_name_unique UNIQUE (name)
 );
+
+CREATE INDEX proxy_instances_sort_idx ON proxy_instances (sort_order, created_at);

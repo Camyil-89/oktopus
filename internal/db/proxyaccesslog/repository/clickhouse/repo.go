@@ -28,7 +28,7 @@ func (r *Repository) InsertBatch(ctx context.Context, entries []domain.Entry) er
 	}
 
 	logBatch, err := r.conn.PrepareBatch(ctx, `INSERT INTO proxy_access_log (
-		id, created_at, source_address, destination_address, user_name,
+		id, instance_id, created_at, source_address, destination_address, user_name,
 		decide_duration_us, full_url, action, inspect_rule_id, denied_by,
 		decision_rule_ref, search_engine, search_query, inspect_error
 	)`)
@@ -41,6 +41,7 @@ func (r *Repository) InsertBatch(ctx context.Context, entries []domain.Entry) er
 		parsed := extra.ParseFromJSON(e.ID, e.Extra)
 		if err := logBatch.Append(
 			e.ID,
+			e.InstanceID,
 			e.CreatedAt.UTC(),
 			e.SourceAddress,
 			e.DestinationAddress,
@@ -117,7 +118,7 @@ func (r *Repository) List(ctx context.Context, f repository.ListFilter, page, pa
 
 	offset := (page - 1) * pageSize
 	listSQL := `SELECT
-		id, created_at, source_address, destination_address, user_name,
+		id, instance_id, created_at, source_address, destination_address, user_name,
 		decide_duration_us, full_url, action, inspect_rule_id, denied_by,
 		decision_rule_ref, search_engine, search_query, inspect_error
 	FROM proxy_access_log
@@ -143,6 +144,7 @@ func (r *Repository) List(ctx context.Context, f repository.ListFilter, page, pa
 	for rows.Next() {
 		var (
 			id                 uuid.UUID
+			instanceID         uuid.UUID
 			createdAt          time.Time
 			source             string
 			destination        string
@@ -158,7 +160,7 @@ func (r *Repository) List(ctx context.Context, f repository.ListFilter, page, pa
 			inspectError       string
 		)
 		if err := rows.Scan(
-			&id, &createdAt, &source, &destination, &user,
+			&id, &instanceID, &createdAt, &source, &destination, &user,
 			&decideUs, &fullURL, &action, &inspectRule, &deniedBy,
 			&decisionRef, &searchEngine, &searchQuery, &inspectError,
 		); err != nil {
@@ -172,6 +174,7 @@ func (r *Repository) List(ctx context.Context, f repository.ListFilter, page, pa
 		}{searchEngine, searchQuery, inspectError})
 		items = append(items, domain.Entry{
 			ID:                 id,
+			InstanceID:         instanceID,
 			CreatedAt:          createdAt.UTC(),
 			SourceAddress:      source,
 			DestinationAddress: destination,

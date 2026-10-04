@@ -17,7 +17,7 @@
 | `manage-rules` | `manage/rules.html` | `/manage/rules` |
 | `rules-acl-syntax` | `manage/rules-acl-syntax.html` | — (справочник ACL; промпт для ИИ: `content/prompts/<locale>/rules-acl-syntax.txt`) |
 | `manage-access-log` | `manage/access-log.html` | `/manage/access-log` |
-| `manage-access-log-reports` | `manage/access-log/reports.html` | `/manage/access-log/reports` |
+| `manage-access-log-reports` | `manage/reports.html` | `/manage/reports` |
 | `manage-proxy` | `manage/proxy.html` | `/manage/proxy` |
 | `manage-users` | `manage/users.html` | `/manage/users` |
 

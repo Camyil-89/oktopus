@@ -33,7 +33,7 @@ func (e *Engine) connectMiddleware(rec accesslog.Recorder) hooks.ConnectMiddlewa
 		id, _ := authIdentity(ctx)
 		res := e.EvaluatePolicy(ctx, id, PolicyRequestFromConnect(ctx, hostPort), ConnectSkipFromContext(ctx))
 		parts := metricsDecideParts(res.Prepare, res.Engine, res.Timing)
-		metrics.ObserveDecisionWithPolicy(res.Allow, res.Spend, parts, metricsUser(ctx), metricsSource(ctx, nil))
+		metrics.ObserveDecisionWithPolicy(ctx, res.Allow, res.Spend, parts, metricsUser(ctx), metricsSource(ctx, nil))
 		logCtx := observe.WithPolicyEvalTrace(ctx, policyEvalTraceFromFields(res.Fields))
 		if rec != nil {
 			rec.Record(accesslog.ConnectEntry(logCtx, hostPort, res.Allow, res.Spend, res.RuleRef))
@@ -50,7 +50,7 @@ func (e *Engine) httpRequestMiddleware(rec accesslog.Recorder) hooks.HTTPRequest
 		id, _ := authIdentity(ctx)
 		res := e.EvaluatePolicy(ctx, id, PolicyRequestFromHTTP(ctx, req), nil)
 		parts := metricsDecideParts(res.Prepare, res.Engine, res.Timing)
-		metrics.ObserveDecision(res.Allow, res.Spend, parts, metricsUser(ctx), metricsSource(ctx, req))
+		metrics.ObserveDecision(ctx, res.Allow, res.Spend, parts, metricsUser(ctx), metricsSource(ctx, req))
 		trace := policyEvalTraceFromFields(res.Fields)
 		if req != nil {
 			base := req.Context()
@@ -64,7 +64,7 @@ func (e *Engine) httpRequestMiddleware(rec accesslog.Recorder) hooks.HTTPRequest
 			rec.Record(accesslog.HTTPEntry(ctx, req, false, res.Spend, res.RuleRef))
 		}
 		if !res.Allow {
-			metrics.ObservePolicyTotal(res.Spend)
+			metrics.ObservePolicyTotal(ctx, res.Spend)
 		}
 		if res.Allow {
 			if req != nil {

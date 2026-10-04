@@ -68,6 +68,9 @@ function parseFilters(raw: unknown): AccessLogReportSpec["filters"] {
   }
   const f = raw as Record<string, unknown>;
   const out: AccessLogReportSpec["filters"] = {};
+  if (typeof f.instance_id === "string" && f.instance_id.trim()) {
+    out.instance_id = f.instance_id.trim();
+  }
   if (typeof f.user === "string" && f.user) out.user = f.user;
   if (typeof f.source === "string" && f.source) out.source = f.source;
   if (typeof f.destination === "string" && f.destination)
