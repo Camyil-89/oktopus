@@ -14,6 +14,7 @@ var dstLookup func(context.Context, string) ([]net.IP, error)
 
 // SetDstLookupForTest подменяет DNS для unit-тестов (только в пакете acl).
 func SetDstLookupForTest(fn func(context.Context, string) ([]net.IP, error)) {
+	clearDstResolveCache()
 	if fn == nil {
 		dstLookup = defaultDstLookup
 		return
@@ -53,7 +54,7 @@ func EnrichRequestFieldsDst(ctx context.Context, f RequestFields) RequestFields 
 	if host == "" || net.ParseIP(host) != nil {
 		return f
 	}
-	ips, err := dstLookup(ctx, host)
+	ips, err := lookupDstIPsCached(ctx, host)
 	if err != nil || len(ips) == 0 {
 		return f
 	}
