@@ -1,6 +1,7 @@
 <p align="center">
   <img src="web/public/icon.svg" alt="Oktopus" width="96" height="96">
 </p>
+
 # Oktopus
 
 **Документация:** [русский](https://camyil-89.github.io/oktopus/ru/index.html) · [English](https://camyil-89.github.io/oktopus/en/index.html)
