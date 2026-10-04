@@ -125,10 +125,10 @@ function loadFiltersFromStorage(): AccessLogFiltersValues {
     }
     const p = parsed as Partial<AccessLogFiltersValues> & {
       error_kind?: string;
-      action?: string;
     };
-    let action = parseAccessLogActionFilter(p.action);
-    if (p.action === "errors") {
+    const rawAction = (parsed as Record<string, unknown>).action;
+    let action = parseAccessLogActionFilter(rawAction);
+    if (rawAction === "errors") {
       action = "";
     }
     return {

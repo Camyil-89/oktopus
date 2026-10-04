@@ -46,7 +46,7 @@ export type AccessLogExtra = {
 
 function isLegacyItemsPayload(
   raw: NonNullable<AccessLogExtra["policy_anomaly"]>,
-): raw is { items?: PolicyAnomalyItem[] } {
+): raw is { items: PolicyAnomalyItem[] } {
   return "items" in raw && Array.isArray(raw.items);
 }
 
