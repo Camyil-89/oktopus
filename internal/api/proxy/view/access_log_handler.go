@@ -2,6 +2,7 @@ package view
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"oktopus/internal/api/platform/response"
 	"oktopus/internal/db/proxyaccesslog/domain"
 	"oktopus/internal/db/proxyaccesslog/repository"
+	"oktopus/internal/proxy/observe"
 	proxyaccesslogservice "oktopus/internal/db/proxyaccesslog/service"
 )
 
@@ -47,8 +49,21 @@ func (h *AccessLogHandler) List(w http.ResponseWriter, r *http.Request) {
 		URL:             strings.TrimSpace(r.URL.Query().Get("url")),
 		SearchOnly:      queryBool(r.URL.Query().Get("search_only")),
 		ErrorKind:       parseAccessLogErrorKind(r.URL.Query().Get("error_kind")),
+		Segment:         strings.TrimSpace(r.URL.Query().Get("segment")),
+		AttackKind:      "",
+		PolicyAnomalyQ:  strings.TrimSpace(r.URL.Query().Get("policy_anomaly_q")),
 		DecisionRuleRef: strings.TrimSpace(r.URL.Query().Get("decision_rule_ref")),
 		InspectRuleID:   strings.TrimSpace(r.URL.Query().Get("inspect_rule_id")),
+	}
+	if !repository.ValidAccessLogSegment(filter.Segment) {
+		response.Error(w, http.StatusBadRequest, "invalid segment")
+		return
+	}
+	if kind, err := parseAccessLogAttackKind(r.URL.Query().Get("attack_kind")); err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid attack_kind")
+		return
+	} else {
+		filter.AttackKind = kind
 	}
 	if filter.ID != "" {
 		if _, err := uuid.Parse(filter.ID); err != nil {
@@ -153,6 +168,26 @@ func parseAccessLogErrorKind(raw string) string {
 		return "any"
 	}
 	return ""
+}
+
+func parseAccessLogAttackKind(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	if raw == observe.PolicyAnomalyHostSNIMismatch {
+		return raw, nil
+	}
+	if len(raw) > 64 {
+		return "", fmt.Errorf("too long")
+	}
+	for _, c := range raw {
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' {
+			continue
+		}
+		return "", fmt.Errorf("bad char")
+	}
+	return raw, nil
 }
 
 func (h *AccessLogHandler) withAuth(next http.HandlerFunc) http.HandlerFunc {

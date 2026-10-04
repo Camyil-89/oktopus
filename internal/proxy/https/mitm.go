@@ -19,6 +19,7 @@ import (
 	proxyhttp "oktopus/internal/proxy/http"
 	"oktopus/internal/proxy/bytecount"
 	"oktopus/internal/proxy/hooks"
+	"oktopus/internal/proxy/observe"
 	"oktopus/internal/proxy/wsproxy"
 )
 
@@ -124,6 +125,10 @@ func (m *MITM) serveOneRequest(ctx context.Context, clientConn *tls.Conn, br *bu
 	if wsproxy.IsWebSocketUpgrade(req) {
 		return m.serveWebSocketUpgrade(ctx, clientConn, br, req, defaultHost, hostPort)
 	}
+
+	reqCtx := observe.WithCONNECTDestHostPort(ctx, hostPort)
+	reqCtx = observe.WithMITMClientHelloSNI(reqCtx, defaultHost)
+	req = req.WithContext(reqCtx)
 
 	outReq, d := applyMITMHTTPPolicy(ctx, m.Hooks, req, defaultHost)
 

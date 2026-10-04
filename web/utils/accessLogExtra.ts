@@ -21,6 +21,13 @@ export type AccessLogExtra = {
     engine?: string;
     query?: string;
   };
+  policy_anomaly?: {
+    kind?: string;
+    connect_host?: string;
+    tls_client_sni?: string;
+    policy_host?: string;
+    http_host?: string;
+  };
   [inspectRuleId: string]: unknown;
 };
 
@@ -109,6 +116,7 @@ const RESERVED_ACCESS_LOG_EXTRA_KEYS = new Set([
   "inspect_error",
   "gateway_error",
   "search",
+  "policy_anomaly",
 ]);
 
 export function accessLogInspectPayloads(
@@ -127,6 +135,33 @@ export function accessLogInspectPayloads(
     }
   }
   return out;
+}
+
+export function accessLogPolicyAnomalySummary(
+  anomaly: AccessLogExtra["policy_anomaly"],
+  t: TranslateFn,
+): string {
+  if (!anomaly?.kind) {
+    return "";
+  }
+  const kindKey = `accessLog.policyAnomaly.${anomaly.kind}` as Parameters<
+    TranslateFn
+  >[0];
+  const kindLabel = t(kindKey);
+  const parts: string[] = [kindLabel];
+  if (anomaly.connect_host) {
+    parts.push(`CONNECT=${anomaly.connect_host}`);
+  }
+  if (anomaly.tls_client_sni) {
+    parts.push(`SNI=${anomaly.tls_client_sni}`);
+  }
+  if (anomaly.policy_host) {
+    parts.push(`policy=${anomaly.policy_host}`);
+  }
+  if (anomaly.http_host) {
+    parts.push(`Host=${anomaly.http_host}`);
+  }
+  return parts.join(" · ");
 }
 
 export function parseAccessLogExtra(extra: unknown): AccessLogExtra {

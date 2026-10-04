@@ -275,6 +275,15 @@ function buildAccessLogQuery(params: ListProxyAccessLogParams) {
   if (params.error_kind) {
     q.set("error_kind", params.error_kind);
   }
+  if (params.segment) {
+    q.set("segment", params.segment);
+  }
+  if (params.attack_kind) {
+    q.set("attack_kind", params.attack_kind);
+  }
+  if (params.policy_anomaly_q) {
+    q.set("policy_anomaly_q", params.policy_anomaly_q);
+  }
   if (params.decision_rule_ref) {
     q.set("decision_rule_ref", params.decision_rule_ref);
   }

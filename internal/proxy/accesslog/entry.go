@@ -38,6 +38,9 @@ const (
 	DeniedByGateway = "gateway"
 )
 
+// PolicyNoteInspectRuleID — синтетический inspect_rule_id для KV policy_anomaly (не правило inspect).
+var PolicyNoteInspectRuleID = uuid.MustParse("00000000-0000-4000-8000-000000000001")
+
 // Entry — одна запись решения ACL по запросу или CONNECT.
 type Entry struct {
 	ID                 uuid.UUID // если задан — id строки в proxy_access_log (иначе генерируется при flush)
@@ -55,6 +58,7 @@ type Entry struct {
 	InspectError       string
 	GatewayErrorType   string // тип upstream-ошибки (extra gateway_error.type)
 	InspectRuleLogs    map[string]map[string]any // id правила → payload ctx:log
+	PolicyNameMismatch *observe.PolicyNameMismatch // extra policy_anomaly (MITM host/SNI mismatch)
 }
 
 // Recorder принимает записи; реализация не должна блокировать hot path надолго.
@@ -134,7 +138,30 @@ func HTTPEntry(ctx context.Context, req *stdhttp.Request, allow bool, spend time
 		e.DeniedBy = DeniedByACL
 		e.ACLRuleRef = ruleRef
 	}
+	attachPolicyNameMismatch(&e, ctx, req)
 	return e
+}
+
+func attachPolicyNameMismatch(e *Entry, ctx context.Context, req *stdhttp.Request) {
+	if e == nil || req == nil {
+		return
+	}
+	tools := observe.RequestToolsFor(ctx, req)
+	policyHost := observe.PolicyHostFromRequest(req, tools.SNI())
+	httpHost := ""
+	if req != nil {
+		httpHost = req.Host
+	}
+	note := observe.DetectPolicyNameMismatch(
+		observe.CONNECTDestHostPortFromContext(req.Context()),
+		observe.MITMClientHelloSNIFromContext(req.Context()),
+		policyHost,
+		httpHost,
+	)
+	if note == nil {
+		return
+	}
+	e.PolicyNameMismatch = note
 }
 
 // FinalHTTPEntryAfterACL — одна запись после ACL allow (инспекция отсутствует или пропущена).

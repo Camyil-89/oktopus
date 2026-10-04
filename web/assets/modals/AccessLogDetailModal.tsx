@@ -10,6 +10,7 @@ import { AccessLogActionTag } from "@/utils/accessLogAction";
 import {
   accessLogAclDecisionLabel,
   accessLogDecisionRuleLabel,
+  accessLogPolicyAnomalySummary,
   accessLogSystemRuleLabel,
   isSystemAccessLogRuleId,
   parseAccessLogExtra,
@@ -128,7 +129,11 @@ export function AccessLogDetailModal({
   const { t } = useTranslation();
   const emDash = t("common.emDash");
   const rowNorm = row ? normalizeAccessLogRow(row) : null;
-  const extra = rowNorm ? rowNorm.extra : {};
+  const extra = rowNorm ? parseAccessLogExtra(rowNorm.extra) : {};
+  const policyAnomalySummary = accessLogPolicyAnomalySummary(
+    extra.policy_anomaly,
+    t,
+  );
   const extraJson =
     rowNorm != null
       ? JSON.stringify(parseAccessLogExtra(rowNorm.extra), null, 2)
@@ -215,6 +220,13 @@ export function AccessLogDetailModal({
                         {extra.inspect_error}
                       </span>
                     ) : null}
+                  </Typography.Text>
+                </Descriptions.Item>
+              ) : null}
+              {policyAnomalySummary ? (
+                <Descriptions.Item label={t("accessLog.detailPolicyAnomaly")}>
+                  <Typography.Text className="break-all font-mono text-sm">
+                    {policyAnomalySummary}
                   </Typography.Text>
                 </Descriptions.Item>
               ) : null}
