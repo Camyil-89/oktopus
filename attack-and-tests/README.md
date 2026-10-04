@@ -9,11 +9,15 @@
 | Папка | Описание |
 |-------|----------|
 | [mitm-host-mismatch](./mitm-host-mismatch/) | MITM: CONNECT/SNI vs HTTP Host |
+| [mitm-allowed-host-evil-sni](./mitm-allowed-host-evil-sni/) | MITM: разрешённый Host, запрещённый TLS SNI |
+| [mitm-allowed-sni-evil-host](./mitm-allowed-sni-evil-host/) | MITM: разрешённый TLS SNI, запрещённый HTTP Host |
 | [tunnel-dst-resolve](./tunnel-dst-resolve/) | Tunnel: dstdomain + `deny dst` при DNS на loopback |
 | [websocket-proxy](./websocket-proxy/) | WebSocket echo: wss/ws в mitm и tunnel |
 
 ```bash
 go run ./attack-and-tests/mitm-host-mismatch all
+go run ./attack-and-tests/mitm-allowed-host-evil-sni all
+go run ./attack-and-tests/mitm-allowed-sni-evil-host all
 go run ./attack-and-tests/tunnel-dst-resolve all
 go run ./attack-and-tests/websocket-proxy all
 ```

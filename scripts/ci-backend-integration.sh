@@ -77,6 +77,12 @@ go run ./attack-and-tests/run-all-acl
 echo "==> attack-and-tests: mitm-host-mismatch"
 go run ./attack-and-tests/mitm-host-mismatch all
 
+echo "==> attack-and-tests: mitm-allowed-host-evil-sni"
+go run ./attack-and-tests/mitm-allowed-host-evil-sni all
+
+echo "==> attack-and-tests: mitm-allowed-sni-evil-host"
+go run ./attack-and-tests/mitm-allowed-sni-evil-host all
+
 echo "==> attack-and-tests: tunnel-dst-resolve"
 go run ./attack-and-tests/tunnel-dst-resolve all
 
