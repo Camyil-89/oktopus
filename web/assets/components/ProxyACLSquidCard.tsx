@@ -29,6 +29,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
 import type { TranslateFn } from "@/i18n/translate";
+import type { RulesSectionUnsaved } from "@/types/rulesUnsaved";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const POLICY_PLACEHOLDER = `# acl и http_access (как в Squid)
@@ -124,7 +125,13 @@ function compileStatusTag(st: ProxyACLCompileStatus | null, t: TranslateFn) {
   return <Tag color="success">{t("acl.published")}</Tag>;
 }
 
-export function ProxyACLSquidCard() {
+type ProxyACLSquidCardProps = {
+  onUnsavedChange?: (state: RulesSectionUnsaved) => void;
+};
+
+export function ProxyACLSquidCard({
+  onUnsavedChange,
+}: ProxyACLSquidCardProps = {}) {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const formatApiError = useApiErrorMessage();
@@ -265,7 +272,7 @@ export function ProxyACLSquidCard() {
     }
   };
 
-  const savePolicy = async () => {
+  const savePolicy = useCallback(async (): Promise<boolean> => {
     setSavingPolicy(true);
     try {
       const pol = await proxyApi.putProxyACLPolicy(policyText);
@@ -273,6 +280,7 @@ export function ProxyACLSquidCard() {
       setPolicyText(pol.config_text);
       message.success(t("acl.configSaved"));
       setAclStatus(await proxyApi.getProxyACLStatus());
+      return true;
     } catch (e) {
       if (e instanceof ApiError) {
         message.error(e.message);
@@ -282,10 +290,23 @@ export function ProxyACLSquidCard() {
       } else {
         message.error(t("acl.saveError"));
       }
+      return false;
     } finally {
       setSavingPolicy(false);
     }
-  };
+  }, [formatApiError, message, policyText, t]);
+
+  const discardPolicy = useCallback(() => {
+    setPolicyText(savedPolicy);
+  }, [savedPolicy]);
+
+  useEffect(() => {
+    onUnsavedChange?.({
+      dirty: policyDirty,
+      discard: discardPolicy,
+      save: savePolicy,
+    });
+  }, [onUnsavedChange, policyDirty, discardPolicy, savePolicy]);
 
   const openCreateList = () => {
     setListModalMode("create");

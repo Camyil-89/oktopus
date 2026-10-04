@@ -2,6 +2,16 @@
             <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Deployment</h1>
             <p class="lead">Run Oktopus in Docker: the stack script writes <code>.env</code>, starts Compose, and prints the control panel URL and admin credentials.</p>
 
+            <h2 id="qs-stack">Stack services</h2>
+            <p><code>docker compose</code> from the repo root runs four services (see <code>docker-compose.yml</code>). Together they form one Oktopus installation on your network:</p>
+            <ul>
+              <li><strong>nginx</strong> — entry point for administrators: serves the Next.js UI and proxies browser requests to the Oktopus HTTP API. This is the URL the stack script prints (<code>OKTOPUS_API_HOST</code> / <code>OKTOPUS_API_PORT</code>).</li>
+              <li><strong>oktopus</strong> — single application container (<code>go run</code> equivalent): forward HTTP/HTTPS proxy, REST API, and proxy engine. Client traffic uses the proxy listen port from the panel; administrators use nginx for the UI.</li>
+              <li><strong>postgresql</strong> — operational data: users, proxy settings, ACL rules, sessions, and other metadata the API reads and writes.</li>
+              <li><strong>clickhouse</strong> — high-volume proxy access log and analytics for reports; written by the proxy, queried by the API for the access log UI.</li>
+            </ul>
+            <p>PostgreSQL and ClickHouse are published <strong>on localhost only</strong> (ports from <code>.env</code>).</p>
+
             <h2 id="qs-req">Requirements</h2>
             <ul>
               <li>Git and <a href="https://docs.docker.com/compose/">Docker Compose</a> (<code>docker compose</code>).</li>

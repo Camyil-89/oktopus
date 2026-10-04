@@ -11,6 +11,7 @@
 |------|-------------------|--------------|
 | `intro` | `index.html` | — |
 | `quickstart` | `quickstart.html` | — |
+| `implementation-examples` | `implementation-examples.html` | — (схемы размещения прокси) |
 | `login` | `login.html` | `/login` |
 | `manage-home` | `manage/index.html` | `/manage` |
 | `manage-rules` | `manage/rules.html` | `/manage/rules` |

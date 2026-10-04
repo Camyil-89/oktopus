@@ -5,21 +5,30 @@ import { Button } from "antd";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  ManageNavigationGuardProvider,
+  useManageNavigationGuard,
+} from "@/contexts/ManageNavigationGuardContext";
 import { LanguageSelect } from "@/assets/components/LanguageSelect";
 import { managePageTitle } from "@/assets/components/manageNav";
 import { ManageSidebar } from "@/assets/components/ManageSidebar";
 import { useTranslation } from "@/contexts/LocaleContext";
 
-export function ManageShell({ children }: { children: React.ReactNode }) {
+function ManageShellInner({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useTranslation();
+  const { confirmLeave } = useManageNavigationGuard();
   const pageTitle = managePageTitle(pathname, t);
 
-  const handleLogout = async () => {
-    await logout();
-    router.replace("/login");
+  const handleLogout = () => {
+    confirmLeave(() => {
+      void (async () => {
+        await logout();
+        router.replace("/login");
+      })();
+    });
   };
 
   return (
@@ -39,5 +48,13 @@ export function ManageShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
+  );
+}
+
+export function ManageShell({ children }: { children: React.ReactNode }) {
+  return (
+    <ManageNavigationGuardProvider>
+      <ManageShellInner>{children}</ManageShellInner>
+    </ManageNavigationGuardProvider>
   );
 }

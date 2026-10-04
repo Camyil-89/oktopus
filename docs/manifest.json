@@ -11,6 +11,12 @@
       "webRoute": null,
       "sources": ["scripts/stack-up.sh", "scripts/stack-up.bat", "docker-compose.yml", "docker-compose.desktop.yml"]
     },
+    {
+      "id": "implementation-examples",
+      "docPath": "implementation-examples.html",
+      "webRoute": null,
+      "sources": ["docs/content/ru/implementation-examples.html", "docs/content/en/implementation-examples.html"]
+    },
     { "id": "login", "docPath": "login.html", "webRoute": "/login", "sources": ["web/app/login/page.tsx", "web/api/auth.ts"] },
     { "id": "manage-home", "docPath": "manage/index.html", "webRoute": "/manage", "sources": ["web/app/manage/page.tsx"] },
     { "id": "manage-rules", "docPath": "manage/rules.html", "webRoute": "/manage/rules", "sources": ["web/app/manage/rules/page.tsx"] },

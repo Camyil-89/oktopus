@@ -1,3 +1,4 @@
+import { ACCESS_LOG_ATTACK_KINDS } from "@/utils/accessLogSegment";
 import type { TranslateFn } from "@/i18n/translate";
 
 export const ACCESS_LOG_RULE_AUTH_FAIL = "system_auth_fail";
@@ -233,6 +234,79 @@ export function accessLogPolicyAnomalyItemSummary(
     parts.push(`resolved=${anomaly.resolved_ips.join(",")}`);
   }
   return parts.join(" · ");
+}
+
+const POLICY_ANOMALY_DETAIL_FIELDS = [
+  "connect_host",
+  "tls_client_sni",
+  "http_host",
+  "policy_host",
+  "url_host",
+  "connect_port",
+  "http_port",
+  "resolved_ips",
+] as const;
+
+export function accessLogPolicyAnomalyKindLabel(
+  kind: string,
+  t: TranslateFn,
+): string {
+  const kindKey = `accessLog.policyAnomaly.${kind}` as Parameters<
+    TranslateFn
+  >[0];
+  return t(kindKey);
+}
+
+export function accessLogPolicyAnomalyDetailRows(
+  item: PolicyAnomalyItem,
+  t: TranslateFn,
+): { label: string; value: string }[] {
+  const rows: { label: string; value: string }[] = [];
+  for (const key of POLICY_ANOMALY_DETAIL_FIELDS) {
+    const raw = item[key];
+    if (raw === undefined || raw === null || raw === "") {
+      continue;
+    }
+    const fieldKey = `accessLog.policyAnomaly.fields.${key}` as Parameters<
+      TranslateFn
+    >[0];
+    if (key === "resolved_ips" && Array.isArray(raw)) {
+      if (raw.length === 0) {
+        continue;
+      }
+      rows.push({
+        label: t(fieldKey),
+        value: raw.join(", "),
+      });
+      continue;
+    }
+    if (typeof raw === "number" || typeof raw === "string") {
+      rows.push({ label: t(fieldKey), value: String(raw) });
+    }
+  }
+  return rows;
+}
+
+/** Все проверки в порядке ACCESS_LOG_ATTACK_KINDS, затем неизвестные kind. */
+export function orderedPolicyAnomalyItems(
+  raw: AccessLogExtra["policy_anomaly"],
+): PolicyAnomalyItem[] {
+  const items = normalizePolicyAnomalies(raw, { detectedOnly: false });
+  const byKind = new Map(items.map((it) => [it.kind, it]));
+  const known = new Set(ACCESS_LOG_ATTACK_KINDS.map((k) => k.id));
+  const out: PolicyAnomalyItem[] = [];
+  for (const { id } of ACCESS_LOG_ATTACK_KINDS) {
+    const it = byKind.get(id);
+    if (it) {
+      out.push(it);
+    }
+  }
+  for (const it of items) {
+    if (!known.has(it.kind)) {
+      out.push(it);
+    }
+  }
+  return out;
 }
 
 export function accessLogPolicyAnomalySummary(

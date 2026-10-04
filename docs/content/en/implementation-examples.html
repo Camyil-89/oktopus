@@ -1,0 +1,75 @@
+            <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Deployment</p>
+            <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Implementation patterns</h1>
+            <p class="lead">Oktopus is an HTTP/HTTPS forward proxy with ACL, client authentication, and access logging. Below are typical patterns for placing the <strong>Oktopus server</strong> (one node: proxy, API, and control panel) and steering client traffic.</p>
+
+            <h2 id="ix-role">What the server does</h2>
+            <p>Clients (browser, OS, application) send requests to the proxy <strong>listen address</strong> on the same Oktopus server. The process evaluates rules, may require credentials, records access log events, and opens outbound connections. Administrators open the <strong>web panel</strong> on that same server (via nginx in the Docker stack)—rules, users, monitoring; the server is usually not exposed to the internet.</p>
+            <p>For installation steps see <a href="quickstart.html">Deployment</a>; listen address and mode are in <a href="manage/proxy.html">proxy settings</a>.</p>
+
+            <h2 id="ix-recommended">Recommended: proxy inside the trusted perimeter</h2>
+            <p>The preferred layout keeps the <strong>Oktopus server inside the protected perimeter</strong>, with no access from the internet. Clients send traffic to its proxy; egress: <strong>perimeter → Oktopus → border router (firewall) → internet</strong>. The border firewall allows WAN traffic only from that server (or a trusted egress segment), not direct bypass from workstations.</p>
+            <p>For this pattern, enable <strong>MITM</strong> in <a href="manage/proxy.html">proxy settings</a>: Oktopus issues or uses your organization’s root CA; administrators <strong>install that certificate on clients</strong> as a trusted root. HTTPS is then decrypted on the proxy—full access log, Lua inspect, and content policy—not just CONNECT metadata.</p>
+
+            <div class="note tip">
+              <div>
+                <span class="note-title">Recommended</span>
+                <p>Single controlled exit, ACL, and rich logging; MITM plus org CA for HTTPS visibility and policy; access to the Oktopus server only from trusted segments (VPN, admin VLAN, jump host).</p>
+              </div>
+            </div>
+
+            <div class="mermaid-wrap recommended">
+              <p class="mermaid-label">Perimeter → Oktopus → firewall → internet</p>
+              <pre class="mermaid">
+flowchart TB
+  subgraph perimeter["Trusted perimeter"]
+    direction TB
+    U["Workstations"]
+    S["Servers"]
+    OKT["Oktopus · proxy, API, panel"]
+    ADM["Administrator"]
+    U -->|"proxy / PAC"| OKT
+    S -->|"proxy / PAC"| OKT
+    ADM -->|"browser · UI"| OKT
+  end
+  FW["Border router · firewall"]
+  WEB["Internet"]
+  OKT -->|"egress"| FW
+  FW --> WEB
+              </pre>
+            </div>
+
+            <h3 id="ix-rec-steps">Configuration checklist</h3>
+            <ul>
+              <li><strong>Network:</strong> place the Oktopus server so it is reachable only on the local network; there must be no access from the internet.</li>
+              <li><strong>MITM mode:</strong> enable in the panel, generate or upload CA, distribute the root certificate to workstations and servers (GPO, MDM, manual).</li>
+              <li><strong>Clients:</strong> system or browser proxy, PAC, or <code>HTTP_PROXY</code> / <code>HTTPS_PROXY</code> pointing at Oktopus.</li>
+              <li><strong>Policy:</strong> ACL and proxy auth when needed; with MITM, use inspect rules on the <a href="manage/rules.html">rules</a> page.</li>
+              <li><strong>Monitoring:</strong> access log and reports for outbound traffic audit.</li>
+            </ul>
+
+            <h2 id="ix-alternatives">Other patterns</h2>
+            <p>Used less often or as a trade-off; new deployments usually only need the recommended layout above.</p>
+
+            <h3 id="ix-dmz">Oktopus in DMZ reachable from the internet</h3>
+            <p>The server listens on a public or DMZ address; remote users connect to its proxy directly. Works without VPN but increases attack surface: strict ACL, rate limits, current TLS, and isolated protection for the UI are mandatory.</p>
+
+            <div class="mermaid-wrap">
+              <p class="mermaid-label">DMZ · remote clients over the internet</p>
+              <pre class="mermaid">
+flowchart LR
+  REM["Remote clients"] -->|"internet"| DMZ["Oktopus in DMZ"]
+  DMZ --> WEB["Internet"]
+  ADM["Admin"] -->|"VPN / bastion"| DMZ
+              </pre>
+            </div>
+
+            <h3 id="ix-egress">Strict egress on the firewall (optional)</h3>
+            <p>To stop users bypassing the proxy straight to the internet, the <strong>border router or firewall</strong> often allows WAN traffic only from the Oktopus IP (or a dedicated egress segment); other hosts get deny-to-internet. Clients still need a proxy address or PAC; for HTTPS inspection without browser warnings you need <strong>MITM</strong> and the org CA installed—otherwise tunnel mode leaves you with CONNECT metadata only.</p>
+            <p>This does not replace the recommended chain perimeter → Oktopus → firewall → internet; it reinforces it. The server stays inside the perimeter and is still not reachable from outside.</p>
+
+            <h2 id="ix-summary">Summary</h2>
+            <ul>
+              <li><strong>Best fit:</strong> one Oktopus server inside the perimeter, egress via the border firewall; MITM mode and CA on clients for HTTPS visibility and policy.</li>
+              <li><strong>Administration</strong> — via the UI on the same server, only from trusted networks.</li>
+              <li><strong>Next steps:</strong> <a href="quickstart.html">Deployment</a>, <a href="manage/proxy.html">proxy settings</a> (MITM and CA), <a href="manage/rules.html">rules</a>, and <a href="manage/rules-acl-syntax.html">ACL syntax</a>.</li>
+            </ul>

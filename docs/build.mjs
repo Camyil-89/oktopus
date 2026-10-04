@@ -34,9 +34,12 @@ const UI_MOCK_PAGE_IDS = new Set([
   "manage-users",
 ]);
 
+const MERMAID_PAGE_IDS = new Set(["implementation-examples"]);
+
 const PAGES = [
   { id: "intro", file: "index.html" },
   { id: "quickstart", file: "quickstart.html" },
+  { id: "implementation-examples", file: "implementation-examples.html" },
   { id: "login", file: "login.html" },
   { id: "manage-home", file: "manage/index.html" },
   { id: "manage-rules", file: "manage/rules.html" },
@@ -51,6 +54,11 @@ const META = {
   ru: {
     intro: { section: "Разработка", title: "Разработчикам", pageTitle: "Oktopus — Разработчикам" },
     quickstart: { section: "Развёртывание", title: "Развёртывание", pageTitle: "Oktopus — Развёртывание" },
+    "implementation-examples": {
+      section: "Развёртывание",
+      title: "Примеры реализаций",
+      pageTitle: "Oktopus — Примеры реализаций",
+    },
     login: { section: "Вход", title: "Вход", pageTitle: "Oktopus — Вход" },
     "manage-home": { section: "Панель управления", title: "Главная", pageTitle: "Oktopus — Главная" },
     "manage-rules": { section: "Панель управления", title: "Правила прокси", pageTitle: "Oktopus — Правила прокси" },
@@ -71,6 +79,11 @@ const META = {
   en: {
     intro: { section: "Development", title: "Developers", pageTitle: "Oktopus — Developers" },
     quickstart: { section: "Deployment", title: "Deployment", pageTitle: "Oktopus — Deployment" },
+    "implementation-examples": {
+      section: "Deployment",
+      title: "Implementation patterns",
+      pageTitle: "Oktopus — Implementation patterns",
+    },
     login: { section: "Sign in", title: "Sign in", pageTitle: "Oktopus — Sign in" },
     "manage-home": { section: "Control panel", title: "Home", pageTitle: "Oktopus — Home" },
     "manage-rules": { section: "Control panel", title: "Proxy rules", pageTitle: "Oktopus — Proxy rules" },
@@ -95,7 +108,10 @@ const NAV = {
     sections: [
       {
         label: "Развёртывание",
-        items: [{ id: "quickstart", label: "Развёртывание" }],
+        items: [
+          { id: "quickstart", label: "Развёртывание" },
+          { id: "implementation-examples", label: "Примеры реализаций" },
+        ],
       },
       {
         label: "Разработка",
@@ -136,7 +152,10 @@ const NAV = {
     sections: [
       {
         label: "Deployment",
-        items: [{ id: "quickstart", label: "Deployment" }],
+        items: [
+          { id: "quickstart", label: "Deployment" },
+          { id: "implementation-examples", label: "Implementation patterns" },
+        ],
       },
       {
         label: "Development",
@@ -331,6 +350,17 @@ function renderPage(locale, pageId) {
   const useUiMock = UI_MOCK_PAGE_IDS.has(pageId);
   const extraCss = useUiMock ? `\n  <link rel="stylesheet" href="${assets}ui-mock.css">` : "";
   const extraJs = useUiMock ? `\n<script src="${assets}ui-tour.js"></script>` : "";
+  const mermaidJs = MERMAID_PAGE_IDS.has(pageId)
+    ? `\n<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+mermaid.initialize({
+  startOnLoad: true,
+  theme: "dark",
+  securityLevel: "loose",
+  flowchart: { nodeSpacing: 48, rankSpacing: 56, padding: 16, htmlLabels: true },
+});
+</script>`
+    : "";
 
   const langOther = locale === "ru" ? "en" : "ru";
   const langSwitch = locale === "ru"
@@ -449,7 +479,7 @@ ${renderPager(locale, pageId, page.file)}
   </div>
 </div>
 
-<script src="${assets}docs-page.js"></script>${extraJs}
+<script src="${assets}docs-page.js"></script>${extraJs}${mermaidJs}
 </body>
 </html>
 `;
