@@ -235,6 +235,8 @@ export const ru = {
   "errors.key_not_found": "Ключ не найден",
   "errors.ldap_url_required": "Для LDAP укажите адрес сервера",
   "errors.listen_required": "Укажите адрес прослушивания",
+  "errors.listen_address_in_use":
+    "Адрес прослушивания занят — порт уже используется другим процессом. Освободите порт или укажите другой адрес.",
   "errors.load_proxy_settings_failed": "Не удалось загрузить настройки прокси",
   "errors.login_failed": "Не удалось войти",
   "errors.login_temporarily_disabled": "Вход временно заблокирован из‑за частых неудачных попыток",

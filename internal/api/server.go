@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 
 	apiconfig "oktopus/internal/api/config"
 	authmw "oktopus/internal/api/auth/middleware"
 	authview "oktopus/internal/api/auth/view"
 	"oktopus/internal/api/platform/cors"
+	recovermw "oktopus/internal/api/platform/recover"
 	proxyview "oktopus/internal/api/proxy/view"
 	usersview "oktopus/internal/api/users/view"
 	"oktopus/internal/db"
@@ -41,25 +43,32 @@ func NewServer(cfg apiconfig.Config, runtime *db.Runtime, proxyStatus proxyview.
 
 	var h http.Handler = mux
 	h = cors.Middleware(cfg.CORSOrigins)(h)
+	h = recovermw.Middleware(log.Default())(h)
 
 	return &Server{cfg: cfg, db: runtime, handler: h}
 }
 
 // ListenAndServe запускает HTTP-сервер до отмены контекста.
-func (s *Server) ListenAndServe(ctx context.Context) error {
-	srv := &http.Server{
-		Addr:    s.cfg.Listen,
-		Handler: s.handler,
+// ready вызывается один раз после успешного bind (до приёма соединений).
+func (s *Server) ListenAndServe(ctx context.Context, ready func()) error {
+	ln, err := net.Listen("tcp", s.cfg.Listen)
+	if err != nil {
+		return fmt.Errorf("listen: %w", err)
 	}
+	if ready != nil {
+		ready()
+	}
+
+	srv := &http.Server{Handler: s.handler}
 
 	go func() {
 		<-ctx.Done()
 		_ = srv.Shutdown(context.Background())
 	}()
 
-	log.Printf("api: listening on http://%s", s.cfg.Listen)
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("listen: %w", err)
+	log.Printf("api: listening on http://%s", ln.Addr().String())
+	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("serve: %w", err)
 	}
 	return nil
 }

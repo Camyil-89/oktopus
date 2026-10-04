@@ -37,8 +37,8 @@ func TestApplyListenBindErrorNotActive(t *testing.T) {
 	if m.ProxyActive() {
 		t.Fatal("proxy must not be active when listen failed")
 	}
-	if got := m.ProxyLastStartError(); got == "" {
-		t.Fatal("expected last start error to be set")
+	if got := m.ProxyLastStartError(); got != "listen_address_in_use" {
+		t.Fatalf("expected listen_address_in_use, got %q", got)
 	}
 }
 

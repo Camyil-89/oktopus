@@ -80,4 +80,7 @@ go run ./attack-and-tests/mitm-host-mismatch all
 echo "==> attack-and-tests: tunnel-dst-resolve"
 go run ./attack-and-tests/tunnel-dst-resolve all
 
+echo "==> attack-and-tests: websocket-proxy"
+go run ./attack-and-tests/websocket-proxy all
+
 echo "==> backend integration: OK"

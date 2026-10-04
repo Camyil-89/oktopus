@@ -3,6 +3,7 @@ package apperr
 import (
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 )
 
@@ -65,10 +66,38 @@ func PublicMessage(err error) string {
 	return err.Error()
 }
 
+// IsListenBindError — не удалось занять адрес прослушивания (порт занят и т.п.).
+func IsListenBindError(err error) bool {
+	var op *net.OpError
+	return errors.As(err, &op) && op.Op == "listen"
+}
+
+// MapListenBind переводит ошибку listen/bind в код API.
+func MapListenBind(err error) error {
+	if err == nil {
+		return nil
+	}
+	if IsListenBindError(err) {
+		return Wrap(ListenAddressInUse, err)
+	}
+	return err
+}
+
+// ProxyStartErrorMessage — значение proxy_start_error в статусе (код или текст).
+func ProxyStartErrorMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	return PublicMessage(MapListenBind(err))
+}
+
 // MapProxyApply переводит ошибки hot-reload прокси в коды API.
 func MapProxyApply(err error) error {
 	if err == nil {
 		return nil
+	}
+	if mapped := MapListenBind(err); mapped != err {
+		return mapped
 	}
 	msg := err.Error()
 	if strings.Contains(msg, "mitm requires CA") {

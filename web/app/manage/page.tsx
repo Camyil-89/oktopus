@@ -144,7 +144,7 @@ function MetricsWindow5mBadge({ label }: { label: string }) {
 }
 
 export default function ManagePage() {
-  const { t, localeTag } = useTranslation();
+  const { t, localeTag, apiErrorMessage } = useTranslation();
   const formatApiError = useApiErrorMessage();
   const byteUnits = useMemo(() => byteUnitLabelsFromT(t), [t]);
   const durationUnits = useMemo(() => durationUnitLabelsFromT(t), [t]);
@@ -203,7 +203,7 @@ export default function ManagePage() {
           type="warning"
           showIcon
           message={t("dashboard.proxyDown")}
-          description={status.proxy_start_error}
+          description={apiErrorMessage(status.proxy_start_error)}
         />
       ) : null}
 
