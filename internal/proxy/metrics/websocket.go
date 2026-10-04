@@ -1,24 +1,18 @@
 package metrics
 
-import "sync/atomic"
+import "oktopus/internal/proxy/wsactive"
 
-var activeWebSockets atomic.Int64
-
-// IncActiveWebSocket — после успешного 101 и старта relay (MITM).
+// IncActiveWebSocket — после успешного 101 и старта relay (MITM / plain HTTP).
 func IncActiveWebSocket() {
-	activeWebSockets.Add(1)
+	wsactive.Inc()
 }
 
 // DecActiveWebSocket — при закрытии WS relay.
 func DecActiveWebSocket() {
-	activeWebSockets.Add(-1)
+	wsactive.Dec()
 }
 
-// ActiveWebSocketConnections — число активных WebSocket-сессий через прокси (MITM).
+// ActiveWebSocketConnections — число активных WebSocket-сессий через прокси.
 func ActiveWebSocketConnections() int {
-	n := activeWebSockets.Load()
-	if n < 0 {
-		return 0
-	}
-	return int(n)
+	return wsactive.Count()
 }

@@ -6,10 +6,12 @@ import (
 	"log"
 	"net"
 	stdhttp "net/http"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"oktopus/internal/apperr"
 	"oktopus/internal/proxy/accesslog"
 	"oktopus/internal/proxy/acl"
 	"oktopus/internal/proxy/auth"
@@ -30,14 +32,24 @@ type Manager struct {
 	listen    string
 	httpSrv   *stdhttp.Server
 	holder    atomic.Pointer[Server]
-	listening atomic.Bool
-	lastStartErr atomic.Value // string
+	listening                 atomic.Bool
+	listenRestartAfterPanic   atomic.Bool
+	lastStartErr              atomic.Value // string
 	authCache *auth.AuthCache
 	conns         activeConns
 	accessBatcher *accesslog.Batcher
 }
 
-const proxyListenRetryInterval = 10 * time.Second
+const (
+	proxyListenRetryInterval = 10 * time.Second
+	panicRecoveryDelay       = 5 * time.Second
+)
+
+// ErrRuntimeDeferred — прокси временно не запускается (например выключен); RunContext повторит позже.
+var ErrRuntimeDeferred = errors.New("proxy runtime deferred")
+
+// RuntimeLoader возвращает конфиг и зависимости на каждой итерации цикла запуска.
+type RuntimeLoader func(ctx context.Context) (config.Config, *acl.Engine, *inspect.Runner, error)
 
 type activeConns struct {
 	mu    sync.Mutex
@@ -94,12 +106,37 @@ type reloadableHandler struct {
 }
 
 func (h reloadableHandler) ServeHTTP(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			h.m.recoverHandlerPanic(rec)
+			stdhttp.Error(w, "internal error", stdhttp.StatusInternalServerError)
+		}
+	}()
 	s := h.m.holder.Load()
 	if s == nil {
 		stdhttp.Error(w, "proxy not ready", stdhttp.StatusServiceUnavailable)
 		return
 	}
 	s.ServeHTTP(w, r)
+}
+
+func (m *Manager) recoverHandlerPanic(recovered interface{}) {
+	m.log.Printf("proxy: panic in request handler: %v\n%s", recovered, debug.Stack())
+	m.markListenRestartAfterPanic()
+	m.triggerListenRestart()
+}
+
+// triggerListenRestart останавливает текущий http.Server, чтобы RunContext перезапустил слушатель.
+func (m *Manager) triggerListenRestart() {
+	m.mu.Lock()
+	srv := m.httpSrv
+	m.mu.Unlock()
+	if srv == nil {
+		return
+	}
+	go func() {
+		_ = srv.Close()
+	}()
 }
 
 // Apply пересобирает прокси и применяет конфиг (hot reload).
@@ -109,7 +146,7 @@ func (m *Manager) Apply(ctx context.Context, cfg config.Config, aclEngine *acl.E
 	authCache := m.prepareAuthCache(cfg.Auth)
 	newSrv, err := New(cfg, aclEngine, inspectRunner, m.hooks, m.accessRec, m.log, authCache)
 	if err != nil {
-		m.setStartError(err)
+		m.logStartFailure(err)
 		return err
 	}
 
@@ -119,7 +156,7 @@ func (m *Manager) Apply(ctx context.Context, cfg config.Config, aclEngine *acl.E
 	if m.httpSrv == nil || m.listen != cfg.Listen {
 		ln, err := net.Listen("tcp", cfg.Listen)
 		if err != nil {
-			m.setStartError(err)
+			m.logStartFailure(err)
 			return err
 		}
 		if m.httpSrv != nil {
@@ -155,11 +192,17 @@ func (m *Manager) Apply(ctx context.Context, cfg config.Config, aclEngine *acl.E
 }
 
 func (m *Manager) runServe(ln net.Listener, srv *stdhttp.Server) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			m.log.Printf("proxy: panic in listener: %v\n%s", rec, debug.Stack())
+			m.markListenRestartAfterPanic()
+			m.listening.Store(false)
+		}
+	}()
 	err := srv.Serve(ln)
 	m.listening.Store(false)
 	if err != nil && err != stdhttp.ErrServerClosed {
-		m.setStartError(err)
-		m.log.Printf("proxy listen: %v", err)
+		m.logStartFailure(err)
 	}
 }
 
@@ -220,7 +263,15 @@ func (m *Manager) setStartError(err error) {
 		m.clearStartError()
 		return
 	}
-	m.lastStartErr.Store(err.Error())
+	m.lastStartErr.Store(apperr.ProxyStartErrorMessage(err))
+}
+
+func (m *Manager) logStartFailure(err error) {
+	if err == nil {
+		return
+	}
+	m.setStartError(err)
+	m.log.Printf("proxy: не удалось запустить: %s (%v)", apperr.ProxyStartErrorMessage(err), err)
 }
 
 func (m *Manager) clearStartError() {
@@ -243,27 +294,57 @@ func (m *Manager) ProxyTraffic() metrics.Snapshot {
 	return snap
 }
 
-// RunContext запускает прокси с начальным конфигом до отмены ctx.
-// Если порт занят, пишет в лог и повторяет попытку каждые 10 секунд.
+// RunContext запускает прокси с фиксированным конфигом до отмены ctx.
 func (m *Manager) RunContext(ctx context.Context, cfg config.Config, aclEngine *acl.Engine, inspectRunner *inspect.Runner) error {
+	return m.RunContextWithLoader(ctx, func(context.Context) (config.Config, *acl.Engine, *inspect.Runner, error) {
+		return cfg, aclEngine, inspectRunner, nil
+	})
+}
+
+// RunContextWithLoader на каждой итерации загружает runtime (например из БД).
+// Если порт занят, пишет в лог и повторяет попытку каждые 10 секунд.
+func (m *Manager) RunContextWithLoader(ctx context.Context, load RuntimeLoader) error {
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil
 		}
 
-		err := m.Apply(ctx, cfg, aclEngine, inspectRunner)
+		cfg, aclEngine, inspectRunner, err := load(ctx)
+		if err != nil {
+			if errors.Is(err, ErrRuntimeDeferred) {
+				if !waitFor(ctx, proxyListenRetryInterval) {
+					m.shutdownProxy()
+					return nil
+				}
+				continue
+			}
+			return err
+		}
+
+		err = m.Apply(ctx, cfg, aclEngine, inspectRunner)
 		switch {
 		case err != nil && !isListenBindError(err):
 			return err
 		case err != nil:
-			m.log.Printf("proxy: не удалось запустить: %v", err)
+			// ошибка уже залогирована в Apply
 		case m.listening.Load():
 			m.waitUntilNotListening(ctx)
 			m.shutdownProxy()
 			if ctx.Err() != nil {
 				return nil
 			}
-			m.log.Printf("proxy: повтор запуска...")
+			retry := proxyListenRetryInterval
+			if m.consumeListenRestartAfterPanic() {
+				retry = panicRecoveryDelay
+				m.log.Printf("proxy: восстановление после паники через %s", retry)
+			} else {
+				m.log.Printf("proxy: повтор запуска...")
+			}
+			if !waitFor(ctx, retry) {
+				m.shutdownProxy()
+				return nil
+			}
+			continue
 		}
 
 		if !waitFor(ctx, proxyListenRetryInterval) {
@@ -319,6 +400,13 @@ func waitFor(ctx context.Context, d time.Duration) bool {
 }
 
 func isListenBindError(err error) bool {
-	var op *net.OpError
-	return errors.As(err, &op) && op.Op == "listen"
+	return apperr.IsListenBindError(err)
+}
+
+func (m *Manager) markListenRestartAfterPanic() {
+	m.listenRestartAfterPanic.Store(true)
+}
+
+func (m *Manager) consumeListenRestartAfterPanic() bool {
+	return m.listenRestartAfterPanic.Swap(false)
 }

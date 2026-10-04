@@ -60,9 +60,21 @@ attack-and-tests/<kebab-name>/
 - Раннер `aclrun.RunEvaluateSuite` или `RunCompileSuite` для `ssl_verify` / `delay_*`.
 - Список в `attack-and-tests/README.md`, агрегатор `run-all-acl`.
 
+## CI (обязательно при новом каталоге)
+
+Бэкенд CI: `.github/workflows/ci.yml` → Docker `deploy/docker/Dockerfile.ci` target **integration** → **`scripts/ci-backend-integration.sh`**.
+
+| Тип | Что добавить |
+|-----|----------------|
+| PoC с подкомандой **`all`** (lab + mitm/tunnel) | Блок `echo` + `go run ./attack-and-tests/<name> all` в **`scripts/ci-backend-integration.sh`** (рядом с `mitm-host-mismatch`, `tunnel-dst-resolve`, …). |
+| ACL / `http_access` | Сьют в **`attack-and-tests/aclrun`** и вызов из **`run-all-acl`** (уже гоняется в CI первым шагом attack-and-tests). |
+
+Новый PoC не должен требовать правок `ci.yml` / `Dockerfile.ci`, если код уже копируется через `COPY attack-and-tests`.
+
 ## Чеклист новой атаки
 
 1. Папка `attack-and-tests/<name>/`, README + `acl.example.squid`.
 2. `all` с mitm/tunnel и RESULT OK/FAIL.
 3. Запись в `attack-and-tests/README.md`.
 4. Регрессия в `internal/.../test/`.
+5. **CI:** шаг в `scripts/ci-backend-integration.sh` (PoC `all`) или `run-all-acl` / `aclrun` (ACL).

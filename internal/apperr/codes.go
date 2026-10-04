@@ -7,6 +7,7 @@ const (
 	InvalidJSON              Code = "invalid_json"
 	MethodNotAllowed         Code = "method_not_allowed"
 	ListenRequired           Code = "listen_required"
+	ListenAddressInUse       Code = "listen_address_in_use"
 	InvalidConnectMode       Code = "invalid_connect_mode"
 	AuthStaticUsersRequired  Code = "auth_static_users_required"
 	LDAPURLRequired          Code = "ldap_url_required"

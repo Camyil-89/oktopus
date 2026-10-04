@@ -237,6 +237,8 @@ export const en: Record<keyof typeof ru, string> = {
   "errors.key_not_found": "Key not found",
   "errors.ldap_url_required": "LDAP server URL is required",
   "errors.listen_required": "Listen address is required",
+  "errors.listen_address_in_use":
+    "Listen address is already in use — the port is taken by another process. Free the port or choose a different address.",
   "errors.load_proxy_settings_failed": "Failed to load proxy settings",
   "errors.login_failed": "Sign-in failed",
   "errors.login_temporarily_disabled": "Sign-in is temporarily blocked after too many failed attempts",

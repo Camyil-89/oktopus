@@ -10,10 +10,12 @@
 |-------|----------|
 | [mitm-host-mismatch](./mitm-host-mismatch/) | MITM: CONNECT/SNI vs HTTP Host |
 | [tunnel-dst-resolve](./tunnel-dst-resolve/) | Tunnel: dstdomain + `deny dst` при DNS на loopback |
+| [websocket-proxy](./websocket-proxy/) | WebSocket echo: wss/ws в mitm и tunnel |
 
 ```bash
 go run ./attack-and-tests/mitm-host-mismatch all
 go run ./attack-and-tests/tunnel-dst-resolve all
+go run ./attack-and-tests/websocket-proxy all
 ```
 
 ## ACL / `http_access` (API evaluate)
