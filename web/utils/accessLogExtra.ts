@@ -10,6 +10,21 @@ export const ACCESS_LOG_RULE_GATEWAY_ERROR = "system_gateway_error";
  * текст http_access / ssl_verify, UUID инспекции или system_*.
  */
 
+export type PolicyAnomalyCheck = {
+  detect?: boolean;
+  connect_host?: string;
+  tls_client_sni?: string;
+  policy_host?: string;
+  http_host?: string;
+  url_host?: string;
+  connect_port?: number;
+  http_port?: number;
+  resolved_ips?: string[];
+};
+
+/** kind + поля проверки (только detect=true в summary по умолчанию). */
+export type PolicyAnomalyItem = PolicyAnomalyCheck & { kind: string };
+
 /** Поля JSON extra: поиск, inspect_error, ctx:log по UUID правила. */
 export type AccessLogExtra = {
   inspect_error?: string;
@@ -21,15 +36,56 @@ export type AccessLogExtra = {
     engine?: string;
     query?: string;
   };
-  policy_anomaly?: {
-    kind?: string;
-    connect_host?: string;
-    tls_client_sni?: string;
-    policy_host?: string;
-    http_host?: string;
-  };
+  /** kind → { detect, … }; legacy: items[] или flat { kind }. */
+  policy_anomaly?:
+    | Record<string, PolicyAnomalyCheck>
+    | { items?: PolicyAnomalyItem[] }
+    | (PolicyAnomalyCheck & { kind?: string });
   [inspectRuleId: string]: unknown;
 };
+
+function isLegacyItemsPayload(
+  raw: NonNullable<AccessLogExtra["policy_anomaly"]>,
+): raw is { items?: PolicyAnomalyItem[] } {
+  return "items" in raw && Array.isArray(raw.items);
+}
+
+/** Нормализация: map по kind, legacy items/flat. */
+export function normalizePolicyAnomalies(
+  raw: AccessLogExtra["policy_anomaly"],
+  opts?: { detectedOnly?: boolean },
+): PolicyAnomalyItem[] {
+  if (!raw || typeof raw !== "object") {
+    return [];
+  }
+  const detectedOnly = opts?.detectedOnly ?? false;
+
+  if (isLegacyItemsPayload(raw)) {
+    return raw.items
+      .filter((it) => it && typeof it === "object")
+      .filter((it) => !detectedOnly || it.detect !== false);
+  }
+  if ("kind" in raw && typeof raw.kind === "string" && raw.kind) {
+    const it = raw as PolicyAnomalyItem;
+    if (detectedOnly && it.detect === false) {
+      return [];
+    }
+    return [{ ...it, kind: raw.kind }];
+  }
+
+  const out: PolicyAnomalyItem[] = [];
+  for (const [kind, check] of Object.entries(raw)) {
+    if (!check || typeof check !== "object" || Array.isArray(check)) {
+      continue;
+    }
+    const c = check as PolicyAnomalyCheck;
+    if (detectedOnly && !c.detect) {
+      continue;
+    }
+    out.push({ kind, ...c });
+  }
+  return out;
+}
 
 export function isSystemAccessLogRuleId(ruleId: string | undefined): boolean {
   return Boolean(ruleId?.startsWith("system_"));
@@ -137,8 +193,8 @@ export function accessLogInspectPayloads(
   return out;
 }
 
-export function accessLogPolicyAnomalySummary(
-  anomaly: AccessLogExtra["policy_anomaly"],
+export function accessLogPolicyAnomalyItemSummary(
+  anomaly: PolicyAnomalyItem,
   t: TranslateFn,
 ): string {
   if (!anomaly?.kind) {
@@ -149,6 +205,9 @@ export function accessLogPolicyAnomalySummary(
   >[0];
   const kindLabel = t(kindKey);
   const parts: string[] = [kindLabel];
+  if (anomaly.detect === false) {
+    parts.push("detect=false");
+  }
   if (anomaly.connect_host) {
     parts.push(`CONNECT=${anomaly.connect_host}`);
   }
@@ -158,10 +217,36 @@ export function accessLogPolicyAnomalySummary(
   if (anomaly.policy_host) {
     parts.push(`policy=${anomaly.policy_host}`);
   }
+  if (anomaly.url_host) {
+    parts.push(`URL=${anomaly.url_host}`);
+  }
   if (anomaly.http_host) {
     parts.push(`Host=${anomaly.http_host}`);
   }
+  if (anomaly.connect_port) {
+    parts.push(`connect_port=${anomaly.connect_port}`);
+  }
+  if (anomaly.http_port) {
+    parts.push(`http_port=${anomaly.http_port}`);
+  }
+  if (anomaly.resolved_ips?.length) {
+    parts.push(`resolved=${anomaly.resolved_ips.join(",")}`);
+  }
   return parts.join(" · ");
+}
+
+export function accessLogPolicyAnomalySummary(
+  anomaly: AccessLogExtra["policy_anomaly"],
+  t: TranslateFn,
+): string {
+  const items = normalizePolicyAnomalies(anomaly, { detectedOnly: true });
+  if (items.length === 0) {
+    return "";
+  }
+  return items
+    .map((it) => accessLogPolicyAnomalyItemSummary(it, t))
+    .filter(Boolean)
+    .join("; ");
 }
 
 export function parseAccessLogExtra(extra: unknown): AccessLogExtra {

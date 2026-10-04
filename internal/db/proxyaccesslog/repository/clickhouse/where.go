@@ -7,6 +7,7 @@ import (
 
 	"oktopus/internal/db/proxyaccesslog/extra"
 	"oktopus/internal/db/proxyaccesslog/repository"
+	"oktopus/internal/proxy/observe/policyanomaly"
 )
 
 func listWhere(f repository.ListFilter) (string, []any) {
@@ -99,11 +100,12 @@ func policyAnomalyPredicate(kind, contains string) (string, []any) {
 	sub := []string{
 		"inspect_rule_id = ?",
 		"field_key = 'policy_anomaly'",
+		"positionCaseInsensitive(field_value, ?) > 0",
 	}
-	args := []any{extra.PolicyAnomalyKVRuleID}
+	args := []any{extra.PolicyAnomalyKVRuleID, policyanomaly.CHSearchDetectTrue}
 	if kind != "" {
 		sub = append(sub, "positionCaseInsensitive(field_value, ?) > 0")
-		args = append(args, `"kind":"`+kind+`"`)
+		args = append(args, policyanomaly.CHSearchKindDetected(kind))
 	}
 	if contains != "" {
 		sub = append(sub, "field_value ILIKE ?")

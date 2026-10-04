@@ -18,7 +18,7 @@ export const ACCESS_LOG_SEGMENT_LABEL_KEYS: Record<
   errors: "accessLog.segment.errors",
 };
 
-/** Известные kind в extra.policy_anomaly (расширяйте при новых атаках). */
+/** Известные kind в extra.policy_anomaly (дублируйте kind из internal/proxy/observe/policyanomaly/*.go). */
 export const ACCESS_LOG_ATTACK_KINDS: {
   id: string;
   labelKey: MessageKey;
@@ -26,6 +26,22 @@ export const ACCESS_LOG_ATTACK_KINDS: {
   {
     id: "host_sni_mismatch",
     labelKey: "accessLog.policyAnomaly.host_sni_mismatch",
+  },
+  {
+    id: "url_host_mismatch",
+    labelKey: "accessLog.policyAnomaly.url_host_mismatch",
+  },
+  {
+    id: "connect_port_mismatch",
+    labelKey: "accessLog.policyAnomaly.connect_port_mismatch",
+  },
+  {
+    id: "connect_literal_ip",
+    labelKey: "accessLog.policyAnomaly.connect_literal_ip",
+  },
+  {
+    id: "dst_resolve_private",
+    labelKey: "accessLog.policyAnomaly.dst_resolve_private",
   },
 ];
 

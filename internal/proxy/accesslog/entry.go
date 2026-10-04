@@ -58,7 +58,7 @@ type Entry struct {
 	InspectError       string
 	GatewayErrorType   string // тип upstream-ошибки (extra gateway_error.type)
 	InspectRuleLogs    map[string]map[string]any // id правила → payload ctx:log
-	PolicyNameMismatch *observe.PolicyNameMismatch // extra policy_anomaly (MITM host/SNI mismatch)
+	PolicyAnomaly observe.PolicyAnomalyPayload // extra policy_anomaly (kind → {detect, …})
 }
 
 // Recorder принимает записи; реализация не должна блокировать hot path надолго.
@@ -138,30 +138,68 @@ func HTTPEntry(ctx context.Context, req *stdhttp.Request, allow bool, spend time
 		e.DeniedBy = DeniedByACL
 		e.ACLRuleRef = ruleRef
 	}
-	attachPolicyNameMismatch(&e, ctx, req)
+	attachPolicyAnomaliesHTTP(&e, ctx, req)
 	return e
 }
 
-func attachPolicyNameMismatch(e *Entry, ctx context.Context, req *stdhttp.Request) {
+func attachPolicyAnomaliesHTTP(e *Entry, ctx context.Context, req *stdhttp.Request) {
 	if e == nil || req == nil {
 		return
 	}
+	reqCtx := req.Context()
 	tools := observe.RequestToolsFor(ctx, req)
-	policyHost := observe.PolicyHostFromRequest(req, tools.SNI())
-	httpHost := ""
-	if req != nil {
-		httpHost = req.Host
+	urlHost := ""
+	if req.URL != nil {
+		urlHost = req.URL.Host
 	}
-	note := observe.DetectPolicyNameMismatch(
-		observe.CONNECTDestHostPortFromContext(req.Context()),
-		observe.MITMClientHelloSNIFromContext(req.Context()),
-		policyHost,
-		httpHost,
-	)
-	if note == nil {
+	trace, _ := observe.PolicyEvalTraceFromContext(ctx)
+	if !traceHasData(trace) {
+		trace, _ = observe.PolicyEvalTraceFromContext(reqCtx)
+	}
+	in := observe.PolicyAnomalyDetectInput{
+		ConnectHostPort: observe.CONNECTDestHostPortFromContext(reqCtx),
+		TLSClientSNI:    observe.MITMClientHelloSNIFromContext(reqCtx),
+		PolicyHost:      observe.PolicyHostFromRequest(req, tools.SNI()),
+		HTTPHostHeader:  req.Host,
+		URLHost:         urlHost,
+		ConnectPort:     observe.TracePort(observe.CONNECTDestHostPortFromContext(reqCtx)),
+		HTTPPort:        observe.HTTPPortFromRequest(req),
+		DstResolved:     trace.DstResolved,
+	}
+	e.PolicyAnomaly = observe.EvaluatePolicyAnomaly(in)
+}
+
+func attachPolicyAnomaliesConnect(e *Entry, ctx context.Context, connectHostPort string) {
+	if e == nil {
 		return
 	}
-	e.PolicyNameMismatch = note
+	trace, _ := observe.PolicyEvalTraceFromContext(ctx)
+	in := observe.PolicyAnomalyDetectInput{
+		ConnectHostPort: connectHostPort,
+		PolicyHost:      trace.PolicyHost,
+		ConnectPort:     observe.TracePort(connectHostPort),
+		DstResolved:     trace.DstResolved,
+	}
+	if in.PolicyHost == "" {
+		in.PolicyHost = normalizeConnectPolicyHost(connectHostPort)
+	}
+	e.PolicyAnomaly = observe.EvaluatePolicyAnomaly(in)
+}
+
+func traceHasData(t observe.PolicyEvalTrace) bool {
+	return strings.TrimSpace(t.PolicyHost) != "" || len(t.DstResolved) > 0 || t.DstPort != 0
+}
+
+func normalizeConnectPolicyHost(hostPort string) string {
+	hostPort = strings.TrimSpace(hostPort)
+	if hostPort == "" {
+		return ""
+	}
+	host, _, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		return hostPort
+	}
+	return host
 }
 
 // FinalHTTPEntryAfterACL — одна запись после ACL allow (инспекция отсутствует или пропущена).
@@ -218,7 +256,7 @@ func ConnectEntry(ctx context.Context, hostPort string, allow bool, spend time.D
 	if hostPort != "" {
 		full = "https://" + hostPort + "/"
 	}
-	return Entry{
+	e := Entry{
 		SourceAddress:      sourceAddress(ctx, nil),
 		DestinationAddress: hostPort,
 		User:               userFromContext(ctx),
@@ -227,6 +265,8 @@ func ConnectEntry(ctx context.Context, hostPort string, allow bool, spend time.D
 		Action:             actionFromAllow(allow),
 		RuleRef:            ruleRef,
 	}
+	attachPolicyAnomaliesConnect(&e, ctx, hostPort)
+	return e
 }
 
 // GatewayErrorEntry — 502 после ACL allow: текст ошибки в inspect_error, тип в extra.

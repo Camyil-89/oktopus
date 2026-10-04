@@ -33,3 +33,7 @@ func hostOnly(hostPort string) string {
 	}
 	return host
 }
+
+func normalizeTraceHost(hostPort string) string {
+	return hostOnly(strings.TrimSpace(hostPort))
+}

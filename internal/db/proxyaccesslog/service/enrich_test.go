@@ -58,11 +58,13 @@ func Test_fromAccessEntry_ruleColumns(t *testing.T) {
 
 func Test_buildExtraJSON_policyAnomaly_roundTrip(t *testing.T) {
 	raw := buildExtraJSON(accesslog.Entry{
-		PolicyNameMismatch: &observe.PolicyNameMismatch{
-			Kind:         observe.PolicyAnomalyHostSNIMismatch,
-			ConnectHost:  "localhost",
-			TLSClientSNI: "internal.blocked",
-			PolicyHost:   "localhost",
+		PolicyAnomaly: observe.PolicyAnomalyPayload{
+			observe.PolicyAnomalyHostSNIMismatch: {
+				Detect:       true,
+				ConnectHost:  "localhost",
+				TLSClientSNI: "internal.blocked",
+				PolicyHost:   "localhost",
+			},
 		},
 	})
 	parsed := extra.ParseFromJSON(uuid.Nil, raw)

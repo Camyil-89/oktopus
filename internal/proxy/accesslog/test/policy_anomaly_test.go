@@ -20,10 +20,11 @@ func TestHTTPEntryPolicyAnomalyMITM(t *testing.T) {
 	req = req.WithContext(ctx)
 
 	e := accesslog.HTTPEntry(ctx, req, false, 0, "http_access deny evil")
-	if e.PolicyNameMismatch == nil {
-		t.Fatal("expected policy name mismatch note")
+	r, ok := e.PolicyAnomaly[observe.PolicyAnomalyHostSNIMismatch]
+	if !ok || !r.Detect {
+		t.Fatalf("expected host_sni_mismatch detect, got %+v", e.PolicyAnomaly)
 	}
-	if e.PolicyNameMismatch.TLSClientSNI != "internal.blocked" {
-		t.Fatalf("sni: %q", e.PolicyNameMismatch.TLSClientSNI)
+	if r.TLSClientSNI != "internal.blocked" {
+		t.Fatalf("sni: %q", r.TLSClientSNI)
 	}
 }

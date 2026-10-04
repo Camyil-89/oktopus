@@ -1,58 +1,52 @@
 package observe
 
-import (
-	"strings"
+import "oktopus/internal/proxy/observe/policyanomaly"
+
+// PolicyAnomalyCheck — результат одного kind в extra.policy_anomaly.
+type PolicyAnomalyCheck = policyanomaly.CheckResult
+
+// PolicyAnomalyPayload — extra.policy_anomaly (ключ = kind).
+type PolicyAnomalyPayload = policyanomaly.Payload
+
+// PolicyAnomalyDetectInput — вход EvaluatePolicyAnomaly.
+type PolicyAnomalyDetectInput = policyanomaly.Input
+
+// PolicyNameMismatch — совместимость (kind + detect в map).
+type PolicyNameMismatch = policyanomaly.CheckResult
+
+const (
+	PolicyAnomalyHostSNIMismatch     = policyanomaly.KindHostSNIMismatch
+	PolicyAnomalyURLHostMismatch     = policyanomaly.KindURLHostMismatch
+	PolicyAnomalyConnectPortMismatch = policyanomaly.KindConnectPortMismatch
+	PolicyAnomalyConnectLiteralIP    = policyanomaly.KindConnectLiteralIP
+	PolicyAnomalyDstResolvePrivate   = policyanomaly.KindDstResolvePrivate
 )
 
-// PolicyNameMismatch — расхождение CONNECT / TLS SNI / HTTP host для журнала.
-type PolicyNameMismatch struct {
-	Kind           string `json:"kind"`
-	ConnectHost    string `json:"connect_host,omitempty"`
-	TLSClientSNI   string `json:"tls_client_sni,omitempty"`
-	PolicyHost     string `json:"policy_host,omitempty"`
-	HTTPHostHeader string `json:"http_host,omitempty"`
+// EvaluatePolicyAnomaly — все зарегистрированные kind с detect true/false.
+func EvaluatePolicyAnomaly(in PolicyAnomalyDetectInput) PolicyAnomalyPayload {
+	return policyanomaly.Evaluate(in)
 }
 
-const PolicyAnomalyHostSNIMismatch = "host_sni_mismatch"
+// DetectPolicyAnomalies — alias EvaluatePolicyAnomaly.
+func DetectPolicyAnomalies(in PolicyAnomalyDetectInput) PolicyAnomalyPayload {
+	return EvaluatePolicyAnomaly(in)
+}
 
-// DetectPolicyNameMismatch помечает попытку несогласованных имён (MITM). nil — всё согласовано или данных нет.
+// RegisteredPolicyAnomalyKinds — kind из registry.
+func RegisteredPolicyAnomalyKinds() []string {
+	return policyanomaly.RegisteredKinds()
+}
+
+// DetectPolicyNameMismatch — legacy; nil если host_sni_mismatch не detect.
 func DetectPolicyNameMismatch(connectHostPort, tlsClientSNI, policyHost, httpHostHeader string) *PolicyNameMismatch {
-	ch := normalizeTraceHost(connectHostPort)
-	th := normalizeTraceHost(tlsClientSNI)
-	ph := normalizeTraceHost(policyHost)
-	hh := normalizeTraceHost(httpHostHeader)
-
-	if ch == "" && th == "" && ph == "" && hh == "" {
-		return nil
+	p := EvaluatePolicyAnomaly(PolicyAnomalyDetectInput{
+		ConnectHostPort: connectHostPort,
+		TLSClientSNI:    tlsClientSNI,
+		PolicyHost:      policyHost,
+		HTTPHostHeader:  httpHostHeader,
+	})
+	if r, ok := p[PolicyAnomalyHostSNIMismatch]; ok && r.Detect {
+		return &r
 	}
-
-	mismatch := false
-	if hostsDiffer(th, ph) || hostsDiffer(th, ch) || hostsDiffer(ph, ch) || hostsDiffer(hh, ph) {
-		mismatch = true
-	}
-	if !mismatch {
-		return nil
-	}
-	return &PolicyNameMismatch{
-		Kind:           PolicyAnomalyHostSNIMismatch,
-		ConnectHost:    ch,
-		TLSClientSNI:   th,
-		PolicyHost:     ph,
-		HTTPHostHeader: hh,
-	}
-}
-
-func hostsDiffer(a, b string) bool {
-	if a == "" || b == "" {
-		return false
-	}
-	return !strings.EqualFold(a, b)
-}
-
-func normalizeTraceHost(hostPort string) string {
-	hostPort = strings.TrimSpace(hostPort)
-	if hostPort == "" {
-		return ""
-	}
-	return hostOnly(hostPort)
+	return nil
 }

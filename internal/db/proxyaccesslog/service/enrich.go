@@ -33,8 +33,8 @@ func buildExtraJSON(e accesslog.Entry) []byte {
 			}
 		}
 	}
-	if e.PolicyNameMismatch != nil {
-		m["policy_anomaly"] = e.PolicyNameMismatch
+	if len(e.PolicyAnomaly) > 0 {
+		m["policy_anomaly"] = e.PolicyAnomaly
 	}
 	for ruleID, payload := range e.InspectRuleLogs {
 		if ruleID == "" || payload == nil {
