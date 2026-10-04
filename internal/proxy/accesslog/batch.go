@@ -43,7 +43,7 @@ func NewBatcher(flush FlushFunc, cfg BatcherConfig) *Batcher {
 		cfg.FlushInterval = 3 * time.Second
 	}
 	if cfg.MaxBatch <= 0 {
-		cfg.MaxBatch = 5000
+		cfg.MaxBatch = 500_000
 	}
 	b := &Batcher{
 		cfg:    cfg,
