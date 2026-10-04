@@ -35,6 +35,12 @@ func cloneIPs(ips []net.IP) []net.IP {
 	return out
 }
 
+func (c *dstResolveCache) ensureEntries() {
+	if c.entries == nil {
+		c.entries = make(map[string]dstResolveCacheEntry)
+	}
+}
+
 func clearDstResolveCache() {
 	dstResolveCacheStore.mu.Lock()
 	dstResolveCacheStore.entries = make(map[string]dstResolveCacheEntry)
@@ -48,6 +54,7 @@ func lookupDstIPsCached(ctx context.Context, host string) ([]net.IP, error) {
 	}
 	now := time.Now()
 	dstResolveCacheStore.mu.Lock()
+	dstResolveCacheStore.ensureEntries()
 	if e, ok := dstResolveCacheStore.entries[key]; ok {
 		if now.Before(e.expires) {
 			ips := cloneIPs(e.ips)

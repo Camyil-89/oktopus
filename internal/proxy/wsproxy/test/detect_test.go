@@ -1,10 +1,12 @@
-package https
+package wsproxy_test
 
 import (
 	"bufio"
 	stdhttp "net/http"
 	"strings"
 	"testing"
+
+	"oktopus/internal/proxy/wsproxy"
 )
 
 func TestIsWebSocketUpgrade_readRequest(t *testing.T) {
@@ -13,7 +15,7 @@ func TestIsWebSocketUpgrade_readRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !isWebSocketUpgrade(req) {
+	if !wsproxy.IsWebSocketUpgrade(req) {
 		t.Fatalf("headers: %v", req.Header)
 	}
 }

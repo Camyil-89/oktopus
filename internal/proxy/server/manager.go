@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	stdhttp "net/http"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -94,12 +95,36 @@ type reloadableHandler struct {
 }
 
 func (h reloadableHandler) ServeHTTP(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			h.m.recoverHandlerPanic(rec)
+			stdhttp.Error(w, "internal error", stdhttp.StatusInternalServerError)
+		}
+	}()
 	s := h.m.holder.Load()
 	if s == nil {
 		stdhttp.Error(w, "proxy not ready", stdhttp.StatusServiceUnavailable)
 		return
 	}
 	s.ServeHTTP(w, r)
+}
+
+func (m *Manager) recoverHandlerPanic(recovered interface{}) {
+	m.log.Printf("proxy: panic in request handler: %v\n%s", recovered, debug.Stack())
+	m.triggerListenRestart()
+}
+
+// triggerListenRestart останавливает текущий http.Server, чтобы RunContext перезапустил слушатель.
+func (m *Manager) triggerListenRestart() {
+	m.mu.Lock()
+	srv := m.httpSrv
+	m.mu.Unlock()
+	if srv == nil {
+		return
+	}
+	go func() {
+		_ = srv.Close()
+	}()
 }
 
 // Apply пересобирает прокси и применяет конфиг (hot reload).

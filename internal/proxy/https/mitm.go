@@ -17,8 +17,9 @@ import (
 	"oktopus/internal/proxy/accesslog"
 	"oktopus/internal/proxy/gateway"
 	proxyhttp "oktopus/internal/proxy/http"
-	"oktopus/internal/proxy/hooks"
 	"oktopus/internal/proxy/bytecount"
+	"oktopus/internal/proxy/hooks"
+	"oktopus/internal/proxy/wsproxy"
 )
 
 // MITM — CONNECT с расшифровкой TLS (нужен установленный ca.crt на клиенте).
@@ -120,7 +121,7 @@ func (m *MITM) serveOneRequest(ctx context.Context, clientConn *tls.Conn, br *bu
 	}
 	defer req.Body.Close()
 
-	if isWebSocketUpgrade(req) {
+	if wsproxy.IsWebSocketUpgrade(req) {
 		return m.serveWebSocketUpgrade(ctx, clientConn, br, req, defaultHost, hostPort)
 	}
 

@@ -4,38 +4,16 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
-	"io"
 	"net"
 	stdhttp "net/http"
 	"strings"
-	"sync"
 
-	proxyhttp "oktopus/internal/proxy/http"
-	"oktopus/internal/proxy/metrics"
+	"oktopus/internal/proxy/hooks"
 	"oktopus/internal/proxy/observe"
 	"oktopus/internal/proxy/outboundtls"
-	"oktopus/internal/proxy/ratelimit"
+	proxyhttp "oktopus/internal/proxy/http"
+	"oktopus/internal/proxy/wsproxy"
 )
-
-// isWebSocketUpgrade — HTTP GET с Connection: Upgrade и Upgrade: websocket (RFC 6455).
-func isWebSocketUpgrade(req *stdhttp.Request) bool {
-	if req == nil || req.Method != stdhttp.MethodGet {
-		return false
-	}
-	if !headerTokenListContains(req.Header, "Connection", "upgrade") {
-		return false
-	}
-	return strings.EqualFold(strings.TrimSpace(req.Header.Get("Upgrade")), "websocket")
-}
-
-func headerTokenListContains(h stdhttp.Header, key, want string) bool {
-	for _, part := range strings.Split(h.Get(key), ",") {
-		if strings.EqualFold(strings.TrimSpace(part), want) {
-			return true
-		}
-	}
-	return false
-}
 
 // serveWebSocketUpgrade проксирует handshake и затем сырые фреймы до закрытия соединения.
 // Возвращает false, когда сессия MITM на этом TCP должна завершиться.
@@ -55,59 +33,47 @@ func (m *MITM) serveWebSocketUpgrade(
 		return true
 	}
 
-	upstream, err := m.dialUpstream(outReq.Context(), hostPort, defaultHost)
+	sink := &mitmWSSink{conn: clientConn, br: br}
+	continueSession, err := wsproxy.Proxy(ctx, wsproxy.Config{
+		Hooks:     m.Hooks,
+		RateLimit: m.RateLimit,
+		Dial: func(ctx context.Context, outReq *stdhttp.Request) (net.Conn, error) {
+			return m.dialUpstream(outReq.Context(), hostPort, defaultHost)
+		},
+	}, outReq, sink, wsproxy.RelayBlock)
 	if err != nil {
 		_ = WriteProxyError(outReq.Context(), clientConn, outReq, err, m.AccessLog)
 		return true
 	}
+	return continueSession
+}
 
-	if err := outReq.Write(upstream); err != nil {
-		upstream.Close()
-		_ = WriteProxyError(outReq.Context(), clientConn, outReq, err, m.AccessLog)
-		return true
+type mitmWSSink struct {
+	conn *tls.Conn
+	br   *bufio.Reader
+}
+
+func (s *mitmWSSink) WritePolicy(ctx context.Context, outReq *stdhttp.Request, d hooks.Decision) error {
+	return d.WriteResponseConn(s.conn, outReq)
+}
+
+func (s *mitmWSSink) DeliverUpstream(ctx context.Context, outReq *stdhttp.Request, res *stdhttp.Response) (wsproxy.RelayLegs, error) {
+	if res.StatusCode != stdhttp.StatusSwitchingProtocols {
+		proxyhttp.PrepareWebSocketOriginResponse(outReq, res)
+		_ = res.Write(s.conn)
+		return wsproxy.RelayLegs{}, nil
 	}
 
-	upBR := bufio.NewReader(upstream)
-	outRes, err := stdhttp.ReadResponse(upBR, outReq)
-	if err != nil {
-		upstream.Close()
-		_ = WriteProxyError(outReq.Context(), clientConn, outReq, err, m.AccessLog)
-		return true
-	}
-	defer outRes.Body.Close()
-
-	if d := m.Hooks.RunHTTPResponse(outReq.Context(), outReq, outRes); d.Handled() {
-		upstream.Close()
-		_ = d.WriteResponseConn(clientConn, outReq)
-		return true
+	proxyhttp.PrepareWebSocketOriginResponse(outReq, res)
+	if err := res.Write(s.conn); err != nil {
+		return wsproxy.RelayLegs{}, err
 	}
 
-	if outRes.StatusCode != stdhttp.StatusSwitchingProtocols {
-		proxyhttp.StripHopByHopHeaders(outRes.Header)
-		proxyhttp.StripHTTP3Hints(outRes.Header)
-		outRes.ProtoMajor = 1
-		outRes.ProtoMinor = 1
-		outRes.Request = outReq
-		_ = outRes.Write(clientConn)
-		return true
-	}
-
-	outRes.ProtoMajor = 1
-	outRes.ProtoMinor = 1
-	outRes.Request = outReq
-	if err := outRes.Write(clientConn); err != nil {
-		upstream.Close()
-		return false
-	}
-
-	metrics.IncActiveWebSocket()
-	defer metrics.DecActiveWebSocket()
-	var flow *ratelimit.Flow
-	if m.RateLimit != nil {
-		flow = m.RateLimit.DelayFlowHTTP(outReq.Context(), outReq)
-	}
-	relayPair(clientConn, br, upstream, upBR, flow)
-	return false
+	return wsproxy.RelayLegs{
+		ClientWrite: s.conn,
+		ClientRead:  s.br,
+		Switching:   true,
+	}, nil
 }
 
 func prepareMITMOutboundRequest(ctx context.Context, req *stdhttp.Request, defaultHost string) *stdhttp.Request {
@@ -160,22 +126,6 @@ func dialTLSUpstream(ctx context.Context, hostPort, serverName string, tlsCfg *t
 	return tlsConn, nil
 }
 
-type relayEndpoint struct {
-	r io.Reader
-	c io.Closer
-}
-
-func (e *relayEndpoint) Read(p []byte) (int, error) {
-	return e.r.Read(p)
-}
-
-func (e *relayEndpoint) Close() error {
-	if e.c == nil {
-		return nil
-	}
-	return e.c.Close()
-}
-
 func mergeOutboundTLSConfig(ctx context.Context, serverName string, tlsCfg *tls.Config) *tls.Config {
 	var cfg *tls.Config
 	if tlsCfg != nil {
@@ -193,18 +143,4 @@ func mergeOutboundTLSConfig(ctx context.Context, serverName string, tlsCfg *tls.
 		cfg.InsecureSkipVerify = !verify
 	}
 	return cfg
-}
-
-func relayPair(clientConn *tls.Conn, clientBR *bufio.Reader, upstream net.Conn, upstreamBR *bufio.Reader, flow *ratelimit.Flow) {
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		Relay(upstream, &relayEndpoint{r: clientBR, c: clientConn}, flow, RelayFromClient, false)
-		wg.Done()
-	}()
-	go func() {
-		Relay(clientConn, &relayEndpoint{r: upstreamBR, c: upstream}, flow, RelayToClient, false)
-		wg.Done()
-	}()
-	wg.Wait()
 }

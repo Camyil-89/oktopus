@@ -5,8 +5,9 @@ import (
 	"fmt"
 	stdhttp "net/http"
 
-	"oktopus/internal/proxy/hooks"
 	"oktopus/internal/proxy/bytecount"
+	"oktopus/internal/proxy/hooks"
+	"oktopus/internal/proxy/wsproxy"
 )
 
 // Forwarder проксирует запросы с абсолютным URL (http://…).
@@ -20,6 +21,10 @@ type Forwarder struct {
 func (f *Forwarder) Serve(ctx context.Context, w stdhttp.ResponseWriter, inbound *stdhttp.Request) error {
 	if inbound.URL == nil || !inbound.URL.IsAbs() {
 		return fmt.Errorf("proxy expects absolute URL, got %q", inbound.URL)
+	}
+
+	if wsproxy.IsWebSocketUpgrade(inbound) {
+		return f.serveWebSocketUpgrade(ctx, w, inbound)
 	}
 
 	outReq := inbound.Clone(ctx)
