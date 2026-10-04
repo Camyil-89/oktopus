@@ -1,0 +1,8 @@
+acl public dstdomain localhost
+acl v6loop dst ::1/128
+acl loop4 dst 127.0.0.0/8
+acl all all
+http_access deny v6loop
+http_access deny loop4
+http_access allow public
+http_access deny all

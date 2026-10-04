@@ -89,4 +89,20 @@ go run ./attack-and-tests/tunnel-dst-resolve all
 echo "==> attack-and-tests: websocket-proxy"
 go run ./attack-and-tests/websocket-proxy all
 
+for poc in \
+  tunnel-connect-ip-bypass \
+  mitm-port-defer \
+  tunnel-ipv6-loopback \
+  plain-http-host-mismatch \
+  http-url-regex \
+  mitm-http-smuggling \
+  ws-upgrade-host-mismatch \
+  connect-no-proxy-auth \
+  dns-rebind-resolve \
+  dstdomain-normalization
+do
+  echo "==> attack-and-tests: ${poc}"
+  go run "./attack-and-tests/${poc}" all
+done
+
 echo "==> backend integration: OK"

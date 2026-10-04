@@ -27,6 +27,7 @@ type Suite struct {
 	Name        string
 	POCDir      string
 	ProxyLDAP   bool // прокси с auth backend ldap (нужен dev OpenLDAP)
+	HTTPLab     bool // plain HTTP lab на 127.0.0.1:9090 для url_regex proxy probe
 	Cases       []Case
 }
 
@@ -88,6 +89,16 @@ func RunEvaluateSuite(s Suite, args []string) int {
 		return 1
 	}
 	log.Printf("%s: политика опубликована, %d кейсов", s.Name, len(s.Cases))
+
+	var stopHTTPLab func()
+	if s.HTTPLab {
+		stopHTTPLab, err = startACLHTTPLab()
+		if err != nil {
+			log.Printf("%s: http lab: %v", s.Name, err)
+			return 1
+		}
+		defer stopHTTPLab()
+	}
 
 	caPath := filepath.Join(s.POCDir, ".probe-ca.crt")
 	if err := client.DownloadCACert(caPath); err != nil {

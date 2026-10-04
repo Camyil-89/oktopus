@@ -1,0 +1,9 @@
+acl blocked dstdomain LOCALHOST
+acl good dstdomain localhost
+acl all all
+http_access deny blocked
+http_access allow good
+http_access deny all
+
+ssl_verify skip good
+ssl_verify require all
