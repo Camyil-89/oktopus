@@ -32,7 +32,13 @@ export type AccessLogReportWidgetSpec = {
 
 export type AccessLogReportWidgetQuery = {
   metric?: "count" | "avg_decide_duration_us";
-  group_by_time?: "10m" | "1h" | "1d";
+  group_by_time?:
+    | "10m"
+    | "1h"
+    | "1d"
+    | "hour_of_day"
+    | "day_of_week"
+    | "month_of_year";
   split_by?: "action" | "denied_by";
   group_by?: AccessLogReportGroupByField;
   group_by_cols?: AccessLogReportGroupByField[];

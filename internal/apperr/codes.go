@@ -25,6 +25,8 @@ const (
 	InvalidMultipartForm     Code = "invalid_multipart_form"
 	LoadProxySettingsFailed  Code = "load_proxy_settings_failed"
 	UpdateProxySettingsFailed Code = "update_proxy_settings_failed"
+	LoadReportsDashboardFailed  Code = "load_reports_dashboard_failed"
+	UpdateReportsDashboardFailed Code = "update_reports_dashboard_failed"
 	CAStatusFailed           Code = "ca_status_failed"
 	ReadFileFailed           Code = "read_file_failed"
 	ClearForbiddenPageFailed Code = "clear_forbidden_page_failed"

@@ -12,7 +12,7 @@ import (
 )
 
 const getSettings = `-- name: GetSettings :one
-SELECT id, access_log_retention_days, created_at, updated_at
+SELECT id, access_log_retention_days, reports_dashboard, created_at, updated_at
 FROM settings
 ORDER BY created_at ASC
 LIMIT 1
@@ -24,6 +24,7 @@ func (q *Queries) GetSettings(ctx context.Context) (Setting, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.AccessLogRetentionDays,
+		&i.ReportsDashboard,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -31,22 +32,24 @@ func (q *Queries) GetSettings(ctx context.Context) (Setting, error) {
 }
 
 const insertSettings = `-- name: InsertSettings :one
-INSERT INTO settings (id, access_log_retention_days)
-VALUES ($1, $2)
-RETURNING id, access_log_retention_days, created_at, updated_at
+INSERT INTO settings (id, access_log_retention_days, reports_dashboard)
+VALUES ($1, $2, $3)
+RETURNING id, access_log_retention_days, reports_dashboard, created_at, updated_at
 `
 
 type InsertSettingsParams struct {
 	ID                     uuid.UUID `json:"id"`
 	AccessLogRetentionDays int32     `json:"access_log_retention_days"`
+	ReportsDashboard       []byte    `json:"reports_dashboard"`
 }
 
 func (q *Queries) InsertSettings(ctx context.Context, arg InsertSettingsParams) (Setting, error) {
-	row := q.db.QueryRow(ctx, insertSettings, arg.ID, arg.AccessLogRetentionDays)
+	row := q.db.QueryRow(ctx, insertSettings, arg.ID, arg.AccessLogRetentionDays, arg.ReportsDashboard)
 	var i Setting
 	err := row.Scan(
 		&i.ID,
 		&i.AccessLogRetentionDays,
+		&i.ReportsDashboard,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -59,7 +62,7 @@ SET
     access_log_retention_days = $2,
     updated_at = now()
 WHERE id = $1
-RETURNING id, access_log_retention_days, created_at, updated_at
+RETURNING id, access_log_retention_days, reports_dashboard, created_at, updated_at
 `
 
 type UpdateSettingsParams struct {
@@ -73,6 +76,34 @@ func (q *Queries) UpdateSettings(ctx context.Context, arg UpdateSettingsParams) 
 	err := row.Scan(
 		&i.ID,
 		&i.AccessLogRetentionDays,
+		&i.ReportsDashboard,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateSettingsReportsDashboard = `-- name: UpdateSettingsReportsDashboard :one
+UPDATE settings
+SET
+    reports_dashboard = $2,
+    updated_at = now()
+WHERE id = $1
+RETURNING id, access_log_retention_days, reports_dashboard, created_at, updated_at
+`
+
+type UpdateSettingsReportsDashboardParams struct {
+	ID               uuid.UUID `json:"id"`
+	ReportsDashboard []byte    `json:"reports_dashboard"`
+}
+
+func (q *Queries) UpdateSettingsReportsDashboard(ctx context.Context, arg UpdateSettingsReportsDashboardParams) (Setting, error) {
+	row := q.db.QueryRow(ctx, updateSettingsReportsDashboard, arg.ID, arg.ReportsDashboard)
+	var i Setting
+	err := row.Scan(
+		&i.ID,
+		&i.AccessLogRetentionDays,
+		&i.ReportsDashboard,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

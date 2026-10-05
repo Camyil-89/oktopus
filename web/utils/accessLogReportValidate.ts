@@ -159,8 +159,17 @@ function parseQuery(
   switch (type) {
     case "timeseries": {
       const g = q.group_by_time;
-      if (g !== "10m" && g !== "1h" && g !== "1d") {
-        throw new Error(`виджет ${id}: group_by_time 10m|1h|1d`);
+      if (
+        g !== "10m" &&
+        g !== "1h" &&
+        g !== "1d" &&
+        g !== "hour_of_day" &&
+        g !== "day_of_week" &&
+        g !== "month_of_year"
+      ) {
+        throw new Error(
+          `виджет ${id}: group_by_time 10m|1h|1d|hour_of_day|day_of_week|month_of_year`,
+        );
       }
       out.group_by_time = g;
       if (q.split_by === "action" || q.split_by === "denied_by") {

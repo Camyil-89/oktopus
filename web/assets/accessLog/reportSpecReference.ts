@@ -3,12 +3,13 @@ import {
   formatInspectRulesSection,
   loadProxyRulesForReportPrompt,
 } from "@/assets/accessLog/reportPromptRules";
-import { INSPECT_LUA_EXAMPLES } from "@/assets/inspect/luaExamples";
 import type { AccessLogReportSpec } from "@/types/accessLogReport";
 import {
   formatInspectLogFieldsForPrompt,
   inspectLogGroupByField,
+  isInspectLogFieldKey,
   mergedInspectLogFieldKeys,
+  parseCtxLogKeysFromLuaScripts,
 } from "@/utils/accessLogInspectLog";
 
 export const ACCESS_LOG_REPORT_SPEC_VERSION = 1;
@@ -28,10 +29,12 @@ export const ACCESS_LOG_REPORT_COLUMN_FIELDS = [
 export const ACCESS_LOG_REPORT_GROUP_BY_FIELDS =
   ACCESS_LOG_REPORT_COLUMN_FIELDS;
 
-export function accessLogReportInspectLogGroupByFields(): string[] {
-  return mergedInspectLogFieldKeys(
-    INSPECT_LUA_EXAMPLES.map((e) => e.script),
-  ).map((k) => inspectLogGroupByField(k));
+export function accessLogReportInspectLogGroupByFields(
+  luaScripts: string[] = [],
+): string[] {
+  return parseCtxLogKeysFromLuaScripts(luaScripts).map((k) =>
+    inspectLogGroupByField(k),
+  );
 }
 
 export function accessLogReportAllGroupByFields(): string[] {
@@ -125,6 +128,41 @@ export const ACCESS_LOG_REPORT_EXAMPLE: AccessLogReportSpec = {
   ],
 };
 
+export const ACCESS_LOG_REPORT_WIDGETS_EXAMPLE =
+  ACCESS_LOG_REPORT_EXAMPLE.widgets;
+
+export const ACCESS_LOG_REPORT_WIDGETS_REFERENCE = `Виджеты вкладки отчётов (JSON-массив, до 12 элементов)
+
+Каждый элемент:
+  id — уникальная строка в отчёте (snake_case)
+  type — timeseries | bar | table | stat
+  title — подпись на UI
+  query — параметры агрегации
+
+query.metric:
+  count (по умолчанию) | avg_decide_duration_us
+
+query.group_by_time (для timeseries):
+  10m | 1h | 1d | hour_of_day | day_of_week | month_of_year
+
+query.split_by (для timeseries, необязательно):
+  action | denied_by
+
+query.group_by (для bar, одно поле):
+  ${ACCESS_LOG_REPORT_COLUMN_FIELDS.join(" | ")}
+  | inspect_log.<ключ ctx:log>
+
+query.group_by_cols (для table, 1–4 поля из списка group_by)
+
+query.search_columns (для table, необязательно) — подмножество group_by_cols
+
+query.field_nonempty — массив полей group_by: значение не пустая строка
+
+query.limit — bar: топ-N (по умолчанию 20, макс. 100); table: page size (20, макс. 100)
+query.order — asc | desc
+
+Период (time) и filters вкладки задаются в UI панели — в JSON-ответе для «Редактировать дашборд» их не включай.`;
+
 export const ACCESS_LOG_REPORT_API_REFERENCE = `Access Log Report Spec (version ${ACCESS_LOG_REPORT_SPEC_VERSION})
 
 Корень JSON:
@@ -183,42 +221,55 @@ query.order — asc | desc (по значению метрики)
   stat: data.value
   table: data.columns, data.rows, data.values, data.total, data.page, data.page_size`;
 
-function buildAccessLogReportAiPromptStatic(extraInspectKeys?: string[]): string {
-  const luaScripts = INSPECT_LUA_EXAMPLES.map((e) => e.script);
-  const inspectKeys = mergedInspectLogFieldKeys(luaScripts);
+function mergeInspectLogKeysForPrompt(
+  luaScripts: string[],
+  extraInspectKeys?: string[],
+): string[] {
+  const keys = new Set(mergedInspectLogFieldKeys(luaScripts));
   if (extraInspectKeys?.length) {
     for (const k of extraInspectKeys) {
-      if (!inspectKeys.includes(k)) {
-        inspectKeys.push(k);
+      if (isInspectLogFieldKey(k)) {
+        keys.add(k);
       }
     }
-    inspectKeys.sort();
   }
+  return [...keys].sort();
+}
+
+function buildAccessLogReportAiPromptStatic(inspectKeys: string[]): string {
   const inspectLogSection = formatInspectLogFieldsForPrompt(inspectKeys);
 
-  return `Ты помогаешь собрать JSON Access Log Report Spec для панели Oktopus.
+  return `Ты помогаешь собрать JSON-массив widgets для вкладки отчётов Oktopus (журнал доступа).
+Результат вставляется в «Редактировать дашборд» на странице /manage/reports.
 
-${ACCESS_LOG_REPORT_API_REFERENCE}
+${ACCESS_LOG_REPORT_WIDGETS_REFERENCE}
 
 ${inspectLogSection}
 
-Требования к ответу:
-- Верни один JSON-объект spec version ${ACCESS_LOG_REPORT_SPEC_VERSION} без markdown и без комментариев.
-- Подставь реальные time.from и time.to по запросу пользователя (UTC, RFC3339).
-- Выбери подходящие widgets и query; не выходи за whitelist полей.
-- id виджетов — короткие латиницей (snake_case).
-- Учитывай id и смысл правил ACL/инспекции из секций ниже при фильтрах и group_by decision_rule_ref / inspect_log.
+Справка по полному report spec (time, filters, API) — для понимания query:
+${ACCESS_LOG_REPORT_API_REFERENCE}
 
-Пример структуры:
-${JSON.stringify(ACCESS_LOG_REPORT_EXAMPLE, null, 2)}`;
+Требования к ответу:
+- Верни только JSON-массив widgets (от 1 до 12 элементов), без markdown и без комментариев.
+- Не оборачивай в объект: без version, time, filters и без поля "widgets" — только массив [...].
+- Не выходи за whitelist полей group_by / inspect_log.
+- id виджетов — короткие латиницей (snake_case), уникальные в массиве.
+- Учитывай id и смысл правил ACL/инспекции из секций ниже при group_by decision_rule_ref / inspect_log.
+
+Пример ответа:
+${JSON.stringify(ACCESS_LOG_REPORT_WIDGETS_EXAMPLE, null, 2)}`;
 }
 
 /** Собирает промпт с актуальными ACL (полный pattern) и inspect (полный Lua). */
 export async function buildAccessLogReportAiPrompt(
   extraInspectKeys?: string[],
 ): Promise<string> {
-  const staticPart = buildAccessLogReportAiPromptStatic(extraInspectKeys);
   const { policies, inspect } = await loadProxyRulesForReportPrompt();
+  const inspectKeys = mergeInspectLogKeysForPrompt(
+    inspect.map((r) => r.script),
+    extraInspectKeys,
+  );
+  const staticPart = buildAccessLogReportAiPromptStatic(inspectKeys);
   const aclSection = policies
     .map(({ instanceName, policy }) =>
       [
@@ -267,7 +318,7 @@ export function defaultSummaryReportSpec(
       {
         "id": "hourly_traffic",
         "type": "timeseries",
-        "title": "Запросы по часам (разрешения/блокировки)",
+        "title": "Запросы (разрешения/блокировки)",
         "query": {
           "group_by_time": "1h",
           "metric": "count",
@@ -277,7 +328,7 @@ export function defaultSummaryReportSpec(
       {
         "id": "avg_duration_timeseries",
         "type": "timeseries",
-        "title": "Среднее время принятия решения по часам (мкс)",
+        "title": "Среднее время принятия решения (мкс)",
         "query": {
           "group_by_time": "1h",
           "metric": "avg_decide_duration_us",

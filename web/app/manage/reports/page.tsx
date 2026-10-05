@@ -1,22 +1,25 @@
 "use client";
 
-import { ApiError } from "@/api/base";
 import {
+  getReportsDashboard,
+  patchReportsDashboard,
   runProxyAccessLogReport,
   runProxyAccessLogReportTable,
 } from "@/api/proxy";
-import {
-  ACCESS_LOG_REPORT_EXAMPLE,
-  buildAccessLogReportAiPrompt,
-  defaultSummaryReportSpec,
-} from "@/assets/accessLog/reportSpecReference";
 import {
   AccessLogReportWidgetGrid,
   type ReportTableFetchFn,
   type ReportWidgetQueryMeta,
 } from "@/assets/components/accessLog/AccessLogReportWidgets";
+import {
+  buildAccessLogReportAiPrompt,
+  defaultSummaryReportSpec,
+} from "@/assets/accessLog/reportSpecReference";
 import type { ProxyRuleKind } from "@/assets/hooks/useProxyRuleNameMap";
 import { useProxyRuleNameMap } from "@/assets/hooks/useProxyRuleNameMap";
+import { ReportDashboardAddTabModal } from "@/assets/modals/ReportDashboardAddTabModal";
+import { ReportDashboardDeleteTabModal } from "@/assets/modals/ReportDashboardDeleteTabModal";
+import { ReportDashboardEditModal } from "@/assets/modals/ReportDashboardEditModal";
 import { ProxyInspectRuleViewModal } from "@/assets/modals/ProxyInspectRuleViewModal";
 import type {
   AccessLogReportSpec,
@@ -24,10 +27,22 @@ import type {
   AccessLogReportWidgetResult,
   AccessLogReportWidgetSpec,
 } from "@/types/accessLogReport";
-import { parseAccessLogReportSpec } from "@/utils/accessLogReportValidate";
-import { downloadTextFile } from "@/utils/downloadText";
-import { CopyOutlined, DownloadOutlined, ReloadOutlined } from "@ant-design/icons";
-import { App, Button, DatePicker, Input, Tabs } from "antd";
+import type {
+  ReportsDashboardDocument,
+  ReportsDashboardTab,
+} from "@/types/reportsDashboard";
+import { applyAutoTimeBucketsToSpec } from "@/utils/accessLogReportBucket";
+import {
+  createDashboardTab,
+  normalizeReportsDashboard,
+} from "@/utils/reportsDashboard";
+import {
+  CopyOutlined,
+  EditOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
+import { App, Button, DatePicker, Tabs } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import Link from "next/link";
@@ -47,8 +62,6 @@ function rangeToSpecTime(range: [Dayjs, Dayjs]): { from: string; to: string } {
   };
 }
 
-const CUSTOM_SPEC_DEFAULT = JSON.stringify(ACCESS_LOG_REPORT_EXAMPLE, null, 2);
-
 function buildWidgetQueryMeta(
   widgets: AccessLogReportWidgetSpec[],
 ): Record<string, ReportWidgetQueryMeta> {
@@ -58,10 +71,30 @@ function buildWidgetQueryMeta(
       groupBy: w.query.group_by,
       groupByCols: w.query.group_by_cols,
       searchColumns: w.query.search_columns,
+      groupByTime: w.query.group_by_time,
     };
   }
   return m;
 }
+
+function tabToSpec(
+  tab: ReportsDashboardTab,
+  range: [Dayjs, Dayjs],
+): AccessLogReportSpec {
+  const time = rangeToSpecTime(range);
+  return {
+    version: 1,
+    time,
+    filters: tab.filters ?? {},
+    widgets: tab.widgets,
+  };
+}
+
+type TabRunState = {
+  widgets: AccessLogReportWidgetResult[];
+  appliedSpec: AccessLogReportSpec | null;
+  loaded: boolean;
+};
 
 export default function ManageAccessLogReportsPage() {
   const { message } = App.useApp();
@@ -72,7 +105,15 @@ export default function ManageAccessLogReportsPage() {
     id: string;
     kind: ProxyRuleKind;
   } | null>(null);
+
   const [activeTab, setActiveTab] = useState("summary");
+  const [dashboard, setDashboard] = useState<ReportsDashboardDocument>(() =>
+    normalizeReportsDashboard(null),
+  );
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dashboardRef = useRef(dashboard);
+  dashboardRef.current = dashboard;
 
   const [summaryRange, setSummaryRange] = useState<[Dayjs, Dayjs]>(() =>
     defaultRange(),
@@ -83,15 +124,17 @@ export default function ManageAccessLogReportsPage() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const summaryLoadedRef = useRef(false);
 
-  const [customText, setCustomText] = useState(CUSTOM_SPEC_DEFAULT);
-  const [customWidgets, setCustomWidgets] = useState<
-    AccessLogReportWidgetResult[]
-  >([]);
-  const [customLoading, setCustomLoading] = useState(false);
+  const [tabRanges, setTabRanges] = useState<Record<string, [Dayjs, Dayjs]>>({});
+  const [tabRuns, setTabRuns] = useState<Record<string, TabRunState>>({});
+  const [tabLoadingId, setTabLoadingId] = useState<string | null>(null);
+
+  const [addTabOpen, setAddTabOpen] = useState(false);
+  const [deleteTabId, setDeleteTabId] = useState<string | null>(null);
+  const [dashboardEditTabId, setDashboardEditTabId] = useState<string | null>(
+    null,
+  );
   const [aiPromptText, setAiPromptText] = useState<string | null>(null);
   const [aiPromptPreparing, setAiPromptPreparing] = useState(true);
-  const [customAppliedSpec, setCustomAppliedSpec] =
-    useState<AccessLogReportSpec | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,18 +162,69 @@ export default function ManageAccessLogReportsPage() {
     };
   }, [formatApiError, message, t]);
 
+  const persistDashboard = useCallback(
+    (doc: ReportsDashboardDocument) => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+      saveTimerRef.current = setTimeout(() => {
+        void patchReportsDashboard(doc).catch((e) => {
+          message.error(formatApiError(e, t("reports.dashboardSaveFailed")));
+        });
+      }, 400);
+    },
+    [formatApiError, message, t],
+  );
+
+  const updateDashboard = useCallback(
+    (updater: (prev: ReportsDashboardDocument) => ReportsDashboardDocument) => {
+      setDashboard((prev) => {
+        const next = updater(prev);
+        persistDashboard(next);
+        return next;
+      });
+    },
+    [persistDashboard],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setDashboardLoading(true);
+    void getReportsDashboard()
+      .then((doc) => {
+        if (!cancelled) {
+          setDashboard(normalizeReportsDashboard(doc));
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          message.error(formatApiError(e, t("reports.dashboardLoadFailed")));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setDashboardLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [formatApiError, message, t]);
+
   const summarySpec = useMemo((): AccessLogReportSpec => {
     const range = rangeToSpecTime(summaryRange);
-    return defaultSummaryReportSpec(range.from, range.to);
+    return applyAutoTimeBucketsToSpec(
+      defaultSummaryReportSpec(range.from, range.to),
+    );
   }, [summaryRange]);
 
-  const runSpec = useCallback(
-    async (spec: AccessLogReportSpec) => {
-      const res = await runProxyAccessLogReport(spec);
-      return res.widgets;
-    },
-    [],
-  );
+  const runSpec = useCallback(async (spec: AccessLogReportSpec) => {
+    const res = await runProxyAccessLogReport(applyAutoTimeBucketsToSpec(spec));
+    return res.widgets;
+  }, []);
 
   const loadSummary = useCallback(async () => {
     setSummaryLoading(true);
@@ -151,45 +245,51 @@ export default function ManageAccessLogReportsPage() {
     }
   }, [activeTab, loadSummary]);
 
-  const onSummaryTab = (key: string) => {
-    setActiveTab(key);
-  };
+  const getTabRange = useCallback(
+    (tabId: string): [Dayjs, Dayjs] => tabRanges[tabId] ?? defaultRange(),
+    [tabRanges],
+  );
 
-  const runCustom = async () => {
-    setCustomLoading(true);
-    try {
-      const spec = parseAccessLogReportSpec(customText);
-      const widgets = await runSpec(spec);
-      setCustomAppliedSpec(spec);
-      setCustomWidgets(widgets);
-    } catch (e) {
-      message.error(
-        formatApiError(e, t("reports.runFailed")),
-      );
-    } finally {
-      setCustomLoading(false);
-    }
-  };
+  const runTabReport = useCallback(
+    async (tabId: string, doc: ReportsDashboardDocument) => {
+      const tab = doc.tabs.find((x) => x.id === tabId);
+      if (!tab || tab.widgets.length === 0) {
+        setTabRuns((prev) => ({
+          ...prev,
+          [tabId]: { widgets: [], appliedSpec: null, loaded: true },
+        }));
+        return;
+      }
+      const range = getTabRange(tabId);
+      const spec = applyAutoTimeBucketsToSpec(tabToSpec(tab, range));
+      setTabLoadingId(tabId);
+      try {
+        const widgets = await runSpec(spec);
+        setTabRuns((prev) => ({
+          ...prev,
+          [tabId]: { widgets, appliedSpec: spec, loaded: true },
+        }));
+      } catch (e) {
+        message.error(formatApiError(e, t("reports.runFailed")));
+      } finally {
+        setTabLoadingId(null);
+      }
+    },
+    [formatApiError, getTabRange, message, runSpec, t],
+  );
 
-  const copyPrompt = async () => {
-    if (!aiPromptText) {
+  useEffect(() => {
+    if (activeTab === "summary") {
       return;
     }
-    try {
-      await navigator.clipboard.writeText(aiPromptText);
-      message.success(t("reports.promptCopied"));
-    } catch {
-      message.error(t("common.copyFailed"));
-    }
-  };
-
-  const downloadPrompt = () => {
-    if (!aiPromptText) {
+    if (!dashboard.tabs.some((x) => x.id === activeTab)) {
       return;
     }
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    downloadTextFile(aiPromptText, `oktopus-access-log-report-prompt-${stamp}.txt`);
-  };
+    const state = tabRuns[activeTab];
+    if (!state?.loaded) {
+      void runTabReport(activeTab, dashboardRef.current);
+    }
+  }, [activeTab, dashboard.tabs, runTabReport, tabRuns]);
 
   const ruleLabelContext = useMemo(
     () => ({
@@ -214,27 +314,6 @@ export default function ManageAccessLogReportsPage() {
     return m;
   }, [summarySpec.widgets]);
 
-  const customWidgetMetrics = useMemo(() => {
-    try {
-      const spec = parseAccessLogReportSpec(customText);
-      const m: Record<string, string> = {};
-      for (const w of spec.widgets) {
-        m[w.id] = w.query.metric ?? "count";
-      }
-      return m;
-    } catch {
-      return {};
-    }
-  }, [customText]);
-
-  const customWidgetQueryMeta = useMemo(
-    () =>
-      customAppliedSpec
-        ? buildWidgetQueryMeta(customAppliedSpec.widgets)
-        : {},
-    [customAppliedSpec],
-  );
-
   const makeTableFetcher = useCallback(
     (spec: AccessLogReportSpec | null): ReportTableFetchFn | undefined => {
       if (!spec) {
@@ -257,17 +336,12 @@ export default function ManageAccessLogReportsPage() {
         return res.data;
       };
     },
-    [],
+    [t],
   );
 
   const summaryTableFetcher = useMemo(
     () => makeTableFetcher(summarySpec),
     [makeTableFetcher, summarySpec],
-  );
-
-  const customTableFetcher = useMemo(
-    () => makeTableFetcher(customAppliedSpec),
-    [customAppliedSpec, makeTableFetcher],
   );
 
   const patchSummaryWidgetData = useCallback(
@@ -280,13 +354,216 @@ export default function ManageAccessLogReportsPage() {
   );
 
   const patchCustomWidgetData = useCallback(
-    (widgetId: string, data: AccessLogReportWidgetData) => {
-      setCustomWidgets((prev) =>
-        prev.map((w) => (w.id === widgetId ? { ...w, data } : w)),
-      );
+    (tabId: string, widgetId: string, data: AccessLogReportWidgetData) => {
+      setTabRuns((prev) => {
+        const cur = prev[tabId];
+        if (!cur) {
+          return prev;
+        }
+        return {
+          ...prev,
+          [tabId]: {
+            ...cur,
+            widgets: cur.widgets.map((w) =>
+              w.id === widgetId ? { ...w, data } : w,
+            ),
+          },
+        };
+      });
     },
     [],
   );
+
+  const confirmAddTab = (title: string) => {
+    const tab = createDashboardTab(title);
+    updateDashboard((prev) => ({
+      ...prev,
+      tabs: [...prev.tabs, tab],
+    }));
+    setTabRanges((prev) => ({ ...prev, [tab.id]: defaultRange() }));
+    setAddTabOpen(false);
+    setActiveTab(tab.id);
+  };
+
+  const removeTab = (tabId: string) => {
+    updateDashboard((prev) => ({
+      ...prev,
+      tabs: prev.tabs.filter((x) => x.id !== tabId),
+    }));
+    setTabRanges((prev) => {
+      const next = { ...prev };
+      delete next[tabId];
+      return next;
+    });
+    setTabRuns((prev) => {
+      const next = { ...prev };
+      delete next[tabId];
+      return next;
+    });
+    if (activeTab === tabId) {
+      setActiveTab("summary");
+    }
+  };
+
+  const confirmRemoveTab = (tabId: string) => {
+    setDeleteTabId(tabId);
+  };
+
+  const deleteTabTitle =
+    deleteTabId != null
+      ? dashboard.tabs.find((x) => x.id === deleteTabId)?.title ?? ""
+      : "";
+
+  const confirmDeleteTab = () => {
+    if (deleteTabId == null) {
+      return;
+    }
+    removeTab(deleteTabId);
+    setDeleteTabId(null);
+  };
+
+  const applyTabWidgetsEdit = (
+    tabId: string,
+    widgets: AccessLogReportWidgetSpec[],
+  ) => {
+    setDashboardEditTabId(null);
+    setTabRuns((prev) => ({
+      ...prev,
+      [tabId]: {
+        widgets: [],
+        appliedSpec: null,
+        loaded: false,
+      },
+    }));
+    setDashboard((prev) => {
+      const next: ReportsDashboardDocument = {
+        ...prev,
+        tabs: prev.tabs.map((tab) =>
+          tab.id === tabId ? { ...tab, widgets } : tab,
+        ),
+      };
+      persistDashboard(next);
+      void runTabReport(tabId, next);
+      return next;
+    });
+  };
+
+  const dashboardEditTab =
+    dashboardEditTabId != null
+      ? dashboard.tabs.find((t) => t.id === dashboardEditTabId) ?? null
+      : null;
+
+  const copyAiPrompt = async () => {
+    if (!aiPromptText) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(aiPromptText);
+      message.success(t("reports.promptCopied"));
+    } catch {
+      message.error(t("common.copyFailed"));
+    }
+  };
+
+  const removeWidget = (tabId: string, widgetId: string) => {
+    setDashboard((prev) => {
+      const next: ReportsDashboardDocument = {
+        ...prev,
+        tabs: prev.tabs.map((tab) =>
+          tab.id === tabId
+            ? {
+                ...tab,
+                widgets: tab.widgets.filter((w) => w.id !== widgetId),
+              }
+            : tab,
+        ),
+      };
+      persistDashboard(next);
+      void runTabReport(tabId, next);
+      return next;
+    });
+  };
+
+  const customTabItems = dashboard.tabs.map((tab) => {
+    const range = getTabRange(tab.id);
+    const run = tabRuns[tab.id];
+    const spec =
+      run?.appliedSpec ??
+      applyAutoTimeBucketsToSpec(tabToSpec(tab, range));
+    const loading = tabLoadingId === tab.id;
+    const customMetrics: Record<string, string> = {};
+    for (const w of tab.widgets) {
+      customMetrics[w.id] = w.query.metric ?? "count";
+    }
+    return {
+      key: tab.id,
+      label: tab.title,
+      closable: true,
+      children: (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-row flex-wrap items-center gap-2">
+            <DatePicker.RangePicker
+              showTime
+              value={range}
+              onChange={(vals) => {
+                const from = vals?.[0];
+                const to = vals?.[1];
+                if (!from || !to) {
+                  return;
+                }
+                setTabRanges((prev) => ({
+                  ...prev,
+                  [tab.id]: [from, to],
+                }));
+                setTabRuns((prev) => ({
+                  ...prev,
+                  [tab.id]: {
+                    widgets: [],
+                    appliedSpec: null,
+                    loaded: false,
+                  },
+                }));
+              }}
+            />
+            <Button
+              icon={<ReloadOutlined />}
+              loading={loading}
+              onClick={() => void runTabReport(tab.id, dashboardRef.current)}
+            >
+              {t("common.refresh")}
+            </Button>
+            <Button
+              icon={<EditOutlined />}
+              onClick={() => setDashboardEditTabId(tab.id)}
+            >
+              {t("reports.editDashboard")}
+            </Button>
+            <Button
+              icon={<CopyOutlined />}
+              loading={aiPromptPreparing}
+              disabled={!aiPromptText}
+              onClick={() => void copyAiPrompt()}
+            >
+              {t("reports.aiPrompt")}
+            </Button>
+          </div>
+          <AccessLogReportWidgetGrid
+            widgets={run?.widgets ?? []}
+            placeholderSpecs={tab.widgets}
+            loading={loading || dashboardLoading}
+            widgetMetrics={customMetrics}
+            widgetQueryMeta={buildWidgetQueryMeta(spec.widgets)}
+            rules={ruleLabelContext}
+            onFetchTable={makeTableFetcher(spec)}
+            onTableWidgetData={(widgetId, data) =>
+              patchCustomWidgetData(tab.id, widgetId, data)
+            }
+            onRemoveWidget={(widgetId) => removeWidget(tab.id, widgetId)}
+          />
+        </div>
+      ),
+    };
+  });
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -301,11 +578,30 @@ export default function ManageAccessLogReportsPage() {
 
       <Tabs
         activeKey={activeTab}
-        onChange={onSummaryTab}
+        onChange={setActiveTab}
+        type="editable-card"
+        hideAdd
+        destroyOnHidden
+        onEdit={(key, action) => {
+          if (action === "remove" && typeof key === "string") {
+            confirmRemoveTab(key);
+          }
+        }}
+        tabBarExtraContent={
+          <Button
+            type="dashed"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={() => setAddTabOpen(true)}
+          >
+            {t("reports.addTab")}
+          </Button>
+        }
         items={[
           {
             key: "summary",
             label: t("reports.summaryTab"),
+            closable: false,
             children: (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-row flex-wrap items-center gap-2">
@@ -329,6 +625,7 @@ export default function ManageAccessLogReportsPage() {
                 </div>
                 <AccessLogReportWidgetGrid
                   widgets={summaryWidgets}
+                  placeholderSpecs={summarySpec.widgets}
                   loading={summaryLoading}
                   widgetMetrics={widgetMetrics}
                   widgetQueryMeta={summaryWidgetQueryMeta}
@@ -339,56 +636,32 @@ export default function ManageAccessLogReportsPage() {
               </div>
             ),
           },
-          {
-            key: "custom",
-            label: t("reports.customTab"),
-            children: (
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-row flex-wrap gap-2">
-                  <Button
-                    type="primary"
-                    loading={customLoading}
-                    onClick={() => void runCustom()}
-                  >
-                    {t("reports.run")}
-                  </Button>
-                  <Button
-                    icon={<CopyOutlined />}
-                    loading={aiPromptPreparing}
-                    disabled={!aiPromptText}
-                    onClick={() => void copyPrompt()}
-                  >
-                    {t("reports.aiPrompt")}
-                  </Button>
-                  <Button
-                    icon={<DownloadOutlined />}
-                    loading={aiPromptPreparing}
-                    disabled={!aiPromptText}
-                    onClick={downloadPrompt}
-                  >
-                    {t("reports.downloadTxt")}
-                  </Button>
-                </div>
-                <Input.TextArea
-                  value={customText}
-                  onChange={(e) => setCustomText(e.target.value)}
-                  rows={16}
-                  className="font-mono text-[12px]"
-                  spellCheck={false}
-                />
-                <AccessLogReportWidgetGrid
-                  widgets={customWidgets}
-                  loading={customLoading}
-                  widgetMetrics={customWidgetMetrics}
-                  widgetQueryMeta={customWidgetQueryMeta}
-                  rules={ruleLabelContext}
-                  onFetchTable={customTableFetcher}
-                  onTableWidgetData={patchCustomWidgetData}
-                />
-              </div>
-            ),
-          },
+          ...customTabItems,
         ]}
+      />
+
+      <ReportDashboardAddTabModal
+        open={addTabOpen}
+        onCancel={() => setAddTabOpen(false)}
+        onConfirm={confirmAddTab}
+      />
+
+      <ReportDashboardDeleteTabModal
+        open={deleteTabId != null}
+        tabTitle={deleteTabTitle}
+        onCancel={() => setDeleteTabId(null)}
+        onConfirm={confirmDeleteTab}
+      />
+
+      <ReportDashboardEditModal
+        open={dashboardEditTab != null}
+        tab={dashboardEditTab}
+        onCancel={() => setDashboardEditTabId(null)}
+        onSubmit={(widgets) => {
+          if (dashboardEditTabId) {
+            applyTabWidgetsEdit(dashboardEditTabId, widgets);
+          }
+        }}
       />
 
       <ProxyInspectRuleViewModal

@@ -45,6 +45,23 @@ export async function patchHostSettings(body: import("@/types/proxy").HostSettin
   return fetchApi<import("@/types/proxy").HostSettings>("/api/proxy/host-settings", "PATCH", body);
 }
 
+export async function getReportsDashboard() {
+  return fetchApi<import("@/types/reportsDashboard").ReportsDashboardDocument>(
+    "/api/proxy/reports-dashboard",
+    "GET",
+  );
+}
+
+export async function patchReportsDashboard(
+  body: import("@/types/reportsDashboard").ReportsDashboardDocument,
+) {
+  return fetchApi<import("@/types/reportsDashboard").ReportsDashboardDocument>(
+    "/api/proxy/reports-dashboard",
+    "PATCH",
+    body,
+  );
+}
+
 export async function listProxyInstances() {
   const list = await fetchApi<import("@/types/proxy").ProxyInstance[] | null>(
     "/api/proxy/instances",

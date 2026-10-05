@@ -65,6 +65,7 @@ type ProxyInstance struct {
 type Setting struct {
 	ID                     uuid.UUID          `json:"id"`
 	AccessLogRetentionDays int32              `json:"access_log_retention_days"`
+	ReportsDashboard       []byte             `json:"reports_dashboard"`
 	CreatedAt              pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
 }
