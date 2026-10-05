@@ -1,7 +1,9 @@
 import type { AccessLogExtra } from "@/utils/accessLogExtra";
+import type { AccessLogSegment } from "@/utils/accessLogSegment";
 
 export type ProxyAccessLogRow = {
   id: string;
+  instance_id: string;
   created_at: string;
   source_address: string;
   destination_address: string;
@@ -25,6 +27,7 @@ export type ProxyAccessLogListResponse = {
 export type ListProxyAccessLogParams = {
   page?: number;
   page_size?: number;
+  instance_id?: string;
   id?: string;
   user?: string;
   source?: string;
@@ -34,7 +37,11 @@ export type ListProxyAccessLogParams = {
   from?: string;
   to?: string;
   action?: "0" | "1";
+  /** @deprecated используйте segment=errors */
   error_kind?: "any";
+  segment?: AccessLogSegment;
+  attack_kind?: string;
+  policy_anomaly_q?: string;
   decision_rule_ref?: string;
   inspect_rule_id?: string;
 };

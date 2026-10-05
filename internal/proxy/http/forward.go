@@ -7,6 +7,9 @@ import (
 
 	"oktopus/internal/proxy/bytecount"
 	"oktopus/internal/proxy/hooks"
+	"oktopus/internal/proxy/instancectx"
+
+	"github.com/google/uuid"
 	"oktopus/internal/proxy/wsproxy"
 )
 
@@ -32,23 +35,20 @@ func (f *Forwarder) Serve(ctx context.Context, w stdhttp.ResponseWriter, inbound
 	StripHopByHopHeaders(outReq.Header)
 	outReq.Header.Del("Proxy-Connection")
 
+	instID := instanceIDFromCtx(ctx)
 	if d := f.Hooks.RunHTTPRequest(ctx, outReq); d.Handled() {
 		denied := !d.Allow
-		w = bytecount.WrapResponseWriterPolicy(w, denied)
-		if denied {
-			bytecount.ObserveRequestLineHeadersDenied(inbound)
-		} else {
-			bytecount.ObserveRequestLineHeaders(inbound)
-		}
+		w = bytecount.WrapResponseWriterPolicyInstance(w, denied, instID)
+		bytecount.ObserveRequestLineHeadersInstance(inbound, instID, denied)
 		d.WriteResponse(w, inbound)
 		return nil
 	}
 
-	w = bytecount.WrapResponseWriter(w)
-	bytecount.ObserveRequestLineHeaders(inbound)
+	w = bytecount.WrapResponseWriterPolicyInstance(w, false, instID)
+	bytecount.ObserveRequestLineHeadersInstance(inbound, instID, false)
 
 	if outReq.Body != nil && outReq.Body != stdhttp.NoBody {
-		outReq.Body = bytecount.WrapBodyUp(outReq.Body)
+		outReq.Body = bytecount.WrapBodyUpPolicyInstance(outReq.Body, false, instID)
 	}
 	if f.RateLimit != nil {
 		if flow := f.RateLimit.DelayFlowHTTP(ctx, outReq); flow != nil && outReq.Body != nil && outReq.Body != stdhttp.NoBody {
@@ -78,4 +78,11 @@ func (f *Forwarder) Serve(ctx context.Context, w stdhttp.ResponseWriter, inbound
 	}
 	_, err = Copy(w, body)
 	return err
+}
+
+func instanceIDFromCtx(ctx context.Context) uuid.UUID {
+	if id, ok := instancectx.ID(ctx); ok {
+		return id
+	}
+	return uuid.Nil
 }

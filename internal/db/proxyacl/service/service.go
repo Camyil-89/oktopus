@@ -31,8 +31,8 @@ const (
 type Service struct {
 	repo        repository.RulesRepository
 	reloader    Reloader
-	rt          *compileRuntime
-	publishWake chan struct{}
+	runtimes    sync.Map // uuid.UUID -> *compileRuntime
+	publishWake chan uuid.UUID
 	listPoll    *listPollScheduler
 	reloadMu    sync.Mutex
 	lastReload  time.Time
@@ -41,8 +41,7 @@ type Service struct {
 func New(repo repository.RulesRepository) *Service {
 	s := &Service{
 		repo:        repo,
-		rt:          newCompileRuntime(),
-		publishWake: make(chan struct{}, 1),
+		publishWake: make(chan uuid.UUID, 64),
 	}
 	s.listPoll = newListPollScheduler(s)
 	go s.runPublisher()
@@ -60,53 +59,30 @@ func (s *Service) BindReloader(r Reloader) {
 
 // BootstrapCompile синхронно собирает ACL при старте.
 func (s *Service) BootstrapCompile(ctx context.Context) error {
-	pol, err := s.repo.GetPolicy(ctx)
+	ids, err := s.repo.ListPolicyInstanceIDs(ctx)
 	if err != nil {
 		return err
 	}
-	lists, err := s.repo.ListNamedLists(ctx)
-	if err != nil {
-		return err
+	for _, id := range ids {
+		if err := s.bootstrapInstance(ctx, id); err != nil {
+			return err
+		}
 	}
-	s.rt.setEnabledRulesInDB(countSquidSources(lists, pol))
-	refLists, err := referencedNamedLists(ctx, s.repo, pol.ConfigText)
-	if err != nil {
-		return err
-	}
-	rev := revisionFromSquid(pol.ConfigText, refLists)
-	s.rt.setConfigRevision(rev)
-	s.rt.beginBuild()
-	engine, _, sniRep, err := compileSquidPolicy(pol.ConfigText, refLists)
-	if err != nil {
-		s.rt.finishBuild(nil, rev, acl.SNIPatternIndexReport{}, err)
-		return err
-	}
-	s.rt.finishBuild(engine, rev, sniRep, nil)
 	startup.MarkACLDBSynced()
 	return nil
 }
 
-func (s *Service) ActiveEngine() *acl.Engine {
-	return s.rt.activeEngine()
-}
-
-func (s *Service) CompileStatus(ctx context.Context) (CompileStatusDTO, error) {
+func (s *Service) CompileStatus(ctx context.Context, instanceID uuid.UUID) (CompileStatusDTO, error) {
 	_ = ctx
-	return s.rt.statusForAPI(), nil
-}
-
-func (s *Service) requestPublish() {
-	select {
-	case s.publishWake <- struct{}{}:
-	default:
-	}
+	return s.CompileStatusFor(instanceID), nil
 }
 
 func (s *Service) runPublisher() {
-	for range s.publishWake {
+	for instanceID := range s.publishWake {
 		for {
-			err := s.attemptPublish()
-			if err == nil && s.rt.isPublished() {
+			err := s.attemptPublish(instanceID)
+			rt := s.runtimeFor(instanceID)
+			if err == nil && rt.isPublished() {
 				startup.MarkACLDBSynced()
 				break
 			}
@@ -115,10 +91,11 @@ func (s *Service) runPublisher() {
 	}
 }
 
-func (s *Service) attemptPublish() error {
+func (s *Service) attemptPublish(instanceID uuid.UUID) error {
 	ctx := context.Background()
-	prevRev := s.rt.getActiveRevision()
-	pol, err := s.repo.GetPolicy(ctx)
+	rt := s.runtimeFor(instanceID)
+	prevRev := rt.getActiveRevision()
+	pol, err := s.repo.GetPolicy(ctx, instanceID)
 	if err != nil {
 		return err
 	}
@@ -126,30 +103,31 @@ func (s *Service) attemptPublish() error {
 	if err != nil {
 		return err
 	}
-	s.rt.setEnabledRulesInDB(countSquidSources(lists, pol))
-	refLists, err := referencedNamedLists(ctx, s.repo, pol.ConfigText)
+	rt.setEnabledRulesInDB(countSquidSources(lists, pol))
+	src := instancePolicySource{s.repo, instanceID}
+	refLists, err := referencedNamedLists(ctx, src, pol.ConfigText)
 	if err != nil {
 		return err
 	}
 	rev := revisionFromSquid(pol.ConfigText, refLists)
-	s.rt.setConfigRevision(rev)
+	rt.setConfigRevision(rev)
 
 	if rev != prevRev {
-		s.rt.beginBuild()
+		rt.beginBuild()
 		engine, _, sniRep, err := compileSquidPolicy(pol.ConfigText, refLists)
 		if err != nil {
-			s.rt.finishBuild(nil, rev, acl.SNIPatternIndexReport{}, err)
+			rt.finishBuild(nil, rev, acl.SNIPatternIndexReport{}, err)
 			return err
 		}
-		s.rt.finishBuild(engine, rev, sniRep, nil)
+		rt.finishBuild(engine, rev, sniRep, nil)
 	} else {
-		s.rt.markReadyIfSynced()
+		rt.markReadyIfSynced()
 	}
 
 	if err := s.reloadProxyThrottled(ctx); err != nil {
 		return fmt.Errorf("reload proxy: %w", err)
 	}
-	s.rt.markReadyIfSynced()
+	rt.markReadyIfSynced()
 	return nil
 }
 
@@ -169,8 +147,8 @@ func (s *Service) reloadProxyThrottled(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) GetPolicy(ctx context.Context) (domain.Policy, error) {
-	return s.repo.GetPolicy(ctx)
+func (s *Service) GetPolicy(ctx context.Context, instanceID uuid.UUID) (domain.Policy, error) {
+	return s.repo.GetPolicy(ctx, instanceID)
 }
 
 // AnalyzePolicy проверяет конфиг; listInputs == nil — lists из БД.
@@ -199,17 +177,17 @@ func (s *Service) AnalyzePolicy(ctx context.Context, configText string, listInpu
 	return squid.AnalyzeParsedConfig(cfg, domainListsToSquid(dbLists), parseDiags, false)
 }
 
-func (s *Service) SetPolicyAndPublish(ctx context.Context, configText string) (domain.Policy, error) {
-	if err := validateSquidCompile(ctx, &policyValidateRepo{s: s, draftPolicy: configText, hasPolicy: true}); err != nil {
+func (s *Service) SetPolicyAndPublish(ctx context.Context, instanceID uuid.UUID, configText string) (domain.Policy, error) {
+	if err := validateSquidCompile(ctx, &policyValidateRepo{s: s, instanceID: instanceID, draftPolicy: configText, hasPolicy: true}); err != nil {
 		return domain.Policy{}, err
 	}
-	pol, err := s.repo.SetPolicy(ctx, configText)
+	pol, err := s.repo.SetPolicy(ctx, instanceID, configText)
 	if err != nil {
 		return domain.Policy{}, err
 	}
-	refLists, _ := referencedNamedLists(ctx, s.repo, pol.ConfigText)
-	s.rt.setConfigRevision(revisionFromSquid(pol.ConfigText, refLists))
-	s.requestPublish()
+	refLists, _ := referencedNamedLists(ctx, instancePolicySource{s.repo, instanceID}, pol.ConfigText)
+	s.runtimeFor(instanceID).setConfigRevision(revisionFromSquid(pol.ConfigText, refLists))
+	s.requestPublishInstance(instanceID)
 	return pol, nil
 }
 
@@ -238,8 +216,14 @@ func (s *Service) SyncNamedListsAndPublish(ctx context.Context, inputs []SyncNam
 	if err != nil {
 		return nil, err
 	}
-	if err := validateSquidCompile(ctx, &policyValidateRepo{s: s, draftLists: lists, hasLists: true}); err != nil {
+	ids, err := s.repo.ListPolicyInstanceIDs(ctx)
+	if err != nil {
 		return nil, err
+	}
+	for _, instanceID := range ids {
+		if err := validateSquidCompile(ctx, &policyValidateRepo{s: s, instanceID: instanceID, draftLists: lists, hasLists: true}); err != nil {
+			return nil, err
+		}
 	}
 	if err := s.repo.ReplaceNamedLists(ctx, lists); err != nil {
 		return nil, err
@@ -248,21 +232,19 @@ func (s *Service) SyncNamedListsAndPublish(ctx context.Context, inputs []SyncNam
 	if err != nil {
 		return nil, err
 	}
-	pol, _ := s.repo.GetPolicy(ctx)
-	refLists, _ := referencedNamedLists(ctx, s.repo, pol.ConfigText)
-	s.rt.setConfigRevision(revisionFromSquid(pol.ConfigText, refLists))
 	for _, l := range out {
 		if l.SourceMode == domain.ListSourceModeRemote && s.listPoll != nil {
 			s.listPoll.scheduleSoon(l.ID)
 		}
 	}
-	s.requestPublish()
+	s.requestPublishAllInstances(ctx)
 	return out, nil
 }
 
 // policyValidateRepo подставляет черновик policy/lists для проверки компиляции.
 type policyValidateRepo struct {
 	s           *Service
+	instanceID  uuid.UUID
 	draftPolicy string
 	draftLists  []domain.NamedList
 	hasPolicy   bool
@@ -273,7 +255,7 @@ func (p *policyValidateRepo) GetPolicy(ctx context.Context) (domain.Policy, erro
 	if p.hasPolicy {
 		return domain.Policy{ConfigText: p.draftPolicy}, nil
 	}
-	return p.s.repo.GetPolicy(ctx)
+	return p.s.repo.GetPolicy(ctx, p.instanceID)
 }
 
 func (p *policyValidateRepo) ListNamedListsByNames(ctx context.Context, names []string) ([]domain.NamedList, error) {
@@ -306,8 +288,8 @@ type EvaluateResultDTO struct {
 	Steps   []EvaluateStepDTO `json:"steps"`
 }
 
-func (s *Service) Evaluate(_ context.Context, in EvaluateInput) EvaluateResultDTO {
-	engine := s.rt.activeEngine()
+func (s *Service) Evaluate(_ context.Context, instanceID uuid.UUID, in EvaluateInput) EvaluateResultDTO {
+	engine := s.ActiveEngine(instanceID)
 	id := auth.Identity{
 		Username: strings.TrimSpace(in.Username),
 		Groups:   in.Groups,

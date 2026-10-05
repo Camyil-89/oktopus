@@ -8,7 +8,7 @@ import (
 
 	"oktopus/internal/db/proxyaccesslog/domain"
 	"oktopus/internal/db/proxyaccesslog/repository"
-	proxysettingsrepo "oktopus/internal/db/proxysettings/repository"
+	hostsettingsrepo "oktopus/internal/db/hostsettings/repository"
 	"oktopus/internal/proxy/accesslog"
 )
 
@@ -23,11 +23,11 @@ const RetentionUnlimited = 0
 
 type Service struct {
 	repo     repository.Repository
-	settings proxysettingsrepo.SettingsRepository
+	settings hostsettingsrepo.Repository
 	log      *log.Logger
 }
 
-func New(repo repository.Repository, settings proxysettingsrepo.SettingsRepository, logger *log.Logger) *Service {
+func New(repo repository.Repository, settings hostsettingsrepo.Repository, logger *log.Logger) *Service {
 	if logger == nil {
 		logger = log.Default()
 	}
@@ -51,7 +51,11 @@ func (s *Service) FlushAccessLog(ctx context.Context, batch []accesslog.Entry) e
 	}
 	rows := make([]domain.Entry, 0, len(batch))
 	for _, e := range batch {
-		rows = append(rows, fromAccessEntry(e))
+		row, err := fromAccessEntry(e)
+		if err != nil {
+			return err
+		}
+		rows = append(rows, row)
 	}
 	return s.repo.InsertBatch(ctx, rows)
 }

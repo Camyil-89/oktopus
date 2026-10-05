@@ -4,8 +4,8 @@ import { ApiError } from "@/api/base";
 import {
   deleteProxyAccessLogByPeriod,
   listProxyAccessLog,
-  listProxyInspectRules,
-  patchProxySettings,
+  listAllProxyInspectRules,
+  patchHostSettings,
 } from "@/api/proxy";
 import { AccessLogDecisionRuleCell } from "@/assets/components/AccessLogDecisionRuleCell";
 import { AccessLogRuleNameCell } from "@/assets/components/AccessLogRuleNameCell";
@@ -28,9 +28,15 @@ import { AccessLogActionTag } from "@/utils/accessLogAction";
 import type { AccessLogActionCode } from "@/utils/accessLogAction";
 import {
   accessLogActionToListParams,
-  migrateAccessLogFiltersFromStorage,
+  migrateAccessLogSegmentFromStorage,
   parseAccessLogActionFilter,
 } from "@/utils/accessLogFilters";
+import {
+  ACCESS_LOG_SEGMENT_LABEL_KEYS,
+  ACCESS_LOG_SEGMENTS,
+  type AccessLogSegment,
+  parseAccessLogSegment,
+} from "@/utils/accessLogSegment";
 import {
   normalizeAccessLogRow,
 } from "@/utils/accessLogRow";
@@ -48,11 +54,13 @@ import {
   Input,
   Space,
   Table,
+  Tabs,
 } from "antd";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import Link from "next/link";
 import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
 import type { MessageKey } from "@/i18n/translate";
+import { useProxyInstanceNameMap } from "@/assets/hooks/useProxyInstanceNameMap";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -60,6 +68,7 @@ const MAX_PAGE_SIZE = 100;
 
 type ColumnKey =
   | "created_at"
+  | "instance"
   | "source_address"
   | "destination_address"
   | "user"
@@ -74,6 +83,7 @@ type ColumnKey =
 
 const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = [
   "created_at",
+  "instance",
   "source_address",
   "destination_address",
   "user",
@@ -85,6 +95,7 @@ const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = [
 
 const COLUMN_LABEL_KEYS: Record<ColumnKey, MessageKey> = {
   created_at: "accessLog.col.created_at",
+  instance: "accessLog.col.instance",
   source_address: "accessLog.col.source_address",
   destination_address: "accessLog.col.destination_address",
   user: "accessLog.col.user",
@@ -101,6 +112,7 @@ const COLUMN_LABEL_KEYS: Record<ColumnKey, MessageKey> = {
 const ALL_COLUMN_KEYS = Object.keys(COLUMN_LABEL_KEYS) as ColumnKey[];
 const VISIBLE_COLUMNS_STORAGE_KEY = "oktopus.manage.access-log.visible-columns";
 const FILTERS_STORAGE_KEY = "oktopus.manage.access-log.filters";
+const SEGMENT_STORAGE_KEY = "oktopus.manage.access-log.segment";
 
 function loadFiltersFromStorage(): AccessLogFiltersValues {
   if (typeof window === "undefined") {
@@ -118,7 +130,13 @@ function loadFiltersFromStorage(): AccessLogFiltersValues {
     const p = parsed as Partial<AccessLogFiltersValues> & {
       error_kind?: string;
     };
+    const rawAction = (parsed as Record<string, unknown>).action;
+    let action = parseAccessLogActionFilter(rawAction);
+    if (rawAction === "errors") {
+      action = "";
+    }
     return {
+      instance_id: typeof p.instance_id === "string" ? p.instance_id : "",
       id: typeof p.id === "string" ? p.id : "",
       user: typeof p.user === "string" ? p.user : "",
       source: typeof p.source === "string" ? p.source : "",
@@ -127,9 +145,10 @@ function loadFiltersFromStorage(): AccessLogFiltersValues {
       search_only: Boolean(p.search_only),
       from: typeof p.from === "string" ? p.from : "",
       to: typeof p.to === "string" ? p.to : "",
-      action: migrateAccessLogFiltersFromStorage(
-        p as Record<string, unknown>,
-      ),
+      action,
+      attack_kind: typeof p.attack_kind === "string" ? p.attack_kind : "",
+      policy_anomaly_q:
+        typeof p.policy_anomaly_q === "string" ? p.policy_anomaly_q : "",
       decision_rule_ref:
         typeof p.decision_rule_ref === "string" ? p.decision_rule_ref : "",
       inspect_rule_id:
@@ -163,14 +182,39 @@ function loadVisibleColumnsFromStorage(): ColumnKey[] {
   }
 }
 
+function loadSegmentFromStorage(
+  filtersParsed: Record<string, unknown>,
+): AccessLogSegment {
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem(SEGMENT_STORAGE_KEY);
+      if (raw) {
+        return parseAccessLogSegment(raw);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return migrateAccessLogSegmentFromStorage(filtersParsed) ?? "traffic";
+}
+
 function accessLogListParams(
   page: number,
   pageSize: number,
+  segment: AccessLogSegment,
   filters: AccessLogFiltersValues,
 ) {
+  const attackParams =
+    segment === "attacks"
+      ? {
+          attack_kind: filters.attack_kind || undefined,
+          policy_anomaly_q: filters.policy_anomaly_q || undefined,
+        }
+      : {};
   return {
     page,
     page_size: pageSize,
+    segment,
     id: filters.id || undefined,
     user: filters.user || undefined,
     source: filters.source || undefined,
@@ -180,8 +224,10 @@ function accessLogListParams(
     from: filters.from || undefined,
     to: filters.to || undefined,
     ...accessLogActionToListParams(parseAccessLogActionFilter(filters.action)),
+    ...attackParams,
     decision_rule_ref: filters.decision_rule_ref || undefined,
     inspect_rule_id: filters.inspect_rule_id || undefined,
+    instance_id: filters.instance_id || undefined,
   };
 }
 
@@ -189,6 +235,7 @@ export default function ManageAccessLogPage() {
   const { message, modal } = App.useApp();
   const { t } = useTranslation();
   const formatApiError = useApiErrorMessage();
+  const instanceNames = useProxyInstanceNameMap();
   const columnLabels = useMemo(
     () =>
       Object.fromEntries(
@@ -206,6 +253,7 @@ export default function ManageAccessLogPage() {
   const [appliedFilters, setAppliedFilters] =
     useState<AccessLogFiltersValues>(ACCESS_LOG_EMPTY_FILTERS);
   const [filtersHydrated, setFiltersHydrated] = useState(false);
+  const [segment, setSegment] = useState<AccessLogSegment>("traffic");
   const [searchNonce, setSearchNonce] = useState(0);
   const [idSearchDraft, setIdSearchDraft] = useState("");
 
@@ -214,9 +262,22 @@ export default function ManageAccessLogPage() {
   );
 
   useEffect(() => {
+    const raw = localStorage.getItem(FILTERS_STORAGE_KEY);
+    let filtersParsed: Record<string, unknown> = {};
+    if (raw) {
+      try {
+        const p: unknown = JSON.parse(raw);
+        if (p && typeof p === "object") {
+          filtersParsed = p as Record<string, unknown>;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     const stored = loadFiltersFromStorage();
     setAppliedFilters(stored);
     setIdSearchDraft(stored.id);
+    setSegment(loadSegmentFromStorage(filtersParsed));
     setFiltersHydrated(true);
   }, []);
 
@@ -252,7 +313,7 @@ export default function ManageAccessLogPage() {
   );
 
   useEffect(() => {
-    void listProxyInspectRules()
+    void listAllProxyInspectRules()
       .then((inspect) => {
         const m = new Map<string, string>();
         for (const r of inspect) {
@@ -269,7 +330,7 @@ export default function ManageAccessLogPage() {
     setLoading(true);
     try {
       const res = await listProxyAccessLog(
-        accessLogListParams(page, pageSize, appliedFilters),
+        accessLogListParams(page, pageSize, segment, appliedFilters),
       );
       setData(res.results.map(normalizeAccessLogRow));
       setTotal(res.count);
@@ -278,7 +339,16 @@ export default function ManageAccessLogPage() {
     } finally {
       setLoading(false);
     }
-  }, [appliedFilters, formatApiError, message, page, pageSize, searchNonce, t]);
+  }, [
+    appliedFilters,
+    formatApiError,
+    message,
+    page,
+    pageSize,
+    searchNonce,
+    segment,
+    t,
+  ]);
 
   useEffect(() => {
     if (!filtersHydrated) {
@@ -309,8 +379,22 @@ export default function ManageAccessLogPage() {
     appliedFilters.from !== "" ||
     appliedFilters.to !== "" ||
     appliedFilters.action !== "" ||
+    appliedFilters.attack_kind !== "" ||
+    appliedFilters.policy_anomaly_q !== "" ||
     appliedFilters.decision_rule_ref !== "" ||
     appliedFilters.inspect_rule_id !== "";
+
+  const onSegmentChange = (key: string) => {
+    const next = parseAccessLogSegment(key);
+    setSegment(next);
+    setPage(1);
+    try {
+      localStorage.setItem(SEGMENT_STORAGE_KEY, next);
+    } catch {
+      /* ignore */
+    }
+    setSearchNonce((n) => n + 1);
+  };
 
   const refreshList = () => {
     setSearchNonce((n) => n + 1);
@@ -344,7 +428,7 @@ export default function ManageAccessLogPage() {
           setDeleteOpen(false);
           setPage(1);
           const list = await listProxyAccessLog(
-            accessLogListParams(1, pageSize, appliedFilters),
+            accessLogListParams(1, pageSize, segment, appliedFilters),
           );
           setData(list.results.map(normalizeAccessLogRow));
           setTotal(list.count);
@@ -360,7 +444,7 @@ export default function ManageAccessLogPage() {
   const saveRetention = async (body: { access_log_retention_days: number }) => {
     setSettingsSaving(true);
     try {
-      await patchProxySettings(body);
+      await patchHostSettings(body);
       message.success(t("common.saved"));
       setSettingsOpen(false);
     } catch (e) {
@@ -378,6 +462,15 @@ export default function ManageAccessLogPage() {
         dataIndex: "created_at",
         width: 190,
         render: (v: string) => new Date(v).toLocaleString(),
+      },
+      {
+        key: "instance",
+        title: columnLabels.instance,
+        dataIndex: "instance_id",
+        width: 140,
+        ellipsis: true,
+        render: (id: string) =>
+          instanceNames.get(id) ?? (id ? id.slice(0, 8) : "—"),
       },
       {
         key: "source_address",
@@ -472,7 +565,7 @@ export default function ManageAccessLogPage() {
         },
       },
     ],
-    [columnLabels, ruleNames, t],
+    [columnLabels, instanceNames, ruleNames, t],
   );
 
   const tableColumns = useMemo(
@@ -507,7 +600,7 @@ export default function ManageAccessLogPage() {
     <div className="flex w-full flex-col gap-4">
       <header className="flex flex-row flex-wrap items-center justify-between gap-3">
         <Link
-          href="/manage/access-log/reports"
+          href="/manage/reports"
           className="text-[12px] text-zinc-500 transition hover:text-teal-300"
         >
           {t("accessLog.reportsLink")}
@@ -544,6 +637,7 @@ export default function ManageAccessLogPage() {
         open={detailRow !== null}
         onClose={() => setDetailRow(null)}
         ruleNames={ruleNames}
+        instanceNames={instanceNames}
       />
 
       <AccessLogFiltersModal
@@ -554,6 +648,17 @@ export default function ManageAccessLogPage() {
       />
 
       <div className="panel-table overflow-hidden rounded-xl border border-white/10 bg-white/[0.05]">
+        <div className="px-5 pt-3">
+          <Tabs
+            activeKey={segment}
+            onChange={onSegmentChange}
+            tabBarStyle={{ marginBottom: 0 }}
+            items={ACCESS_LOG_SEGMENTS.map((key) => ({
+              key,
+              label: t(ACCESS_LOG_SEGMENT_LABEL_KEYS[key]),
+            }))}
+          />
+        </div>
         <div className="flex flex-row flex-wrap items-center gap-2 border-b border-white/8 px-5 py-4">
           <Space wrap className="flex-1">
             <Input.Search

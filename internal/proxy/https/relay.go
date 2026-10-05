@@ -4,6 +4,8 @@ import (
 	"io"
 	"sync"
 
+	"github.com/google/uuid"
+
 	"oktopus/internal/proxy/bytecount"
 	"oktopus/internal/proxy/ratelimit"
 )
@@ -29,18 +31,23 @@ var relayBufPool = sync.Pool{
 // flow != nil — один Acquire на chunk (без TCP ReadFrom/WriteTo, симметричный up/down).
 // countBytes — учёт на границе tunnel; для MITM/WebSocket с bytecount.WrapConn — false.
 func Relay(dst io.WriteCloser, src io.ReadCloser, flow *ratelimit.Flow, dir RelayDir, countBytes bool) {
+	RelayInstance(dst, src, flow, dir, countBytes, uuid.Nil)
+}
+
+// RelayInstance — как Relay, с привязкой байтов к proxy-инстансу.
+func RelayInstance(dst io.WriteCloser, src io.ReadCloser, flow *ratelimit.Flow, dir RelayDir, countBytes bool, instanceID uuid.UUID) {
 	defer dst.Close()
 	defer src.Close()
 	buf := relayBufPool.Get().(*[]byte)
 	defer relayBufPool.Put(buf)
 	if flow == nil {
-		_, _ = relayCopy(dst, src, nil, *buf, dir, countBytes)
+		_, _ = relayCopy(dst, src, nil, *buf, dir, countBytes, instanceID)
 		return
 	}
-	_, _ = relayCopy(dst, src, flow, *buf, dir, countBytes)
+	_, _ = relayCopy(dst, src, flow, *buf, dir, countBytes, instanceID)
 }
 
-func relayCopy(dst io.Writer, src io.Reader, flow *ratelimit.Flow, buf []byte, dir RelayDir, countBytes bool) (int64, error) {
+func relayCopy(dst io.Writer, src io.Reader, flow *ratelimit.Flow, buf []byte, dir RelayDir, countBytes bool, instanceID uuid.UUID) (int64, error) {
 	var written int64
 	for {
 		nr, er := src.Read(buf)
@@ -48,9 +55,9 @@ func relayCopy(dst io.Writer, src io.Reader, flow *ratelimit.Flow, buf []byte, d
 			if countBytes {
 				switch dir {
 				case RelayFromClient:
-					bytecount.ObserveUp(nr)
+					bytecount.ObserveUpInstance(instanceID, nr, false)
 				case RelayToClient:
-					bytecount.ObserveDown(nr)
+					bytecount.ObserveDownInstance(instanceID, nr, false)
 				}
 			}
 			if flow != nil {

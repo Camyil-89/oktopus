@@ -33,9 +33,10 @@ func (e *Engine) connectMiddleware(rec accesslog.Recorder) hooks.ConnectMiddlewa
 		id, _ := authIdentity(ctx)
 		res := e.EvaluatePolicy(ctx, id, PolicyRequestFromConnect(ctx, hostPort), ConnectSkipFromContext(ctx))
 		parts := metricsDecideParts(res.Prepare, res.Engine, res.Timing)
-		metrics.ObserveDecisionWithPolicy(res.Allow, res.Spend, parts, metricsUser(ctx), metricsSource(ctx, nil))
+		metrics.ObserveDecisionWithPolicy(ctx, res.Allow, res.Spend, parts, metricsUser(ctx), metricsSource(ctx, nil))
+		logCtx := observe.WithPolicyEvalTrace(ctx, policyEvalTraceFromFields(res.Fields))
 		if rec != nil {
-			rec.Record(accesslog.ConnectEntry(ctx, hostPort, res.Allow, res.Spend, res.RuleRef))
+			rec.Record(accesslog.ConnectEntry(logCtx, hostPort, res.Allow, res.Spend, res.RuleRef))
 		}
 		if res.Allow {
 			return hooks.AllowDecision()
@@ -49,12 +50,21 @@ func (e *Engine) httpRequestMiddleware(rec accesslog.Recorder) hooks.HTTPRequest
 		id, _ := authIdentity(ctx)
 		res := e.EvaluatePolicy(ctx, id, PolicyRequestFromHTTP(ctx, req), nil)
 		parts := metricsDecideParts(res.Prepare, res.Engine, res.Timing)
-		metrics.ObserveDecision(res.Allow, res.Spend, parts, metricsUser(ctx), metricsSource(ctx, req))
+		metrics.ObserveDecision(ctx, res.Allow, res.Spend, parts, metricsUser(ctx), metricsSource(ctx, req))
+		trace := policyEvalTraceFromFields(res.Fields)
+		if req != nil {
+			base := req.Context()
+			if base == nil {
+				base = ctx
+			}
+			base = observe.WithPolicyEvalTrace(base, trace)
+			*req = *req.WithContext(base)
+		}
 		if rec != nil && !res.Allow {
 			rec.Record(accesslog.HTTPEntry(ctx, req, false, res.Spend, res.RuleRef))
 		}
 		if !res.Allow {
-			metrics.ObservePolicyTotal(res.Spend)
+			metrics.ObservePolicyTotal(ctx, res.Spend)
 		}
 		if res.Allow {
 			if req != nil {
@@ -141,6 +151,20 @@ func httpDstPort(req *stdhttp.Request) int {
 		}
 	}
 	return 0
+}
+
+func policyEvalTraceFromFields(f RequestFields) observe.PolicyEvalTrace {
+	ips := make([]string, 0, len(f.DstResolved))
+	for _, ip := range f.DstResolved {
+		if ipValid(ip) {
+			ips = append(ips, ip.String())
+		}
+	}
+	return observe.PolicyEvalTrace{
+		PolicyHost:  strings.TrimSpace(f.SNI),
+		DstPort:     f.DstPort,
+		DstResolved: ips,
+	}
 }
 
 func connectSkipRuleTypes(ctx context.Context) map[RuleType]bool {

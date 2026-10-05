@@ -50,6 +50,7 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Deployment</p>
         <div class="flex flex-col gap-0.5">
           <a href="./quickstart.html" class="nav-item active"><span class="dot"></span>Deployment</a>
+<a href="./implementation-examples.html" class="nav-item"><span class="dot"></span>Implementation patterns</a>
         </div>
       </div>
 
@@ -71,9 +72,10 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Control panel</p>
         <div class="flex flex-col gap-0.5">
           <a href="./manage/index.html" class="nav-item"><span class="dot"></span>Home</a>
+<a href="./manage/instance.html" class="nav-item"><span class="dot"></span>Instance statistics</a>
 <a href="./manage/rules.html" class="nav-item"><span class="dot"></span>Proxy rules</a>
 <a href="./manage/access-log.html" class="nav-item"><span class="dot"></span>Access log</a>
-<a href="./manage/access-log/reports.html" class="nav-item"><span class="dot"></span>Access log reports</a>
+<a href="./manage/reports.html" class="nav-item"><span class="dot"></span>Access log reports</a>
 <a href="./manage/proxy.html" class="nav-item"><span class="dot"></span>Proxy settings</a>
 <a href="./manage/users.html" class="nav-item"><span class="dot"></span>Users</a>
         </div>
@@ -127,6 +129,16 @@
             <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Deployment</h1>
             <p class="lead">Run Oktopus in Docker: the stack script writes <code>.env</code>, starts Compose, and prints the control panel URL and admin credentials.</p>
 
+            <h2 id="qs-stack">Stack services</h2>
+            <p><code>docker compose</code> from the repo root runs four services (see <code>docker-compose.yml</code>). Together they form one Oktopus installation on your network:</p>
+            <ul>
+              <li><strong>nginx</strong> — entry point for administrators: serves the Next.js UI and proxies browser requests to the Oktopus HTTP API. This is the URL the stack script prints (<code>OKTOPUS_API_HOST</code> / <code>OKTOPUS_API_PORT</code>).</li>
+              <li><strong>oktopus</strong> — single application container (<code>go run</code> equivalent): forward HTTP/HTTPS proxy, REST API, and proxy engine. Client traffic uses the proxy listen port from the panel; administrators use nginx for the UI.</li>
+              <li><strong>postgresql</strong> — operational data: users, proxy settings, ACL rules, sessions, and other metadata the API reads and writes.</li>
+              <li><strong>clickhouse</strong> — high-volume proxy access log and analytics for reports; written by the proxy, queried by the API for the access log UI.</li>
+            </ul>
+            <p>PostgreSQL and ClickHouse are published <strong>on localhost only</strong> (ports from <code>.env</code>).</p>
+
             <h2 id="qs-req">Requirements</h2>
             <ul>
               <li>Git and <a href="https://docs.docker.com/compose/">Docker Compose</a> (<code>docker compose</code>).</li>
@@ -161,7 +173,7 @@ cd oktopus</code></pre>
             <ol>
               <li>The script prints <strong>UI</strong> URL, admin login, and password from <code>.env</code>.</li>
               <li>Sign in and confirm the proxy is <strong>RUNNING</strong> on <a href="manage/index.html">Home</a>.</li>
-              <li>Configure listen port and mode under <a href="manage/proxy.html">Proxy settings</a>.</li>
+              <li>On <a href="manage/index.html">Home</a>, create a proxy instance (name and listen), then set port, tunnel/MITM, and CA under <a href="manage/proxy.html">instance settings</a>; point clients at that listen address.</li>
             </ol>
 
             <p>Re-running the script recreates <code>.env</code> but keeps DB passwords when Docker volumes already exist.</p>
@@ -174,10 +186,10 @@ cd oktopus</code></pre>
           <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Back</span>
           <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Developers</span>
         </span>
-      </a><a href="./login.html" class="pager-link group text-right ml-auto">
+      </a><a href="./implementation-examples.html" class="pager-link group text-right ml-auto">
         <span class="min-w-0">
           <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Next</span>
-          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Sign in</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Implementation patterns</span>
         </span>
         <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
       </a></div>

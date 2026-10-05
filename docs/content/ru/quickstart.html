@@ -2,6 +2,16 @@
             <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Развёртывание</h1>
             <p class="lead">Запуск Oktopus в Docker: скрипт создаёт <code>.env</code>, поднимает compose и выводит URL панели управления и учётные данные администратора.</p>
 
+            <h2 id="qs-stack">Состав стека</h2>
+            <p>Скрипт развёртывания поднимает <code>docker compose</code> с четырьмя сервисами (см. <code>docker-compose.yml</code> в корне). Вместе это одна установка Oktopus в вашей сети:</p>
+            <ul>
+              <li><strong>nginx</strong> — точка входа для администраторов: отдаёт собранный UI (Next.js) и проксирует запросы браузера к HTTP API Oktopus. Именно этот адрес печатает скрипт (<code>OKTOPUS_API_HOST</code> / <code>OKTOPUS_API_PORT</code>).</li>
+              <li><strong>oktopus</strong> — один контейнер приложения: форвард-прокси HTTP/HTTPS, REST API и движок прокси. Клиенты ходят на listen-порт прокси (из кабинета); администраторы — в UI через nginx.</li>
+              <li><strong>postgresql</strong> — рабочие данные: пользователи, настройки прокси, правила ACL, сессии и прочие метаданные, с которыми работает API.</li>
+              <li><strong>clickhouse</strong> — журнал доступа прокси и аналитика для отчётов; прокси пишет события, API отдаёт их в разделе журнала.</li>
+            </ul>
+            <p>PostgreSQL и ClickHouse в compose проброшены <strong>только на localhost</strong> (порты из <code>.env</code>).</p>
+
             <h2 id="qs-req">Что нужно</h2>
             <ul>
               <li>Git и <a href="https://docs.docker.com/compose/">Docker Compose</a> (команда <code>docker compose</code>).</li>
@@ -36,7 +46,7 @@ cd oktopus</code></pre>
             <ol>
               <li>В конце скрипт выведет <strong>UI</strong> (<code>http://…</code>), логин и пароль администратора из <code>.env</code>.</li>
               <li>Откройте URL в браузере, войдите и на <a href="manage/index.html">главной</a> проверьте, что прокси <strong>RUNNING</strong>.</li>
-              <li>Порт и режим прокси — в <a href="manage/proxy.html">настройках прокси</a>; клиентам укажите listen-адрес из панели.</li>
+              <li>На <a href="manage/index.html">главной</a> создайте прокси-инстанс (имя и listen), затем порт, режим tunnel/MITM и CA — в <a href="manage/proxy.html">настройках инстанса</a>; клиентам укажите его listen-адрес.</li>
             </ol>
 
             <p>При повторном запуске скрипт пересоздаёт <code>.env</code>, но пароли БД сохраняются, если тома Docker уже существуют.</p>

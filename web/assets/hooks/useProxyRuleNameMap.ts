@@ -1,11 +1,11 @@
 "use client";
 
-import { listProxyInspectRules } from "@/api/proxy";
+import { listAllProxyInspectRules, listProxyInspectRules } from "@/api/proxy";
 import { useEffect, useState } from "react";
 
 export type ProxyRuleKind = "inspect";
 
-export function useProxyRuleNameMap(): {
+export function useProxyRuleNameMap(instanceId?: string): {
   ruleNames: ReadonlyMap<string, string>;
   ruleKinds: ReadonlyMap<string, ProxyRuleKind>;
   loading: boolean;
@@ -21,7 +21,10 @@ export function useProxyRuleNameMap(): {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void listProxyInspectRules()
+    const loadRules = instanceId
+      ? () => listProxyInspectRules(instanceId)
+      : () => listAllProxyInspectRules();
+    void loadRules()
       .then((inspect) => {
         if (cancelled) {
           return;
@@ -49,7 +52,7 @@ export function useProxyRuleNameMap(): {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [instanceId]);
 
   return { ruleNames, ruleKinds, loading };
 }

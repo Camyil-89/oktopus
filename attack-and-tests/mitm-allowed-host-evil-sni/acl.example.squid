@@ -1,0 +1,13 @@
+# Пример для публикации в oktopus (режим connect=mitm).
+
+acl public dstdomain localhost
+acl evil_sni dstdomain internal.blocked
+acl loopback dst 127.0.0.0/8
+acl all all
+http_access deny loopback
+http_access deny evil_sni
+http_access allow public
+http_access deny all
+
+ssl_verify skip public
+ssl_verify require all

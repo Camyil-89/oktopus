@@ -1,4 +1,9 @@
-import { getProxyACLPolicy, listProxyInspectRules } from "@/api/proxy";
+import {
+  getProxyACLPolicy,
+  listAllProxyInspectRules,
+  listProxyInspectRules,
+  listProxyInstances,
+} from "@/api/proxy";
 import { INSPECT_LUA_API_REFERENCE } from "@/assets/inspect/luaExamples";
 import type { ProxyInspectRule } from "@/types/inspect";
 import type { ProxyACLPolicy } from "@/types/proxy";
@@ -9,16 +14,27 @@ function inspectActionLabel(action: 0 | 1): string {
     : "allow_on_match (1) — при совпадении отметить и проверять следующие правила";
 }
 
-export async function loadProxyRulesForReportPrompt(): Promise<{
-  policy: ProxyACLPolicy;
+export async function loadProxyRulesForReportPrompt(instanceId?: string): Promise<{
+  policies: { instanceName: string; policy: ProxyACLPolicy }[];
   inspect: ProxyInspectRule[];
 }> {
-  const [policy, inspect] = await Promise.all([
-    getProxyACLPolicy(),
-    listProxyInspectRules(),
+  const instances = await listProxyInstances();
+  const targets = instanceId
+    ? instances.filter((i) => i.id === instanceId)
+    : instances;
+  const [policyPairs, inspect] = await Promise.all([
+    Promise.all(
+      targets.map(async (inst) => ({
+        instanceName: inst.name,
+        policy: await getProxyACLPolicy(inst.id),
+      })),
+    ),
+    instanceId
+      ? listProxyInspectRules(instanceId)
+      : listAllProxyInspectRules(),
   ]);
   return {
-    policy,
+    policies: policyPairs,
     inspect: [...inspect].sort((a, b) => a.sort_order - b.sort_order),
   };
 }

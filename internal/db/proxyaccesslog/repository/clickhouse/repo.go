@@ -28,7 +28,7 @@ func (r *Repository) InsertBatch(ctx context.Context, entries []domain.Entry) er
 	}
 
 	logBatch, err := r.conn.PrepareBatch(ctx, `INSERT INTO proxy_access_log (
-		id, created_at, source_address, destination_address, user_name,
+		id, instance_id, created_at, source_address, destination_address, user_name,
 		decide_duration_us, full_url, action, inspect_rule_id, denied_by,
 		decision_rule_ref, search_engine, search_query, inspect_error
 	)`)
@@ -41,6 +41,7 @@ func (r *Repository) InsertBatch(ctx context.Context, entries []domain.Entry) er
 		parsed := extra.ParseFromJSON(e.ID, e.Extra)
 		if err := logBatch.Append(
 			e.ID,
+			e.InstanceID,
 			e.CreatedAt.UTC(),
 			e.SourceAddress,
 			e.DestinationAddress,
@@ -117,7 +118,7 @@ func (r *Repository) List(ctx context.Context, f repository.ListFilter, page, pa
 
 	offset := (page - 1) * pageSize
 	listSQL := `SELECT
-		id, created_at, source_address, destination_address, user_name,
+		id, instance_id, created_at, source_address, destination_address, user_name,
 		decide_duration_us, full_url, action, inspect_rule_id, denied_by,
 		decision_rule_ref, search_engine, search_query, inspect_error
 	FROM proxy_access_log
@@ -143,6 +144,7 @@ func (r *Repository) List(ctx context.Context, f repository.ListFilter, page, pa
 	for rows.Next() {
 		var (
 			id                 uuid.UUID
+			instanceID         uuid.UUID
 			createdAt          time.Time
 			source             string
 			destination        string
@@ -158,7 +160,7 @@ func (r *Repository) List(ctx context.Context, f repository.ListFilter, page, pa
 			inspectError       string
 		)
 		if err := rows.Scan(
-			&id, &createdAt, &source, &destination, &user,
+			&id, &instanceID, &createdAt, &source, &destination, &user,
 			&decideUs, &fullURL, &action, &inspectRule, &deniedBy,
 			&decisionRef, &searchEngine, &searchQuery, &inspectError,
 		); err != nil {
@@ -172,6 +174,7 @@ func (r *Repository) List(ctx context.Context, f repository.ListFilter, page, pa
 		}{searchEngine, searchQuery, inspectError})
 		items = append(items, domain.Entry{
 			ID:                 id,
+			InstanceID:         instanceID,
 			CreatedAt:          createdAt.UTC(),
 			SourceAddress:      source,
 			DestinationAddress: destination,
@@ -235,68 +238,6 @@ func (r *Repository) loadKVForLogs(ctx context.Context, ids []uuid.UUID) (map[uu
 		})
 	}
 	return out, rows.Err()
-}
-
-func listWhere(f repository.ListFilter) (string, []any) {
-	parts := []string{"1 = 1"}
-	args := []any{}
-
-	addILIKE := func(col, val string) {
-		val = strings.TrimSpace(val)
-		if val == "" {
-			return
-		}
-		parts = append(parts, col+" ILIKE ?")
-		args = append(args, "%"+val+"%")
-	}
-
-	addILIKE("user_name", f.User)
-	addILIKE("source_address", f.Source)
-	addILIKE("destination_address", f.Destination)
-	addILIKE("full_url", f.URL)
-
-	if f.SearchOnly {
-		parts = append(parts, "search_engine != ''")
-	}
-	if strings.TrimSpace(f.ErrorKind) == "any" {
-		parts = append(parts, `(
-			length(trimBoth(inspect_error)) > 0
-			OR decision_rule_ref IN ('system_auth_fail', 'system_inspect_error', 'system_gateway_error')
-			OR coalesce(denied_by, '') = 'gateway'
-		)`)
-	}
-	if f.From != nil {
-		parts = append(parts, "created_at >= ?")
-		args = append(args, f.From.UTC())
-	}
-	if f.To != nil {
-		parts = append(parts, "created_at <= ?")
-		args = append(args, f.To.UTC())
-	}
-	if f.Action == 0 || f.Action == 1 {
-		parts = append(parts, "action = ?")
-		args = append(args, uint8(f.Action))
-	}
-	if id := strings.TrimSpace(f.ID); id != "" {
-		parsed, err := uuid.Parse(id)
-		if err == nil {
-			parts = append(parts, "id = ?")
-			args = append(args, parsed)
-		}
-	}
-	if ref := strings.TrimSpace(f.DecisionRuleRef); ref != "" {
-		parts = append(parts, "decision_rule_ref ILIKE ?")
-		args = append(args, "%"+ref+"%")
-	}
-	if id := strings.TrimSpace(f.InspectRuleID); id != "" {
-		parsed, err := uuid.Parse(id)
-		if err == nil {
-			parts = append(parts, "inspect_rule_id = ?")
-			args = append(args, parsed)
-		}
-	}
-
-	return strings.Join(parts, " AND "), args
 }
 
 func (r *Repository) DeleteBefore(ctx context.Context, before time.Time) error {

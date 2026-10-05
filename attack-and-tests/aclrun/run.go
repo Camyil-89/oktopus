@@ -27,6 +27,7 @@ type Suite struct {
 	Name        string
 	POCDir      string
 	ProxyLDAP   bool // прокси с auth backend ldap (нужен dev OpenLDAP)
+	HTTPLab     bool // plain HTTP lab на 127.0.0.1:9090 для url_regex proxy probe
 	Cases       []Case
 }
 
@@ -74,6 +75,10 @@ func RunEvaluateSuite(s Suite, args []string) int {
 		log.Printf("%s: login: %v", s.Name, err)
 		return 1
 	}
+	if _, err := client.EnsureTestInstance(); err != nil {
+		log.Printf("%s: test instance: %v", s.Name, err)
+		return 1
+	}
 	if s.ProxyLDAP {
 		if err := setup.CheckLDAPDevReachable(); err != nil {
 			log.Printf("%s: %v", s.Name, err)
@@ -88,6 +93,16 @@ func RunEvaluateSuite(s Suite, args []string) int {
 		return 1
 	}
 	log.Printf("%s: политика опубликована, %d кейсов", s.Name, len(s.Cases))
+
+	var stopHTTPLab func()
+	if s.HTTPLab {
+		stopHTTPLab, err = startACLHTTPLab()
+		if err != nil {
+			log.Printf("%s: http lab: %v", s.Name, err)
+			return 1
+		}
+		defer stopHTTPLab()
+	}
 
 	caPath := filepath.Join(s.POCDir, ".probe-ca.crt")
 	if err := client.DownloadCACert(caPath); err != nil {
@@ -153,6 +168,10 @@ func RunCompileSuite(s CompileSuite, args []string) int {
 	}
 	if err := client.Login(api.APIUser, api.APIPass); err != nil {
 		log.Printf("%s: login: %v", s.Name, err)
+		return 1
+	}
+	if _, err := client.EnsureTestInstance(); err != nil {
+		log.Printf("%s: test instance: %v", s.Name, err)
 		return 1
 	}
 	if failed := validatePolicy(client, s.Name, policy); failed {

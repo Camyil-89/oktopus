@@ -11,9 +11,18 @@ CREATE TABLE users (
 
 CREATE INDEX users_username_idx ON users (username);
 
-CREATE TABLE proxy_settings (
+CREATE TABLE settings (
     id UUID PRIMARY KEY,
-    proxy_enabled BOOLEAN NOT NULL DEFAULT false,
+    access_log_retention_days INTEGER NOT NULL DEFAULT 3
+        CHECK (access_log_retention_days = 0 OR access_log_retention_days >= 1),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE proxy_instances (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT false,
     listen TEXT NOT NULL,
     connect_mode TEXT NOT NULL,
     ca_cert_path TEXT NOT NULL,
@@ -27,14 +36,18 @@ CREATE TABLE proxy_settings (
     ldap_base_dn TEXT NOT NULL,
     ldap_bind_dn TEXT NOT NULL,
     ldap_bind_password TEXT NOT NULL,
-    access_log_retention_days INTEGER NOT NULL DEFAULT 3
-        CHECK (access_log_retention_days = 0 OR access_log_retention_days >= 1),
+    sort_order INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT proxy_instances_listen_unique UNIQUE (listen),
+    CONSTRAINT proxy_instances_name_unique UNIQUE (name)
 );
+
+CREATE INDEX proxy_instances_sort_idx ON proxy_instances (sort_order, created_at);
 
 CREATE TABLE proxy_inspect_rules (
     id UUID PRIMARY KEY,
+    instance_id UUID NOT NULL REFERENCES proxy_instances (id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     script TEXT NOT NULL,
     action SMALLINT NOT NULL DEFAULT 0,
@@ -45,16 +58,15 @@ CREATE TABLE proxy_inspect_rules (
     CONSTRAINT proxy_inspect_rules_action_check CHECK (action IN (0, 1))
 );
 
-CREATE INDEX proxy_inspect_rules_sort_idx ON proxy_inspect_rules (sort_order);
+CREATE INDEX proxy_inspect_rules_instance_sort_idx ON proxy_inspect_rules (instance_id, sort_order);
 
 CREATE TABLE proxy_acl_policy (
     id UUID PRIMARY KEY,
+    instance_id UUID NOT NULL REFERENCES proxy_instances (id) ON DELETE CASCADE,
     config_text TEXT NOT NULL DEFAULT '',
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT proxy_acl_policy_instance_unique UNIQUE (instance_id)
 );
-
-INSERT INTO proxy_acl_policy (id, config_text)
-VALUES ('01900000-0000-7000-8000-000000000001', '');
 
 CREATE TABLE proxy_acl_lists (
     id UUID PRIMARY KEY,
@@ -77,5 +89,6 @@ CREATE INDEX proxy_acl_lists_name_idx ON proxy_acl_lists (name);
 DROP TABLE IF EXISTS proxy_acl_lists;
 DROP TABLE IF EXISTS proxy_acl_policy;
 DROP TABLE IF EXISTS proxy_inspect_rules;
-DROP TABLE IF EXISTS proxy_settings;
+DROP TABLE IF EXISTS proxy_instances;
+DROP TABLE IF EXISTS settings;
 DROP TABLE IF EXISTS users;

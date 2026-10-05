@@ -1,0 +1,11 @@
+acl public dstdomain localhost
+acl badport port 9778
+acl loopback dst 127.0.0.0/8
+acl all all
+http_access deny badport
+http_access deny loopback
+http_access allow public
+http_access deny all
+
+ssl_verify skip public
+ssl_verify require all

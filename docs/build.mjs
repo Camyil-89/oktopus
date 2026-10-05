@@ -4,28 +4,49 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const MANAGE_NAV = {
+const GLOBAL_MANAGE_NAV = {
   ru: [
     { id: "manage-home", label: "Главная" },
-    { id: "manage-rules", label: "Правила прокси" },
     { id: "manage-access-log", label: "Журнал доступа" },
     { id: "manage-access-log-reports", label: "Отчёты журнала" },
-    { id: "manage-proxy", label: "Настройки прокси" },
     { id: "manage-users", label: "Пользователи" },
   ],
   en: [
     { id: "manage-home", label: "Home" },
-    { id: "manage-rules", label: "Proxy rules" },
     { id: "manage-access-log", label: "Access log" },
     { id: "manage-access-log-reports", label: "Access log reports" },
-    { id: "manage-proxy", label: "Proxy settings" },
     { id: "manage-users", label: "Users" },
   ],
+};
+
+const INSTANCE_SIDEBAR = {
+  ru: {
+    sampleName: "Офис",
+    stats: "Статистика",
+    rules: "Правила прокси",
+    settings: "Настройки",
+    accessLog: "Журнал доступа",
+  },
+  en: {
+    sampleName: "Office",
+    stats: "Statistics",
+    rules: "Proxy rules",
+    settings: "Settings",
+    accessLog: "Access log",
+  },
+};
+
+/** Which instance sub-nav item is active (null = instance row only, no sub-nav). */
+const INSTANCE_NAV_ACTIVE = {
+  "manage-instance": "stats",
+  "manage-rules": "rules",
+  "manage-proxy": "settings",
 };
 
 const UI_MOCK_PAGE_IDS = new Set([
   "login",
   "manage-home",
+  "manage-instance",
   "manage-rules",
   "rules-acl-syntax",
   "manage-access-log",
@@ -34,15 +55,19 @@ const UI_MOCK_PAGE_IDS = new Set([
   "manage-users",
 ]);
 
+const MERMAID_PAGE_IDS = new Set(["implementation-examples"]);
+
 const PAGES = [
   { id: "intro", file: "index.html" },
   { id: "quickstart", file: "quickstart.html" },
+  { id: "implementation-examples", file: "implementation-examples.html" },
   { id: "login", file: "login.html" },
   { id: "manage-home", file: "manage/index.html" },
+  { id: "manage-instance", file: "manage/instance.html" },
   { id: "manage-rules", file: "manage/rules.html" },
   { id: "rules-acl-syntax", file: "manage/rules-acl-syntax.html" },
   { id: "manage-access-log", file: "manage/access-log.html" },
-  { id: "manage-access-log-reports", file: "manage/access-log/reports.html" },
+  { id: "manage-access-log-reports", file: "manage/reports.html" },
   { id: "manage-proxy", file: "manage/proxy.html" },
   { id: "manage-users", file: "manage/users.html" },
 ];
@@ -51,8 +76,18 @@ const META = {
   ru: {
     intro: { section: "Разработка", title: "Разработчикам", pageTitle: "Oktopus — Разработчикам" },
     quickstart: { section: "Развёртывание", title: "Развёртывание", pageTitle: "Oktopus — Развёртывание" },
+    "implementation-examples": {
+      section: "Развёртывание",
+      title: "Примеры реализаций",
+      pageTitle: "Oktopus — Примеры реализаций",
+    },
     login: { section: "Вход", title: "Вход", pageTitle: "Oktopus — Вход" },
     "manage-home": { section: "Панель управления", title: "Главная", pageTitle: "Oktopus — Главная" },
+    "manage-instance": {
+      section: "Панель управления",
+      title: "Статистика инстанса",
+      pageTitle: "Oktopus — Статистика инстанса",
+    },
     "manage-rules": { section: "Панель управления", title: "Правила прокси", pageTitle: "Oktopus — Правила прокси" },
     "rules-acl-syntax": {
       section: "Справочник",
@@ -71,8 +106,18 @@ const META = {
   en: {
     intro: { section: "Development", title: "Developers", pageTitle: "Oktopus — Developers" },
     quickstart: { section: "Deployment", title: "Deployment", pageTitle: "Oktopus — Deployment" },
+    "implementation-examples": {
+      section: "Deployment",
+      title: "Implementation patterns",
+      pageTitle: "Oktopus — Implementation patterns",
+    },
     login: { section: "Sign in", title: "Sign in", pageTitle: "Oktopus — Sign in" },
     "manage-home": { section: "Control panel", title: "Home", pageTitle: "Oktopus — Home" },
+    "manage-instance": {
+      section: "Control panel",
+      title: "Instance statistics",
+      pageTitle: "Oktopus — Instance statistics",
+    },
     "manage-rules": { section: "Control panel", title: "Proxy rules", pageTitle: "Oktopus — Proxy rules" },
     "rules-acl-syntax": {
       section: "Reference",
@@ -95,7 +140,10 @@ const NAV = {
     sections: [
       {
         label: "Развёртывание",
-        items: [{ id: "quickstart", label: "Развёртывание" }],
+        items: [
+          { id: "quickstart", label: "Развёртывание" },
+          { id: "implementation-examples", label: "Примеры реализаций" },
+        ],
       },
       {
         label: "Разработка",
@@ -106,6 +154,7 @@ const NAV = {
         label: "Панель управления",
         items: [
           { id: "manage-home", label: "Главная" },
+          { id: "manage-instance", label: "Статистика инстанса" },
           { id: "manage-rules", label: "Правила прокси" },
           { id: "manage-access-log", label: "Журнал доступа" },
           { id: "manage-access-log-reports", label: "Отчёты журнала" },
@@ -136,7 +185,10 @@ const NAV = {
     sections: [
       {
         label: "Deployment",
-        items: [{ id: "quickstart", label: "Deployment" }],
+        items: [
+          { id: "quickstart", label: "Deployment" },
+          { id: "implementation-examples", label: "Implementation patterns" },
+        ],
       },
       {
         label: "Development",
@@ -147,6 +199,7 @@ const NAV = {
         label: "Control panel",
         items: [
           { id: "manage-home", label: "Home" },
+          { id: "manage-instance", label: "Instance statistics" },
           { id: "manage-rules", label: "Proxy rules" },
           { id: "manage-access-log", label: "Access log" },
           { id: "manage-access-log-reports", label: "Access log reports" },
@@ -179,30 +232,56 @@ function pageFile(id) {
   return PAGES.find((p) => p.id === id).file;
 }
 
-function manageAsideActiveId(pageId) {
+function manageAsideGlobalActiveId(pageId) {
   if (pageId === "rules-acl-syntax") return "manage-rules";
+  if (INSTANCE_NAV_ACTIVE[pageId]) return null;
   return pageId;
 }
 
-function renderManageAside(locale, activeId, assets) {
+function renderManageAside(locale, pageId, assets) {
   const asideTour =
     locale === "ru"
       ? {
           title: "Боковое меню",
           body:
-            "Навигация по панели управления: главная, правила, журнал, отчёты, настройки прокси, пользователи. Внизу — выход из учётной записи.",
+            "Общие разделы: главная, журнал и отчёты по всем инстансам, пользователи кабинета. Ниже — каждый прокси-инстанс: при открытии появляются подпункты (статистика, правила, настройки, журнал). Выход — внизу.",
         }
       : {
           title: "Sidebar",
           body:
-            "Console navigation: home, rules, access log, reports, proxy settings, users. Sign out is at the bottom.",
+            "Global sections: home, access log and reports across instances, console users. Below — each proxy instance; when opened, sub-items appear (statistics, rules, settings, log). Sign out is at the bottom.",
         };
-  const items = MANAGE_NAV[locale]
+  const globalActive = manageAsideGlobalActiveId(pageId);
+  const globalItems = GLOBAL_MANAGE_NAV[locale]
     .map(
       ({ id, label }) =>
-        `<div class="ui-mock-nav-item${id === activeId ? " is-active" : ""}">${label}</div>`,
+        `<div class="ui-mock-nav-item${id === globalActive ? " is-active" : ""}">${label}</div>`,
     )
     .join("\n                    ");
+
+  const inst = INSTANCE_SIDEBAR[locale];
+  const instSection = INSTANCE_NAV_ACTIVE[pageId];
+  const instanceRowClass = instSection
+    ? "ui-mock-nav-item is-active ui-mock-nav-instance"
+    : "ui-mock-nav-item ui-mock-nav-instance";
+  let instanceBlock = `<div class="${instanceRowClass}">${inst.sampleName}</div>`;
+  if (instSection) {
+    const subs = [
+      { key: "stats", label: inst.stats },
+      { key: "rules", label: inst.rules },
+      { key: "settings", label: inst.settings },
+      { key: "accessLog", label: inst.accessLog },
+    ];
+    instanceBlock += `\n                    <div class="ui-mock-nav-sub">`;
+    instanceBlock += subs
+      .map(
+        ({ key, label }) =>
+          `<div class="ui-mock-nav-item ui-mock-nav-sub-item${instSection === key ? " is-active" : ""}">${label}</div>`,
+      )
+      .join("\n                    ");
+    instanceBlock += `</div>`;
+  }
+
   return `<aside class="ui-mock-aside">
                   <div class="ui-mock-brand">
                     <img src="${assets}icon.svg" alt="">
@@ -211,7 +290,8 @@ function renderManageAside(locale, activeId, assets) {
                   <nav class="ui-mock-nav tour-zone" tabindex="0"
                     data-tour-title="${asideTour.title}"
                     data-tour-body="${asideTour.body}">
-                    ${items}
+                    ${globalItems}
+                    ${instanceBlock}
                   </nav>
                 </aside>`;
 }
@@ -222,7 +302,7 @@ function preparePageBody(locale, pageId, assets) {
   if (body.includes("__MANAGE_ASIDE__")) {
     body = body.replace(
       "__MANAGE_ASIDE__",
-      renderManageAside(locale, manageAsideActiveId(pageId), assets),
+      renderManageAside(locale, pageId, assets),
     );
   }
   return body;
@@ -331,6 +411,17 @@ function renderPage(locale, pageId) {
   const useUiMock = UI_MOCK_PAGE_IDS.has(pageId);
   const extraCss = useUiMock ? `\n  <link rel="stylesheet" href="${assets}ui-mock.css">` : "";
   const extraJs = useUiMock ? `\n<script src="${assets}ui-tour.js"></script>` : "";
+  const mermaidJs = MERMAID_PAGE_IDS.has(pageId)
+    ? `\n<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+mermaid.initialize({
+  startOnLoad: true,
+  theme: "dark",
+  securityLevel: "loose",
+  flowchart: { nodeSpacing: 48, rankSpacing: 56, padding: 16, htmlLabels: true },
+});
+</script>`
+    : "";
 
   const langOther = locale === "ru" ? "en" : "ru";
   const langSwitch = locale === "ru"
@@ -449,7 +540,7 @@ ${renderPager(locale, pageId, page.file)}
   </div>
 </div>
 
-<script src="${assets}docs-page.js"></script>${extraJs}
+<script src="${assets}docs-page.js"></script>${extraJs}${mermaidJs}
 </body>
 </html>
 `;

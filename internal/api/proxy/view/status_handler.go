@@ -3,40 +3,37 @@ package view
 import (
 	"net/http"
 
+	"github.com/google/uuid"
+
 	authmw "oktopus/internal/api/auth/middleware"
 	"oktopus/internal/api/platform/response"
 	proxyaclservice "oktopus/internal/db/proxyacl/service"
-	proxysettingsservice "oktopus/internal/db/proxysettings/service"
+	proxyinstancesservice "oktopus/internal/db/proxyinstances/service"
 	"oktopus/internal/proxy/metrics"
+	"oktopus/internal/proxy/server"
 	"oktopus/internal/startup"
 )
 
-type StatusProvider interface {
+type FleetStatusProvider interface {
+	InstanceStatuses() []server.InstanceStatus
+	AggregateTraffic() metrics.Snapshot
 	ProxyActive() bool
-	ProxyListen() string
-	ProxyLastStartError() string
-	ProxyTraffic() metrics.Snapshot
 }
 
 type StatusHandler struct {
-	settings *proxysettingsservice.Service
-	acl      *proxyaclservice.Service
-	proxy    StatusProvider
-	auth     *authmw.Guard
+	instances *proxyinstancesservice.Service
+	acl       *proxyaclservice.Service
+	fleet     FleetStatusProvider
+	auth      *authmw.Guard
 }
 
 func NewStatusHandler(
-	settings *proxysettingsservice.Service,
+	instances *proxyinstancesservice.Service,
 	acl *proxyaclservice.Service,
-	proxy StatusProvider,
+	fleet FleetStatusProvider,
 	auth *authmw.Guard,
 ) *StatusHandler {
-	return &StatusHandler{
-		settings: settings,
-		acl:      acl,
-		proxy:    proxy,
-		auth:     auth,
-	}
+	return &StatusHandler{instances: instances, acl: acl, fleet: fleet, auth: auth}
 }
 
 func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -44,36 +41,47 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	aclSt, err := h.acl.CompileStatus(r.Context())
+	fleetByID := map[uuid.UUID]server.InstanceStatus{}
+	var instances []instanceStatusDTO
+	aggregate := metrics.Snapshot{}
+	active := false
+	if h.fleet != nil {
+		for _, st := range h.fleet.InstanceStatuses() {
+			fleetByID[st.InstanceID] = st
+		}
+		aggregate = h.fleet.AggregateTraffic()
+		active = h.fleet.ProxyActive()
+	}
+	dbList, err := h.instances.List(r.Context())
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, "status failed")
+		response.Error(w, http.StatusInternalServerError, "load instances failed")
 		return
 	}
-	listen := ""
-	active := false
-	startErr := ""
-	traffic := metrics.Snapshot{}
-	if h.proxy != nil {
-		active = h.proxy.ProxyActive()
-		listen = h.proxy.ProxyListen()
-		startErr = h.proxy.ProxyLastStartError()
-		traffic = h.proxy.ProxyTraffic()
-	}
-	if listen == "" {
-		if st, err := h.settings.Get(r.Context()); err == nil {
+	for _, inst := range dbList {
+		st := fleetByID[inst.ID]
+		aclSt, _ := h.acl.CompileStatus(r.Context(), inst.ID)
+		startErr := st.LastStartError
+		if st.Active {
+			startErr = ""
+		}
+		listen := inst.Listen
+		if st.Listen != "" {
 			listen = st.Listen
 		}
-	}
-	if active {
-		startErr = ""
+		instances = append(instances, instanceStatusDTO{
+			ID:              inst.ID.String(),
+			Listen:          listen,
+			Active:          st.Active,
+			ProxyStartError: startErr,
+			ACL:             aclSt,
+			Traffic:         st.Traffic,
+		})
 	}
 	response.JSON(w, http.StatusOK, proxyStatusResponse{
-		ProxyActive:     active,
-		Listen:          listen,
-		ProxyStartError: startErr,
-		ACL:             aclSt,
-		Traffic:         traffic,
-		Startup:         startup.Timings(),
+		ProxyActive: active,
+		Traffic:     aggregate,
+		Instances:   instances,
+		Startup:     startup.Timings(),
 	})
 }
 
@@ -81,11 +89,18 @@ func (h *StatusHandler) withAuth(next http.HandlerFunc) http.HandlerFunc {
 	return h.auth.Require(next)
 }
 
-type proxyStatusResponse struct {
-	ProxyActive     bool                             `json:"proxy_active"`
+type instanceStatusDTO struct {
+	ID              string                           `json:"id"`
 	Listen          string                           `json:"listen"`
+	Active          bool                             `json:"active"`
 	ProxyStartError string                           `json:"proxy_start_error,omitempty"`
 	ACL             proxyaclservice.CompileStatusDTO `json:"acl"`
 	Traffic         metrics.Snapshot                 `json:"traffic"`
-	Startup         startup.TimingsDTO               `json:"startup"`
+}
+
+type proxyStatusResponse struct {
+	ProxyActive bool                `json:"proxy_active"`
+	Traffic     metrics.Snapshot    `json:"traffic"`
+	Instances   []instanceStatusDTO `json:"instances"`
+	Startup     startup.TimingsDTO  `json:"startup"`
 }

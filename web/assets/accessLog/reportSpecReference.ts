@@ -14,6 +14,7 @@ import {
 export const ACCESS_LOG_REPORT_SPEC_VERSION = 1;
 
 export const ACCESS_LOG_REPORT_COLUMN_FIELDS = [
+  "instance_id",
   "destination_address",
   "source_address",
   "user",
@@ -130,6 +131,7 @@ export const ACCESS_LOG_REPORT_API_REFERENCE = `Access Log Report Spec (version 
   version — только ${ACCESS_LOG_REPORT_SPEC_VERSION}
   time.from, time.to — RFC3339 UTC (обязательны), период не более 31 дня
   filters — необязательно (как в списке журнала):
+    instance_id — UUID прокси-инстанса (пусто — все инстансы)
     user, source, destination, url — подстрока ILIKE
     search_only — true: только записи с непустым search_engine (ClickHouse)
     field_nonempty — массив полей group_by: значение не пустая строка
@@ -216,8 +218,15 @@ export async function buildAccessLogReportAiPrompt(
   extraInspectKeys?: string[],
 ): Promise<string> {
   const staticPart = buildAccessLogReportAiPromptStatic(extraInspectKeys);
-  const { policy, inspect } = await loadProxyRulesForReportPrompt();
-  const aclSection = formatAclPolicySection(policy);
+  const { policies, inspect } = await loadProxyRulesForReportPrompt();
+  const aclSection = policies
+    .map(({ instanceName, policy }) =>
+      [
+        `### Инстанс: ${instanceName}`,
+        formatAclPolicySection(policy),
+      ].join("\n"),
+    )
+    .join("\n\n");
   const inspectSection = formatInspectRulesSection(inspect);
   return `${staticPart}
 

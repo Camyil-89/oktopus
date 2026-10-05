@@ -7,7 +7,10 @@ import (
 	stdhttp "net/http"
 
 	"oktopus/internal/proxy/hooks"
+	"oktopus/internal/proxy/instancectx"
 	"oktopus/internal/proxy/ratelimit"
+
+	"github.com/google/uuid"
 )
 
 // RelayMode — синхронный relay (MITM) или в фоне (plain HTTP handler).
@@ -75,11 +78,15 @@ func Proxy(ctx context.Context, cfg Config, outReq *stdhttp.Request, sink Client
 		flow = cfg.RateLimit.DelayFlowHTTP(ctx, outReq)
 	}
 
+	var instID uuid.UUID
+	if id, ok := instancectx.ID(ctx); ok {
+		instID = id
+	}
 	if mode == RelayBlock {
-		RelayPair(legs.ClientWrite, legs.ClientRead, upstream, upBR, flow)
+		RelayPairInstance(legs.ClientWrite, legs.ClientRead, upstream, upBR, flow, instID)
 		return false, nil
 	}
 
-	go RelayPair(legs.ClientWrite, legs.ClientRead, upstream, upBR, flow)
+	go RelayPairInstance(legs.ClientWrite, legs.ClientRead, upstream, upBR, flow, instID)
 	return true, nil
 }

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"time"
 )
 // AuthConfig — HTTP Proxy Authentication (Basic); backend: static | ldap.
@@ -66,4 +67,9 @@ func (c Config) WithDefaults() Config {
 		c.CAKeyPath = "config/ca.key"
 	}
 	return c
+}
+
+// RuntimeEqual — те же параметры слушателя и политики, что уже применены к Manager.
+func RuntimeEqual(a, b Config) bool {
+	return reflect.DeepEqual(a.WithDefaults(), b.WithDefaults())
 }

@@ -10,6 +10,9 @@ import (
 
 var ruleIDKey = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
+// PolicyAnomalyKVRuleID — KV для extra.policy_anomaly (совпадает с accesslog.PolicyNoteInspectRuleID).
+var PolicyAnomalyKVRuleID = uuid.MustParse("00000000-0000-4000-8000-000000000001")
+
 // KVRow — одно поле ctx:log в области inspect-правила.
 type KVRow struct {
 	LogID         uuid.UUID
@@ -46,8 +49,16 @@ func ParseFromJSON(logID uuid.UUID, raw []byte) Parsed {
 			out.SearchQuery = jsonString(search["query"])
 		}
 	}
+	if v, ok := m["policy_anomaly"]; ok && len(v) > 0 {
+		out.KV = append(out.KV, KVRow{
+			LogID:         logID,
+			InspectRuleID: PolicyAnomalyKVRuleID,
+			FieldKey:      "policy_anomaly",
+			FieldValue:    string(v),
+		})
+	}
 	for key, payload := range m {
-		if key == "inspect_error" || key == "search" {
+		if key == "inspect_error" || key == "search" || key == "policy_anomaly" || key == "gateway_error" {
 			continue
 		}
 		if !ruleIDKey.MatchString(key) {
@@ -124,6 +135,10 @@ func BuildJSON(searchEngine, searchQuery, inspectError string, kv []KVRow) []byt
 	}
 	byRule := make(map[string]map[string]any)
 	for _, row := range kv {
+		if row.InspectRuleID == PolicyAnomalyKVRuleID && row.FieldKey == "policy_anomaly" {
+			m["policy_anomaly"] = decodeStoredValue(row.FieldValue)
+			continue
+		}
 		rid := row.InspectRuleID.String()
 		block, ok := byRule[rid]
 		if !ok {

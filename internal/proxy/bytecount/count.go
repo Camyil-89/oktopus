@@ -5,6 +5,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 var (
@@ -42,9 +44,46 @@ func Live() (sec int64, upAllow, upDeny, downAllow, downDeny uint64) {
 }
 
 func observeUp(n int, denied bool) {
+	observeUpInstance(uuid.Nil, n, denied)
+}
+
+func observeDown(n int, denied bool) {
+	observeDownInstance(uuid.Nil, n, denied)
+}
+
+// ObserveUpInstance — исх. байты для конкретного proxy-инстанса.
+func ObserveUpInstance(id uuid.UUID, n int, denied bool) {
+	observeUpInstance(id, n, denied)
+}
+
+// ObserveDownInstance — вх. байты для конкретного proxy-инстанса.
+func ObserveDownInstance(id uuid.UUID, n int, denied bool) {
+	observeDownInstance(id, n, denied)
+}
+
+func observeUpInstance(id uuid.UUID, n int, denied bool) {
 	if n <= 0 {
 		return
 	}
+	if recordUp != nil {
+		recordUp(id, n, denied)
+		return
+	}
+	observeUpLegacy(n, denied)
+}
+
+func observeDownInstance(id uuid.UUID, n int, denied bool) {
+	if n <= 0 {
+		return
+	}
+	if recordDown != nil {
+		recordDown(id, n, denied)
+		return
+	}
+	observeDownLegacy(n, denied)
+}
+
+func observeUpLegacy(n int, denied bool) {
 	for {
 		sec := time.Now().Unix()
 		if liveSec.Load() != sec {
@@ -63,10 +102,7 @@ func observeUp(n int, denied bool) {
 	}
 }
 
-func observeDown(n int, denied bool) {
-	if n <= 0 {
-		return
-	}
+func observeDownLegacy(n int, denied bool) {
 	for {
 		sec := time.Now().Unix()
 		if liveSec.Load() != sec {
@@ -130,8 +166,9 @@ func byteSecRotate(newSec int64) {
 }
 
 type readCloserUp struct {
-	rc     io.ReadCloser
-	denied bool
+	rc         io.ReadCloser
+	instanceID uuid.UUID
+	denied     bool
 }
 
 // WrapBodyUp считает тело запроса (клиент → origin).
@@ -141,16 +178,21 @@ func WrapBodyUp(rc io.ReadCloser) io.ReadCloser {
 
 // WrapBodyUpPolicy — как WrapBodyUp, с учётом allow/deny.
 func WrapBodyUpPolicy(rc io.ReadCloser, denied bool) io.ReadCloser {
+	return WrapBodyUpPolicyInstance(rc, denied, uuid.Nil)
+}
+
+// WrapBodyUpPolicyInstance — как WrapBodyUpPolicy, с привязкой к инстансу.
+func WrapBodyUpPolicyInstance(rc io.ReadCloser, denied bool, instanceID uuid.UUID) io.ReadCloser {
 	if rc == nil {
 		return rc
 	}
-	return readCloserUp{rc: rc, denied: denied}
+	return readCloserUp{rc: rc, instanceID: instanceID, denied: denied}
 }
 
 func (r readCloserUp) Read(p []byte) (int, error) {
 	n, err := r.rc.Read(p)
 	if n > 0 {
-		observeUp(n, r.denied)
+		observeUpInstance(r.instanceID, n, r.denied)
 	}
 	return n, err
 }

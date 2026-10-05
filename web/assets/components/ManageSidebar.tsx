@@ -1,54 +1,25 @@
 "use client";
 
 import {
-  ApiOutlined,
   BarChartOutlined,
   HomeOutlined,
+  LineChartOutlined,
   SafetyCertificateOutlined,
+  SettingOutlined,
   TeamOutlined,
   UnorderedListOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import type { AuthUser } from "@/types/auth";
+import * as proxyApi from "@/api/proxy";
+import type { ProxyInstance } from "@/types/proxy";
 import { OktopusIcon } from "@/assets/components/oktopus/OktopusIcon";
-import {
-  manageNavLabel,
-  type ManageNavPath,
-} from "@/assets/components/manageNav";
+import { manageNavLabel } from "@/assets/components/manageNav";
 import { AppVersion } from "@/assets/components/AppVersion";
+import { PROXY_INSTANCES_CHANGED_EVENT } from "@/assets/modals/CreateProxyInstanceModal";
 import { useTranslation } from "@/contexts/LocaleContext";
-
-const navItems: { href: ManageNavPath; icon: typeof HomeOutlined }[] = [
-  { href: "/manage", icon: HomeOutlined },
-  { href: "/manage/rules", icon: SafetyCertificateOutlined },
-  { href: "/manage/access-log", icon: UnorderedListOutlined },
-  { href: "/manage/access-log/reports", icon: BarChartOutlined },
-  { href: "/manage/proxy", icon: ApiOutlined },
-  { href: "/manage/users", icon: TeamOutlined },
-];
-
-function selectedHref(pathname: string): ManageNavPath {
-  if (pathname === "/manage/users" || pathname.startsWith("/manage/users/")) {
-    return "/manage/users";
-  }
-  if (pathname === "/manage/rules" || pathname.startsWith("/manage/rules/")) {
-    return "/manage/rules";
-  }
-  if (pathname === "/manage/proxy" || pathname.startsWith("/manage/proxy/")) {
-    return "/manage/proxy";
-  }
-  if (
-    pathname === "/manage/access-log/reports" ||
-    pathname.startsWith("/manage/access-log/reports/")
-  ) {
-    return "/manage/access-log/reports";
-  }
-  if (pathname === "/manage/access-log") {
-    return "/manage/access-log";
-  }
-  return "/manage";
-}
 
 type ManageSidebarProps = {
   user: AuthUser | null;
@@ -57,8 +28,24 @@ type ManageSidebarProps = {
 
 export function ManageSidebar({ user, onLogout }: ManageSidebarProps) {
   const pathname = usePathname();
-  const active = selectedHref(pathname);
   const { t } = useTranslation();
+  const [instances, setInstances] = useState<ProxyInstance[]>([]);
+
+  useEffect(() => {
+    const reload = () => {
+      void proxyApi.listProxyInstances().then(setInstances).catch(() => setInstances([]));
+    };
+    reload();
+    window.addEventListener(PROXY_INSTANCES_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(PROXY_INSTANCES_CHANGED_EVENT, reload);
+  }, []);
+
+  const globalItems = [
+    { href: "/manage", icon: HomeOutlined, label: manageNavLabel("/manage", t) },
+    { href: "/manage/access-log", icon: UnorderedListOutlined, label: manageNavLabel("/manage/access-log", t) },
+    { href: "/manage/reports", icon: BarChartOutlined, label: manageNavLabel("/manage/reports", t) },
+    { href: "/manage/users", icon: TeamOutlined, label: manageNavLabel("/manage/users", t) },
+  ] as const;
 
   return (
     <aside className="flex w-[236px] shrink-0 flex-col border-r border-white/5 bg-ink/50">
@@ -66,26 +53,55 @@ export function ManageSidebar({ user, onLogout }: ManageSidebarProps) {
         <span className="grid h-7 w-7 place-items-center rounded-md border border-teal-400/25 bg-teal-400/10">
           <OktopusIcon size="sm" title="Oktopus" />
         </span>
-        <span className="text-sm font-medium tracking-tight text-zinc-200">
-          Oktopus
-        </span>
+        <span className="text-sm font-medium tracking-tight text-zinc-200">Oktopus</span>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-0.5 px-3 py-4">
-        {navItems.map(({ href, icon: Icon }) => {
-          const isActive = active === href;
-          const label = manageNavLabel(href, t);
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4">
+        {globalItems.map(({ href, icon: Icon, label }) => {
+          const isActive = pathname === href || (href !== "/manage" && pathname.startsWith(href));
           return (
-            <Link
-              key={href}
-              href={href}
-              className={`nav-item ${isActive ? "nav-item-active" : ""}`}
-            >
-              <Icon
-                className={`nav-item-icon text-[17px] ${isActive ? "text-teal-400" : ""}`}
-              />
+            <Link key={href} href={href} className={`nav-item ${isActive ? "nav-item-active" : ""}`}>
+              <Icon className={`nav-item-icon text-[17px] ${isActive ? "text-teal-400" : ""}`} />
               {label}
             </Link>
+          );
+        })}
+
+        {instances.map((inst) => {
+          const base = `/manage/instances/${inst.id}`;
+          const inInstance = pathname === base || pathname.startsWith(`${base}/`);
+          const subNavActive = (href: string) =>
+            href === base
+              ? pathname === base
+              : pathname === href || pathname.startsWith(`${href}/`);
+          return (
+            <div key={inst.id} className="mt-3 flex flex-col gap-0.5">
+              <Link
+                href={base}
+                className={`nav-item text-[13px] font-medium ${inInstance ? "nav-item-active" : ""}`}
+              >
+                {inst.name}
+              </Link>
+              {inInstance ? (
+                <div className="ml-3 flex flex-col gap-0.5 border-l border-white/10 pl-2">
+                  {[
+                    { href: base, icon: LineChartOutlined, label: t("nav.instanceStats") },
+                    { href: `${base}/rules`, icon: SafetyCertificateOutlined, label: t("nav.proxyRules") },
+                    { href: `${base}/settings`, icon: SettingOutlined, label: t("nav.proxySettings") },
+                    { href: `${base}/access-log`, icon: UnorderedListOutlined, label: t("nav.accessLog") },
+                  ].map(({ href, icon: Icon, label }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={`nav-item py-1.5 text-[12px] ${subNavActive(href) ? "nav-item-active" : ""}`}
+                    >
+                      <Icon className="nav-item-icon text-[15px]" />
+                      {label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           );
         })}
       </nav>
@@ -100,38 +116,12 @@ export function ManageSidebar({ user, onLogout }: ManageSidebarProps) {
             {(user?.username ?? "?").slice(0, 1).toUpperCase()}
           </div>
           <div className="min-w-0 text-left">
-            <p className="truncate text-[12.5px] leading-tight text-zinc-300">
-              {user?.username ?? "—"}
-            </p>
-            <p className="truncate font-mono text-[10.5px] text-zinc-500">
-              {t("nav.controlPanel")}
-            </p>
+            <p className="truncate text-[12.5px] leading-tight text-zinc-300">{user?.username ?? "—"}</p>
+            <p className="truncate font-mono text-[10.5px] text-zinc-500">{t("nav.controlPanel")}</p>
           </div>
-          <LogoutIcon className="ml-auto h-4 w-4 text-zinc-500" />
         </button>
-        <AppVersion
-          className="mt-2 px-2 text-center font-mono text-[10px] tabular-nums text-zinc-600"
-        />
+        <AppVersion className="mt-2 px-2 text-center font-mono text-[10px] tabular-nums text-zinc-600" />
       </div>
     </aside>
-  );
-}
-
-function LogoutIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      viewBox="0 0 24 24"
-      aria-hidden
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"
-      />
-    </svg>
   );
 }

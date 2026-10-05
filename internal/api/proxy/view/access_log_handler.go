@@ -2,6 +2,7 @@ package view
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"oktopus/internal/api/platform/response"
 	"oktopus/internal/db/proxyaccesslog/domain"
 	"oktopus/internal/db/proxyaccesslog/repository"
+	"oktopus/internal/proxy/observe"
 	proxyaccesslogservice "oktopus/internal/db/proxyaccesslog/service"
 )
 
@@ -40,6 +42,7 @@ func (h *AccessLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filter := repository.ListFilter{
+		InstanceID:      strings.TrimSpace(r.URL.Query().Get("instance_id")),
 		ID:              strings.TrimSpace(r.URL.Query().Get("id")),
 		User:            strings.TrimSpace(r.URL.Query().Get("user")),
 		Source:          strings.TrimSpace(r.URL.Query().Get("source")),
@@ -47,8 +50,21 @@ func (h *AccessLogHandler) List(w http.ResponseWriter, r *http.Request) {
 		URL:             strings.TrimSpace(r.URL.Query().Get("url")),
 		SearchOnly:      queryBool(r.URL.Query().Get("search_only")),
 		ErrorKind:       parseAccessLogErrorKind(r.URL.Query().Get("error_kind")),
+		Segment:         strings.TrimSpace(r.URL.Query().Get("segment")),
+		AttackKind:      "",
+		PolicyAnomalyQ:  strings.TrimSpace(r.URL.Query().Get("policy_anomaly_q")),
 		DecisionRuleRef: strings.TrimSpace(r.URL.Query().Get("decision_rule_ref")),
 		InspectRuleID:   strings.TrimSpace(r.URL.Query().Get("inspect_rule_id")),
+	}
+	if !repository.ValidAccessLogSegment(filter.Segment) {
+		response.Error(w, http.StatusBadRequest, "invalid segment")
+		return
+	}
+	if kind, err := parseAccessLogAttackKind(r.URL.Query().Get("attack_kind")); err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid attack_kind")
+		return
+	} else {
+		filter.AttackKind = kind
 	}
 	if filter.ID != "" {
 		if _, err := uuid.Parse(filter.ID); err != nil {
@@ -69,6 +85,12 @@ func (h *AccessLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	if filter.InspectRuleID != "" {
 		if _, err := uuid.Parse(filter.InspectRuleID); err != nil {
 			response.Error(w, http.StatusBadRequest, "invalid inspect_rule_id")
+			return
+		}
+	}
+	if filter.InstanceID != "" {
+		if _, err := uuid.Parse(filter.InstanceID); err != nil {
+			response.Error(w, http.StatusBadRequest, "invalid instance_id")
 			return
 		}
 	}
@@ -155,6 +177,26 @@ func parseAccessLogErrorKind(raw string) string {
 	return ""
 }
 
+func parseAccessLogAttackKind(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	if raw == observe.PolicyAnomalyHostSNIMismatch {
+		return raw, nil
+	}
+	if len(raw) > 64 {
+		return "", fmt.Errorf("too long")
+	}
+	for _, c := range raw {
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' {
+			continue
+		}
+		return "", fmt.Errorf("bad char")
+	}
+	return raw, nil
+}
+
 func (h *AccessLogHandler) withAuth(next http.HandlerFunc) http.HandlerFunc {
 	return h.auth.Require(next)
 }
@@ -177,6 +219,7 @@ type accessLogListResponse struct {
 
 type accessLogRowResponse struct {
 	ID                 string          `json:"id"`
+	InstanceID         string          `json:"instance_id"`
 	CreatedAt          string          `json:"created_at"`
 	SourceAddress      string          `json:"source_address"`
 	DestinationAddress string          `json:"destination_address"`
@@ -206,6 +249,7 @@ func toAccessLogRow(row domain.Entry) accessLogRowResponse {
 	}
 	return accessLogRowResponse{
 		ID:                 row.ID.String(),
+		InstanceID:         row.InstanceID.String(),
 		CreatedAt:          row.CreatedAt.UTC().Format(time.RFC3339),
 		SourceAddress:      row.SourceAddress,
 		DestinationAddress: row.DestinationAddress,

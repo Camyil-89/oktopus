@@ -1,6 +1,13 @@
-export type ProxySettings = {
+export type HostSettings = {
   id: string;
-  proxy_enabled: boolean;
+  access_log_retention_days: number;
+  updated_at: string;
+};
+
+export type ProxyInstance = {
+  id: string;
+  name: string;
+  enabled: boolean;
   listen: string;
   connect_mode: "mitm" | "tunnel";
   auth_enabled: boolean;
@@ -12,8 +19,14 @@ export type ProxySettings = {
   ldap_base_dn: string;
   ldap_bind_dn: string;
   ldap_bind_password_set: boolean;
-  access_log_retention_days: number;
+  sort_order: number;
   updated_at: string;
+};
+
+/** @deprecated use ProxyInstance */
+export type ProxySettings = ProxyInstance & {
+  proxy_enabled: boolean;
+  access_log_retention_days?: number;
 };
 
 export type ProxyCAStatus = {
@@ -33,8 +46,13 @@ export type ProxyGatewayPageStatus = ProxyForbiddenPageStatus;
 
 export type ProxyErrorPagePreviewVariant = "default" | "custom";
 
-export type ProxySettingsPatch = Partial<{
-  proxy_enabled: boolean;
+export type HostSettingsPatch = Partial<{
+  access_log_retention_days: number;
+}>;
+
+export type ProxyInstancePatch = Partial<{
+  name: string;
+  enabled: boolean;
   listen: string;
   connect_mode: string;
   auth_enabled: boolean;
@@ -46,8 +64,11 @@ export type ProxySettingsPatch = Partial<{
   ldap_base_dn: string;
   ldap_bind_dn: string;
   ldap_bind_password: string;
-  access_log_retention_days: number;
+  sort_order: number;
 }>;
+
+/** @deprecated */
+export type ProxySettingsPatch = ProxyInstancePatch & Partial<{ proxy_enabled: boolean }>;
 
 export type ProxyACLPolicy = {
   config_text: string;
@@ -197,12 +218,19 @@ export type ProxyStartupTimings = {
   acl_db_sync_ms?: number;
 };
 
-export type ProxyRuntimeStatus = {
-  proxy_active: boolean;
+export type ProxyInstanceRuntimeStatus = {
+  id: string;
   listen: string;
+  active: boolean;
   proxy_start_error?: string;
   acl: ProxyACLCompileStatus;
   traffic: ProxyTrafficSnapshot;
+};
+
+export type ProxyRuntimeStatus = {
+  proxy_active: boolean;
+  traffic: ProxyTrafficSnapshot;
+  instances: ProxyInstanceRuntimeStatus[];
   startup?: ProxyStartupTimings;
 };
 

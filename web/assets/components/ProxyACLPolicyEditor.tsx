@@ -319,6 +319,7 @@ export function ProxyACLPolicyEditor({
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
+  const suppressOnChangeRef = useRef(false);
   const listNamesRef = useRef(listNames);
   const listMetasRef = useRef(listMetas);
   const diagnosticsRef = useRef(diagnostics);
@@ -368,7 +369,7 @@ export function ProxyACLPolicyEditor({
         cmPlaceholder(placeholder),
         policyDecorationsField,
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
+          if (update.docChanged && !suppressOnChangeRef.current) {
             onChangeRef.current?.(update.state.doc.toString());
             update.view.dispatch({
               effects: [
@@ -410,9 +411,11 @@ export function ProxyACLPolicyEditor({
     if (!view) return;
     const current = view.state.doc.toString();
     if (value === current) return;
+    suppressOnChangeRef.current = true;
     view.dispatch({
       changes: { from: 0, to: current.length, insert: value },
     });
+    suppressOnChangeRef.current = false;
   }, [value]);
 
   return <div ref={hostRef} className="w-full" />;

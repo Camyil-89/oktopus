@@ -50,6 +50,7 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Развёртывание</p>
         <div class="flex flex-col gap-0.5">
           <a href="./quickstart.html" class="nav-item"><span class="dot"></span>Развёртывание</a>
+<a href="./implementation-examples.html" class="nav-item"><span class="dot"></span>Примеры реализаций</a>
         </div>
       </div>
 
@@ -71,9 +72,10 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Панель управления</p>
         <div class="flex flex-col gap-0.5">
           <a href="./manage/index.html" class="nav-item"><span class="dot"></span>Главная</a>
+<a href="./manage/instance.html" class="nav-item"><span class="dot"></span>Статистика инстанса</a>
 <a href="./manage/rules.html" class="nav-item"><span class="dot"></span>Правила прокси</a>
 <a href="./manage/access-log.html" class="nav-item"><span class="dot"></span>Журнал доступа</a>
-<a href="./manage/access-log/reports.html" class="nav-item"><span class="dot"></span>Отчёты журнала</a>
+<a href="./manage/reports.html" class="nav-item"><span class="dot"></span>Отчёты журнала</a>
 <a href="./manage/proxy.html" class="nav-item"><span class="dot"></span>Настройки прокси</a>
 <a href="./manage/users.html" class="nav-item"><span class="dot"></span>Пользователи</a>
         </div>
@@ -128,7 +130,7 @@
             <p class="lead">Oktopus — корпоративный прокси и веб-панель (Go + Next.js). Локально: зависимости в Docker, API/прокси и UI — из исходников на хосте. Продакшен в Docker — <a href="quickstart.html">Развёртывание</a>.</p>
 
             <h2 id="intro-who">Документация по панели</h2>
-            <p>Разделы <strong>Панель управления</strong> описывают интерфейс для операторов. Эта страница — для разработки в репозитории.</p>
+            <p>Разделы <strong>Панель управления</strong> описывают интерфейс для администраторов. Эта страница — для разработки в репозитории.</p>
 
             <h2 id="intro-deps">Зависимости (Docker)</h2>
             <p>Из корня репозитория поднимите dev-стек: PostgreSQL, ClickHouse, OpenLDAP и вспомогательный nginx для нагрузочных тестов. Подробности и учётки LDAP — в комментариях в файле <code>docker-compose.dev.yml</code>.</p>

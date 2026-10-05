@@ -51,6 +51,7 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Развёртывание</p>
         <div class="flex flex-col gap-0.5">
           <a href="../quickstart.html" class="nav-item"><span class="dot"></span>Развёртывание</a>
+<a href="../implementation-examples.html" class="nav-item"><span class="dot"></span>Примеры реализаций</a>
         </div>
       </div>
 
@@ -72,9 +73,10 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Панель управления</p>
         <div class="flex flex-col gap-0.5">
           <a href="./index.html" class="nav-item"><span class="dot"></span>Главная</a>
+<a href="./instance.html" class="nav-item"><span class="dot"></span>Статистика инстанса</a>
 <a href="./rules.html" class="nav-item"><span class="dot"></span>Правила прокси</a>
 <a href="./access-log.html" class="nav-item"><span class="dot"></span>Журнал доступа</a>
-<a href="./access-log/reports.html" class="nav-item"><span class="dot"></span>Отчёты журнала</a>
+<a href="./reports.html" class="nav-item"><span class="dot"></span>Отчёты журнала</a>
 <a href="./proxy.html" class="nav-item"><span class="dot"></span>Настройки прокси</a>
 <a href="./users.html" class="nav-item"><span class="dot"></span>Пользователи</a>
         </div>
@@ -138,13 +140,12 @@
                   </div>
                   <nav class="ui-mock-nav tour-zone" tabindex="0"
                     data-tour-title="Боковое меню"
-                    data-tour-body="Навигация по панели управления: главная, правила, журнал, отчёты, настройки прокси, пользователи. Внизу — выход из учётной записи.">
+                    data-tour-body="Общие разделы: главная, журнал и отчёты по всем инстансам, пользователи кабинета. Ниже — каждый прокси-инстанс: при открытии появляются подпункты (статистика, правила, настройки, журнал). Выход — внизу.">
                     <div class="ui-mock-nav-item">Главная</div>
-                    <div class="ui-mock-nav-item is-active">Правила прокси</div>
                     <div class="ui-mock-nav-item">Журнал доступа</div>
                     <div class="ui-mock-nav-item">Отчёты журнала</div>
-                    <div class="ui-mock-nav-item">Настройки прокси</div>
                     <div class="ui-mock-nav-item">Пользователи</div>
+                    <div class="ui-mock-nav-item ui-mock-nav-instance">Офис</div>
                   </nav>
                 </aside>
                 <div class="ui-mock-main">
@@ -157,7 +158,7 @@
                       <span class="ui-mock-tab is-active tour-zone" tabindex="0" data-tour-title="ACL / http_access" data-tour-body="Сюда вставляется текст из справочника ниже: директивы acl и http_access.">ACL / http_access</span>
                       <span class="ui-mock-tab">Инспекция</span>
                     </div>
-                    <div class="ui-mock-editor tour-zone" tabindex="0" data-tour-title="Редактор" data-tour-body="Тот же редактор, что на /manage/rules. После сохранения смотрите «Сборка ACL» на главной."># ваш конфиг
+                    <div class="ui-mock-editor tour-zone" tabindex="0" data-tour-title="Редактор" data-tour-body="Тот же редактор, что на /manage/instances/{id}/rules. После сохранения смотрите «Сборка ACL» на главной или статистике инстанса."># ваш конфиг
 acl all all
 http_access deny all</div>
                   </div>
@@ -166,7 +167,7 @@ http_access deny all</div>
               <div class="ui-tour-hint">
                 <p class="ui-tour-hint-label">Подсказка</p>
                 <p id="ui-tour-title" class="ui-tour-hint-title" data-default-title="Наведите на элемент">Наведите на элемент</p>
-                <p id="ui-tour-body" class="ui-tour-hint-body" data-default-body="Справочник описывает текст, который редактируется на /manage/rules.">Справочник описывает текст, который редактируется на /manage/rules.</p>
+                <p id="ui-tour-body" class="ui-tour-hint-body" data-default-body="Справочник описывает текст ACL на странице правил инстанса.">Справочник описывает текст ACL на странице правил инстанса.</p>
               </div>
             </div>
 

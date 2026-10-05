@@ -28,15 +28,16 @@ func (h *AccessLogHandler) RunReport(w http.ResponseWriter, r *http.Request) {
 			To:   body.Time.To,
 		},
 		Filters: proxyaccesslogservice.ReportSpecFilters{
-			User:          body.Filters.User,
-			Source:        body.Filters.Source,
-			Destination:   body.Filters.Destination,
-			URL:           body.Filters.URL,
-			SearchOnly:    body.Filters.SearchOnly,
+			InstanceID:      body.Filters.InstanceID,
+			User:            body.Filters.User,
+			Source:          body.Filters.Source,
+			Destination:     body.Filters.Destination,
+			URL:             body.Filters.URL,
+			SearchOnly:      body.Filters.SearchOnly,
 			DecisionRuleRef: body.Filters.DecisionRuleRef,
-			InspectRuleID: body.Filters.InspectRuleID,
-			InspectLog:    body.Filters.InspectLog,
-			FieldNonempty: body.Filters.FieldNonempty,
+			InspectRuleID:   body.Filters.InspectRuleID,
+			InspectLog:      body.Filters.InspectLog,
+			FieldNonempty:   body.Filters.FieldNonempty,
 		},
 	}
 	if body.Filters.Action != nil {
@@ -98,15 +99,16 @@ func (h *AccessLogHandler) RunReportTable(w http.ResponseWriter, r *http.Request
 			To:   body.Time.To,
 		},
 		Filters: proxyaccesslogservice.ReportSpecFilters{
-			User:          body.Filters.User,
-			Source:        body.Filters.Source,
-			Destination:   body.Filters.Destination,
-			URL:           body.Filters.URL,
-			SearchOnly:    body.Filters.SearchOnly,
+			InstanceID:      body.Filters.InstanceID,
+			User:            body.Filters.User,
+			Source:          body.Filters.Source,
+			Destination:     body.Filters.Destination,
+			URL:             body.Filters.URL,
+			SearchOnly:      body.Filters.SearchOnly,
 			DecisionRuleRef: body.Filters.DecisionRuleRef,
-			InspectRuleID: body.Filters.InspectRuleID,
-			InspectLog:    body.Filters.InspectLog,
-			FieldNonempty: body.Filters.FieldNonempty,
+			InspectRuleID:   body.Filters.InspectRuleID,
+			InspectLog:      body.Filters.InspectLog,
+			FieldNonempty:   body.Filters.FieldNonempty,
 		},
 	}
 	if body.Filters.Action != nil {
@@ -164,6 +166,7 @@ type reportTimeRequest struct {
 }
 
 type reportFiltersRequest struct {
+	InstanceID    string `json:"instance_id"`
 	User          string `json:"user"`
 	Source        string `json:"source"`
 	Destination   string `json:"destination"`

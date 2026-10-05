@@ -24,7 +24,11 @@ func NewInspectHandler(inspect *proxyinspectservice.Service, auth *authmw.Guard)
 }
 
 func (h *InspectHandler) ListRules(w http.ResponseWriter, r *http.Request) {
-	rules, err := h.inspect.List(r.Context())
+	instanceID, ok := parseInstanceID(w, r)
+	if !ok {
+		return
+	}
+	rules, err := h.inspect.List(r.Context(), instanceID)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, "list inspect rules failed")
 		return
@@ -37,7 +41,7 @@ func (h *InspectHandler) ListRules(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *InspectHandler) GetRule(w http.ResponseWriter, r *http.Request) {
-	ruleID, err := uuid.Parse(r.PathValue("id"))
+	ruleID, err := uuid.Parse(r.PathValue("ruleId"))
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, "invalid id")
 		return
@@ -71,7 +75,11 @@ func (h *InspectHandler) SyncRules(w http.ResponseWriter, r *http.Request) {
 			SortOrder: rule.SortOrder,
 		}
 	}
-	rules, err := h.inspect.SyncAndPublish(r.Context(), inputs)
+	instanceID, ok := parseInstanceID(w, r)
+	if !ok {
+		return
+	}
+	rules, err := h.inspect.SyncAndPublish(r.Context(), instanceID, inputs)
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, err.Error())
 		return
@@ -84,7 +92,11 @@ func (h *InspectHandler) SyncRules(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *InspectHandler) Status(w http.ResponseWriter, r *http.Request) {
-	st, err := h.inspect.CompileStatus(r.Context())
+	instanceID, ok := parseInstanceID(w, r)
+	if !ok {
+		return
+	}
+	st, err := h.inspect.CompileStatus(r.Context(), instanceID)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, "inspect status failed")
 		return

@@ -3,6 +3,8 @@ package metrics
 import (
 	"time"
 
+	"github.com/google/uuid"
+
 	"oktopus/internal/proxy/bytecount"
 )
 
@@ -14,9 +16,22 @@ type byteTotals struct {
 }
 
 func init() {
-	bytecount.SetRotateHook(func(sec int64, upAllow, upDeny, downAllow, downDeny uint64) {
-		defaultCollector.ingestBytes(sec, upAllow, upDeny, downAllow, downDeny)
-	})
+	bytecount.SetRecordHooks(recordBytesUp, recordBytesDown)
+}
+
+func recordBytesUp(id uuid.UUID, n int, denied bool) {
+	collectorForID(id).recordBytesUp(n, denied)
+}
+
+func recordBytesDown(id uuid.UUID, n int, denied bool) {
+	collectorForID(id).recordBytesDown(n, denied)
+}
+
+func collectorForID(id uuid.UUID) *Collector {
+	if id == uuid.Nil {
+		return defaultCollector
+	}
+	return DefaultRegistry().Collector(id)
 }
 
 func (c *Collector) ingestBytes(sec int64, upAllow, upDeny, downAllow, downDeny uint64) {
@@ -39,7 +54,7 @@ func (c *Collector) mergeBytesIntoBucketsLocked(now time.Time, out []TrafficBuck
 	endBucket := nowSec / seriesBucketSec
 	startBucket := endBucket - int64(seriesBucketCount-1)
 
-	liveSec, liveUpAllow, liveUpDeny, liveDownAllow, liveDownDeny := bytecount.Live()
+	liveSec := c.liveByteSec
 	for sec, bt := range c.bytesBySec {
 		if sec < cutoffSec {
 			continue
@@ -62,12 +77,12 @@ func (c *Collector) mergeBytesIntoBucketsLocked(now time.Time, out []TrafficBuck
 		if bucketIdx >= startBucket && bucketIdx <= endBucket {
 			i := int(bucketIdx - startBucket)
 			if i >= 0 && i < seriesBucketCount {
-				out[i].BytesUpAllow += int64(liveUpAllow)
-				out[i].BytesUpDeny += int64(liveUpDeny)
-				out[i].BytesDownAllow += int64(liveDownAllow)
-				out[i].BytesDownDeny += int64(liveDownDeny)
-				out[i].BytesUp += int64(liveUpAllow + liveUpDeny)
-				out[i].BytesDown += int64(liveDownAllow + liveDownDeny)
+				out[i].BytesUpAllow += c.liveUpAllow
+				out[i].BytesUpDeny += c.liveUpDeny
+				out[i].BytesDownAllow += c.liveDownAllow
+				out[i].BytesDownDeny += c.liveDownDeny
+				out[i].BytesUp += c.liveUpAllow + c.liveUpDeny
+				out[i].BytesDown += c.liveDownAllow + c.liveDownDeny
 			}
 		}
 	}

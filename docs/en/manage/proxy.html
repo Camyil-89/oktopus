@@ -51,6 +51,7 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Deployment</p>
         <div class="flex flex-col gap-0.5">
           <a href="../quickstart.html" class="nav-item"><span class="dot"></span>Deployment</a>
+<a href="../implementation-examples.html" class="nav-item"><span class="dot"></span>Implementation patterns</a>
         </div>
       </div>
 
@@ -72,9 +73,10 @@
         <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Control panel</p>
         <div class="flex flex-col gap-0.5">
           <a href="./index.html" class="nav-item"><span class="dot"></span>Home</a>
+<a href="./instance.html" class="nav-item"><span class="dot"></span>Instance statistics</a>
 <a href="./rules.html" class="nav-item"><span class="dot"></span>Proxy rules</a>
 <a href="./access-log.html" class="nav-item"><span class="dot"></span>Access log</a>
-<a href="./access-log/reports.html" class="nav-item"><span class="dot"></span>Access log reports</a>
+<a href="./reports.html" class="nav-item"><span class="dot"></span>Access log reports</a>
 <a href="./proxy.html" class="nav-item active"><span class="dot"></span>Proxy settings</a>
 <a href="./users.html" class="nav-item"><span class="dot"></span>Users</a>
         </div>
@@ -126,7 +128,7 @@
           <article class="doc doc-page">
             <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Control panel</p>
             <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Proxy settings</h1>
-            <p class="lead">Route <code>/manage/proxy</code> — listen address, tunnel vs MITM, CA certificate, block pages.</p>
+            <p class="lead">Route <code>/manage/instances/{id}/settings</code> — settings for one proxy instance: listen, enabled flag, tunnel/MITM, CA, auth, and block pages.</p>
 
             <h2 id="mp-tour">Interface</h2>
             <div class="ui-mock-wrap">
@@ -138,22 +140,25 @@
                   </div>
                   <nav class="ui-mock-nav tour-zone" tabindex="0"
                     data-tour-title="Sidebar"
-                    data-tour-body="Console navigation: home, rules, access log, reports, proxy settings, users. Sign out is at the bottom.">
+                    data-tour-body="Global sections: home, access log and reports across instances, console users. Below — each proxy instance; when opened, sub-items appear (statistics, rules, settings, log). Sign out is at the bottom.">
                     <div class="ui-mock-nav-item">Home</div>
-                    <div class="ui-mock-nav-item">Proxy rules</div>
                     <div class="ui-mock-nav-item">Access log</div>
                     <div class="ui-mock-nav-item">Access log reports</div>
-                    <div class="ui-mock-nav-item is-active">Proxy settings</div>
                     <div class="ui-mock-nav-item">Users</div>
+                    <div class="ui-mock-nav-item is-active ui-mock-nav-instance">Office</div>
+                    <div class="ui-mock-nav-sub"><div class="ui-mock-nav-item ui-mock-nav-sub-item">Statistics</div>
+                    <div class="ui-mock-nav-item ui-mock-nav-sub-item">Proxy rules</div>
+                    <div class="ui-mock-nav-item ui-mock-nav-sub-item is-active">Settings</div>
+                    <div class="ui-mock-nav-item ui-mock-nav-sub-item">Access log</div></div>
                   </nav>
                 </aside>
                 <div class="ui-mock-main">
                   <header class="ui-mock-top">
-                    <h2 class="tour-zone" tabindex="0" data-tour-title="Title" data-tour-body="/manage/proxy settings page.">Proxy settings</h2>
+                    <h2 class="tour-zone" tabindex="0" data-tour-title="Title" data-tour-body="Instance settings at /manage/instances/{id}/settings; Settings sub-item under the instance in the sidebar.">Settings</h2>
                     <span class="ui-mock-lang">EN ▾</span>
                   </header>
                   <div class="ui-mock-content ui-mock-scroll">
-                    <div class="ui-mock-panel tour-zone" tabindex="0" data-tour-title="Listen & mode" data-tour-body="Listen port, bind address, tunnel or mitm; saved via PATCH /api/proxy/settings.">
+                    <div class="ui-mock-panel tour-zone" tabindex="0" data-tour-title="Listen & mode" data-tour-body="Listen address, enabled switch, connect_mode tunnel or mitm; per-instance PATCH.">
                       <p class="ui-mock-panel-title">Proxy</p>
                       <div class="ui-mock-form-row"><span class="k">Port</span><span class="v">8080</span></div>
                       <div class="ui-mock-form-row"><span class="k">Mode</span><span class="v" style="color:#5eead4">tunnel</span></div>
@@ -172,15 +177,30 @@
               <div class="ui-tour-hint">
                 <p class="ui-tour-hint-label">Hint</p>
                 <p id="ui-tour-title" class="ui-tour-hint-title" data-default-title="Hover a block">Hover a block</p>
-                <p id="ui-tour-body" class="ui-tour-hint-body" data-default-body="Mock of /manage/proxy.">Mock of /manage/proxy.</p>
+                <p id="ui-tour-body" class="ui-tour-hint-body" data-default-body="Instance settings mock.">Instance settings mock.</p>
               </div>
             </div>
 
-            <p>After changes, confirm RUNNING on Home. MITM requires distributing your CA to clients.</p>
+            <h2 id="mp-basic">Basics</h2>
+            <ul>
+              <li><strong>Listen</strong> — where clients connect for this instance.</li>
+              <li><strong>Mode (tunnel / MITM)</strong> — tunnel checks destination via SNI; MITM decrypts HTTPS for URL ACL and inspect (requires CA on clients).</li>
+              <li><strong>CA</strong> — generate or upload the MITM root certificate.</li>
+              <li><strong>Auth</strong> — optional proxy authentication (static users or LDAP).</li>
+            </ul>
+
+            <h2 id="mp-pages">Block pages</h2>
+            <p>Configure HTML for ACL deny and gateway errors so users see a clear message instead of a dropped connection.</p>
+
+            <h2 id="mp-instance">Instance lifecycle</h2>
+            <p>Rename the instance, change listen when the port is free, disable with <strong>enabled</strong>, or delete the instance (ACL and inspect config removed; access log rows kept). Create new instances on <a href="index.html">Home</a>.</p>
+
+            <h2 id="mp-after">After changes</h2>
+            <p>Save and confirm RUNNING on <a href="instance.html">instance statistics</a> or Home. For MITM, distribute the CA to clients.</p>
 
           </article>
 
-<div class="flex items-center justify-between gap-3 mt-14 pt-6 border-t border-white/5"><a href="./access-log/reports.html" class="pager-link group text-left">
+<div class="flex items-center justify-between gap-3 mt-14 pt-6 border-t border-white/5"><a href="./reports.html" class="pager-link group text-left">
         <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
         <span class="min-w-0">
           <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Back</span>

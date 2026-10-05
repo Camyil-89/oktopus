@@ -23,37 +23,47 @@ type ProxyAclList struct {
 
 type ProxyAclPolicy struct {
 	ID         uuid.UUID          `json:"id"`
+	InstanceID uuid.UUID          `json:"instance_id"`
 	ConfigText string             `json:"config_text"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
 type ProxyInspectRule struct {
-	ID        uuid.UUID          `json:"id"`
-	Name      string             `json:"name"`
-	Script    string             `json:"script"`
-	Action    int16              `json:"action"`
-	Enabled   bool               `json:"enabled"`
-	SortOrder int32              `json:"sort_order"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	ID         uuid.UUID          `json:"id"`
+	InstanceID uuid.UUID          `json:"instance_id"`
+	Name       string             `json:"name"`
+	Script     string             `json:"script"`
+	Action     int16              `json:"action"`
+	Enabled    bool               `json:"enabled"`
+	SortOrder  int32              `json:"sort_order"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
-type ProxySetting struct {
+type ProxyInstance struct {
+	ID                  uuid.UUID          `json:"id"`
+	Name                string             `json:"name"`
+	Enabled             bool               `json:"enabled"`
+	Listen              string             `json:"listen"`
+	ConnectMode         string             `json:"connect_mode"`
+	CaCertPath          string             `json:"ca_cert_path"`
+	CaKeyPath           string             `json:"ca_key_path"`
+	AuthEnabled         bool               `json:"auth_enabled"`
+	AuthStaticUsers     string             `json:"auth_static_users"`
+	AuthRealm           string             `json:"auth_realm"`
+	AuthBackend         string             `json:"auth_backend"`
+	AuthCacheTtlMinutes int64              `json:"auth_cache_ttl_minutes"`
+	LdapUrl             string             `json:"ldap_url"`
+	LdapBaseDn          string             `json:"ldap_base_dn"`
+	LdapBindDn          string             `json:"ldap_bind_dn"`
+	LdapBindPassword    string             `json:"ldap_bind_password"`
+	SortOrder           int32              `json:"sort_order"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+}
+
+type Setting struct {
 	ID                     uuid.UUID          `json:"id"`
-	ProxyEnabled           bool               `json:"proxy_enabled"`
-	Listen                 string             `json:"listen"`
-	ConnectMode            string             `json:"connect_mode"`
-	CaCertPath             string             `json:"ca_cert_path"`
-	CaKeyPath              string             `json:"ca_key_path"`
-	AuthEnabled            bool               `json:"auth_enabled"`
-	AuthStaticUsers        string             `json:"auth_static_users"`
-	AuthRealm              string             `json:"auth_realm"`
-	AuthBackend            string             `json:"auth_backend"`
-	AuthCacheTtlMinutes    int64              `json:"auth_cache_ttl_minutes"`
-	LdapUrl                string             `json:"ldap_url"`
-	LdapBaseDn             string             `json:"ldap_base_dn"`
-	LdapBindDn             string             `json:"ldap_bind_dn"`
-	LdapBindPassword       string             `json:"ldap_bind_password"`
 	AccessLogRetentionDays int32              `json:"access_log_retention_days"`
 	CreatedAt              pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`

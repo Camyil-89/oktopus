@@ -1,15 +1,22 @@
 "use client";
 
 import { scrollableModalProps } from "@/assets/modals/modalConfig";
-import { listProxyInspectRules } from "@/api/proxy";
+import {
+  listAllProxyInspectRules,
+  listProxyInspectRules,
+  listProxyInstances,
+} from "@/api/proxy";
+import type { ProxyInstance } from "@/types/proxy";
 import { Button, Checkbox, Collapse, DatePicker, Form, Input, Modal, Select } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import type { AccessLogActionFilter } from "@/utils/accessLogFilters";
+import { ACCESS_LOG_ATTACK_KINDS } from "@/utils/accessLogSegment";
 import { useTranslation } from "@/contexts/LocaleContext";
 import { useEffect, useMemo, useState } from "react";
 
 export type AccessLogFiltersValues = {
+  instance_id: string;
   id: string;
   user: string;
   source: string;
@@ -19,11 +26,14 @@ export type AccessLogFiltersValues = {
   from: string;
   to: string;
   action: AccessLogActionFilter;
+  attack_kind: string;
+  policy_anomaly_q: string;
   decision_rule_ref: string;
   inspect_rule_id: string;
 };
 
 export const ACCESS_LOG_EMPTY_FILTERS: AccessLogFiltersValues = {
+  instance_id: "",
   id: "",
   user: "",
   source: "",
@@ -33,6 +43,8 @@ export const ACCESS_LOG_EMPTY_FILTERS: AccessLogFiltersValues = {
   from: "",
   to: "",
   action: "",
+  attack_kind: "",
+  policy_anomaly_q: "",
   decision_rule_ref: "",
   inspect_rule_id: "",
 };
@@ -44,6 +56,8 @@ type FormValues = Omit<AccessLogFiltersValues, "from" | "to"> & {
 };
 
 type AccessLogFiltersModalProps = {
+  /** Если задан — только правила этого инстанса; иначе все инстансы. */
+  instanceId?: string;
   open: boolean;
   initialValues: AccessLogFiltersValues;
   onCancel: () => void;
@@ -82,6 +96,9 @@ function collapseKeysForFilters(values: AccessLogFiltersValues): string[] {
   if (values.action || values.decision_rule_ref || values.inspect_rule_id) {
     keys.push("rules");
   }
+  if (values.attack_kind || values.policy_anomaly_q) {
+    keys.push("attacks");
+  }
   if (
     values.user ||
     values.source ||
@@ -91,12 +108,16 @@ function collapseKeysForFilters(values: AccessLogFiltersValues): string[] {
   ) {
     keys.push("request");
   }
+  if (values.instance_id) {
+    keys.push("instance");
+  }
   return keys;
 }
 
 function filtersFromForm(values: FormValues): AccessLogFiltersValues {
   const period = values.period;
   return {
+    instance_id: values.instance_id ?? "",
     id: values.id?.trim() ?? "",
     user: values.user?.trim() ?? "",
     source: values.source?.trim() ?? "",
@@ -106,12 +127,15 @@ function filtersFromForm(values: FormValues): AccessLogFiltersValues {
     from: period?.[0]?.isValid() ? period[0]!.toDate().toISOString() : "",
     to: period?.[1]?.isValid() ? period[1]!.toDate().toISOString() : "",
     action: values.action ?? "",
+    attack_kind: values.attack_kind ?? "",
+    policy_anomaly_q: values.policy_anomaly_q?.trim() ?? "",
     decision_rule_ref: values.decision_rule_ref?.trim() ?? "",
     inspect_rule_id: values.inspect_rule_id ?? "",
   };
 }
 
 export function AccessLogFiltersModal({
+  instanceId,
   open,
   initialValues,
   onCancel,
@@ -123,6 +147,11 @@ export function AccessLogFiltersModal({
   const [inspectOptions, setInspectOptions] = useState<
     { value: string; label: string }[]
   >([]);
+  const [instanceOptions, setInstanceOptions] = useState<
+    { value: string; label: string }[]
+  >([]);
+
+  const scopedToInstance = Boolean(instanceId);
 
   useEffect(() => {
     if (open) {
@@ -136,7 +165,10 @@ export function AccessLogFiltersModal({
       return;
     }
     let cancelled = false;
-    void listProxyInspectRules()
+    const loadRules = instanceId
+      ? () => listProxyInspectRules(instanceId)
+      : () => listAllProxyInspectRules();
+    void loadRules()
       .then((inspect) => {
         if (cancelled) {
           return;
@@ -153,10 +185,58 @@ export function AccessLogFiltersModal({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, instanceId]);
+
+  useEffect(() => {
+    if (!open || scopedToInstance) {
+      return;
+    }
+    let cancelled = false;
+    void listProxyInstances()
+      .then((list: ProxyInstance[]) => {
+        if (cancelled) {
+          return;
+        }
+        setInstanceOptions(
+          list.map((i) => ({ value: i.id, label: i.name || i.listen })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setInstanceOptions([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, scopedToInstance]);
 
   const collapseItems = useMemo(
     () => [
+      ...(!scopedToInstance
+        ? [
+            {
+              key: "instance",
+              label: t("accessLog.filtersInstance"),
+              children: (
+                <Form.Item
+                  name="instance_id"
+                  label={t("accessLog.col.instance")}
+                  className={FORM_ITEM_CLASS}
+                >
+                  <Select
+                    size="small"
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder={t("common.any")}
+                    options={instanceOptions}
+                  />
+                </Form.Item>
+              ),
+            },
+          ]
+        : []),
       {
         key: "period",
         label: t("accessLog.filtersPeriod"),
@@ -185,7 +265,6 @@ export function AccessLogFiltersModal({
                 options={[
                   { value: "1", label: t("accessLog.filterAllowed") },
                   { value: "0", label: t("accessLog.filterDenied") },
-                  { value: "errors", label: t("accessLog.filterErrorsOnly") },
                 ]}
               />
             </Form.Item>
@@ -219,6 +298,41 @@ export function AccessLogFiltersModal({
         ),
       },
       {
+        key: "attacks",
+        label: t("accessLog.filtersAttacks"),
+        children: (
+          <>
+            <Form.Item
+              name="attack_kind"
+              label={t("accessLog.filterAttackKind")}
+              className={FORM_ITEM_CLASS}
+            >
+              <Select
+                size="small"
+                allowClear
+                placeholder={t("accessLog.filterAttackKindAny")}
+                options={ACCESS_LOG_ATTACK_KINDS.map((k) => ({
+                  value: k.id,
+                  label: t(k.labelKey),
+                }))}
+              />
+            </Form.Item>
+            <Form.Item
+              name="policy_anomaly_q"
+              label={t("accessLog.filterPolicyAnomalyQ")}
+              className={FORM_ITEM_CLASS}
+            >
+              <Input
+                size="small"
+                allowClear
+                autoComplete="off"
+                placeholder={t("accessLog.filterPolicyAnomalyQPlaceholder")}
+              />
+            </Form.Item>
+          </>
+        ),
+      },
+      {
         key: "request",
         label: t("accessLog.filtersRequest"),
         children: (
@@ -242,7 +356,7 @@ export function AccessLogFiltersModal({
         ),
       },
     ],
-    [inspectOptions, t],
+    [inspectOptions, instanceOptions, scopedToInstance, t],
   );
 
   const close = () => {

@@ -1,5 +1,6 @@
 CREATE TABLE proxy_inspect_rules (
     id UUID PRIMARY KEY,
+    instance_id UUID NOT NULL REFERENCES proxy_instances (id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     script TEXT NOT NULL,
     action SMALLINT NOT NULL DEFAULT 0,
@@ -10,4 +11,4 @@ CREATE TABLE proxy_inspect_rules (
     CONSTRAINT proxy_inspect_rules_action_check CHECK (action IN (0, 1))
 );
 
-CREATE INDEX proxy_inspect_rules_sort_idx ON proxy_inspect_rules (sort_order);
+CREATE INDEX proxy_inspect_rules_instance_sort_idx ON proxy_inspect_rules (instance_id, sort_order);

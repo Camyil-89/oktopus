@@ -44,6 +44,10 @@ func RunProxyAuthSuite(s AuthSuite, args []string) int {
 		log.Printf("%s: login: %v", s.Name, err)
 		return 1
 	}
+	if _, err := client.EnsureTestInstance(); err != nil {
+		log.Printf("%s: test instance: %v", s.Name, err)
+		return 1
+	}
 	if s.RequireLDAP {
 		if err := setup.CheckLDAPDevReachable(); err != nil {
 			log.Printf("%s: %v", s.Name, err)

@@ -15,6 +15,7 @@ import type {
   ProxyInspectCompileStatus,
   ProxyInspectRuleDraft,
 } from "@/types/inspect";
+import type { RulesSectionUnsaved } from "@/types/rulesUnsaved";
 import { ensureRuleId } from "@/utils/uuidv7";
 import {
   ArrowDownOutlined,
@@ -73,7 +74,25 @@ function rowsSnapshot(rows: Row[]) {
   );
 }
 
-export function ProxyInspectRulesCard() {
+function rowsFromSnapshot(snapshot: string): Row[] {
+  type SnapRow = Omit<Row, "key"> & { id: string };
+  const items = JSON.parse(snapshot) as SnapRow[];
+  return items.map((r) => ({
+    ...r,
+    id: ensureRuleId(r.id),
+    key: ensureRuleId(r.id),
+  }));
+}
+
+type ProxyInspectRulesCardProps = {
+  instanceId: string;
+  onUnsavedChange?: (state: RulesSectionUnsaved) => void;
+};
+
+export function ProxyInspectRulesCard({
+  instanceId,
+  onUnsavedChange,
+}: ProxyInspectRulesCardProps) {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const formatApiError = useApiErrorMessage();
@@ -100,9 +119,9 @@ export function ProxyInspectRulesCard() {
     setLoading(true);
     try {
       const [st, list, settings] = await Promise.all([
-        proxyApi.getProxyInspectStatus(),
-        proxyApi.listProxyInspectRules(),
-        proxyApi.getProxySettings(),
+        proxyApi.getProxyInspectStatus(instanceId),
+        proxyApi.listProxyInspectRules(instanceId),
+        proxyApi.getProxyInstance(instanceId),
       ]);
       setConnectMode(settings.connect_mode);
       setStatus(st);
@@ -145,21 +164,15 @@ export function ProxyInspectRulesCard() {
     setModalOpen(true);
   };
 
-  const openEdit = async (row: Row) => {
-    if (!row.id) return;
-    try {
-      const full = await proxyApi.getProxyInspectRule(row.id);
-      setEditKey(row.key);
-      form.setFieldsValue({
-        name: full.name,
-        script: full.script,
-        action: full.action,
-        enabled: full.enabled,
-      });
-      setModalOpen(true);
-    } catch {
-      message.error(t("inspect.scriptLoadFailed"));
-    }
+  const openEdit = (row: Row) => {
+    setEditKey(row.key);
+    form.setFieldsValue({
+      name: row.name,
+      script: row.script,
+      action: row.action,
+      enabled: row.enabled,
+    });
+    setModalOpen(true);
   };
 
   const validateModalScript = async (): Promise<boolean> => {
@@ -171,7 +184,7 @@ export function ProxyInspectRulesCard() {
     }
     setScriptValidateLoading(true);
     try {
-      await proxyApi.validateProxyInspectScript({ script });
+      await proxyApi.validateProxyInspectScript(instanceId, { script });
       message.success(t("inspect.scriptOk"));
       return true;
     } catch (e) {
@@ -193,7 +206,7 @@ export function ProxyInspectRulesCard() {
     }
     setScriptValidateLoading(true);
     try {
-      await proxyApi.validateProxyInspectScript({ script: values.script });
+      await proxyApi.validateProxyInspectScript(instanceId, { script: values.script });
     } catch (e) {
       message.error(
         formatApiError(e, t("inspect.fixLua")),
@@ -273,7 +286,7 @@ export function ProxyInspectRulesCard() {
     downloadTextFile(agentPromptText, `oktopus-inspect-agent-prompt-${stamp}.txt`);
   };
 
-  const persist = async () => {
+  const persist = useCallback(async (): Promise<boolean> => {
     setSaving(true);
     try {
       const payload: ProxyInspectRuleDraft[] = rows.map((r, i) => ({
@@ -284,15 +297,29 @@ export function ProxyInspectRulesCard() {
         enabled: r.enabled,
         sort_order: i,
       }));
-      await proxyApi.syncProxyInspectRules(payload);
+      await proxyApi.syncProxyInspectRules(instanceId, payload);
       message.success(t("inspect.saved"));
       await load();
+      return true;
     } catch (e) {
       message.error(formatApiError(e, t("inspect.saveFailed")));
+      return false;
     } finally {
       setSaving(false);
     }
-  };
+  }, [formatApiError, load, message, rows, t]);
+
+  const discardChanges = useCallback(() => {
+    setRows(rowsFromSnapshot(savedSnapshot));
+  }, [savedSnapshot]);
+
+  useEffect(() => {
+    onUnsavedChange?.({
+      dirty,
+      discard: discardChanges,
+      save: persist,
+    });
+  }, [dirty, discardChanges, onUnsavedChange, persist]);
 
   const columns: ColumnsType<Row> = [
     { title: "№", width: 48, render: (_, __, i) => i + 1 },
@@ -343,7 +370,7 @@ export function ProxyInspectRulesCard() {
             type="text"
             size="small"
             icon={<EditOutlined />}
-            onClick={() => void openEdit(row)}
+            onClick={() => openEdit(row)}
           />
           <Button
             type="text"

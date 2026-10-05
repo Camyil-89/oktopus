@@ -4,6 +4,7 @@ import "time"
 
 // ReportFilters — подмножество фильтров списка журнала для агрегаций.
 type ReportFilters struct {
+	InstanceID    string
 	User          string
 	Source        string
 	Destination   string

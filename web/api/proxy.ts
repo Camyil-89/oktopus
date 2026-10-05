@@ -33,24 +33,63 @@ import type {
   ProxySettingsPatch,
 } from "@/types/proxy";
 
-export async function getProxySettings() {
-  return fetchApi<ProxySettings>("/api/proxy/settings", "GET");
+function inst(instanceId: string, path: string) {
+  return `/api/proxy/instances/${encodeURIComponent(instanceId)}${path}`;
 }
 
-export async function patchProxySettings(body: ProxySettingsPatch) {
-  return fetchApi<ProxySettings>("/api/proxy/settings", "PATCH", body);
+export async function getHostSettings() {
+  return fetchApi<import("@/types/proxy").HostSettings>("/api/proxy/host-settings", "GET");
 }
 
-export async function getProxyCAStatus() {
-  return fetchApi<ProxyCAStatus>("/api/proxy/ca/status", "GET");
+export async function patchHostSettings(body: import("@/types/proxy").HostSettingsPatch) {
+  return fetchApi<import("@/types/proxy").HostSettings>("/api/proxy/host-settings", "PATCH", body);
 }
 
-export async function generateProxyCA(body: GenerateCARequest) {
-  return fetchApi<ProxySettings>("/api/proxy/ca/generate", "POST", body);
+export async function listProxyInstances() {
+  const list = await fetchApi<import("@/types/proxy").ProxyInstance[] | null>(
+    "/api/proxy/instances",
+    "GET",
+  );
+  return list ?? [];
 }
 
-export async function uploadProxyCA(form: FormData) {
-  return fetchApiForm<ProxySettings>("/api/proxy/ca/upload", "POST", form);
+export async function createProxyInstance(body: { name: string; listen: string }) {
+  return fetchApi<import("@/types/proxy").ProxyInstance>("/api/proxy/instances", "POST", body);
+}
+
+export async function getProxyInstance(instanceId: string) {
+  return fetchApi<import("@/types/proxy").ProxyInstance>(inst(instanceId, ""), "GET");
+}
+
+export async function patchProxyInstance(
+  instanceId: string,
+  body: import("@/types/proxy").ProxyInstancePatch,
+) {
+  return fetchApi<import("@/types/proxy").ProxyInstance>(inst(instanceId, ""), "PATCH", body);
+}
+
+export async function deleteProxyInstance(instanceId: string) {
+  return fetchApi<void>(inst(instanceId, ""), "DELETE");
+}
+
+export async function getProxyCAStatus(instanceId: string) {
+  return fetchApi<ProxyCAStatus>(inst(instanceId, "/ca/status"), "GET");
+}
+
+export async function generateProxyCA(instanceId: string, body: GenerateCARequest) {
+  return fetchApi<import("@/types/proxy").ProxyInstance>(
+    inst(instanceId, "/ca/generate"),
+    "POST",
+    body,
+  );
+}
+
+export async function uploadProxyCA(instanceId: string, form: FormData) {
+  return fetchApiForm<import("@/types/proxy").ProxyInstance>(
+    inst(instanceId, "/ca/upload"),
+    "POST",
+    form,
+  );
 }
 
 export async function getProxyForbiddenPageStatus() {
@@ -128,34 +167,35 @@ async function downloadFile(path: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export function downloadProxyCACert() {
-  return downloadFile("/api/proxy/ca/cert", "ca.crt");
+export function downloadProxyCACert(instanceId: string) {
+  return downloadFile(inst(instanceId, "/ca/cert"), "ca.crt");
 }
 
-export function downloadProxyCAKey() {
-  return downloadFile("/api/proxy/ca/key", "ca.key");
+export function downloadProxyCAKey(instanceId: string) {
+  return downloadFile(inst(instanceId, "/ca/key"), "ca.key");
 }
 
 export async function getProxyRuntimeStatus() {
   return fetchApi<ProxyRuntimeStatus>("/api/proxy/status", "GET");
 }
 
-export async function getProxyACLPolicy() {
+export async function getProxyACLPolicy(instanceId: string) {
   return fetchApi<import("@/types/proxy").ProxyACLPolicy>(
-    "/api/proxy/acl/policy",
+    inst(instanceId, "/acl/policy"),
     "GET",
   );
 }
 
-export async function putProxyACLPolicy(configText: string) {
+export async function putProxyACLPolicy(instanceId: string, configText: string) {
   return fetchApi<import("@/types/proxy").ProxyACLPolicy>(
-    "/api/proxy/acl/policy",
+    inst(instanceId, "/acl/policy"),
     "PUT",
     { config_text: configText },
   );
 }
 
 export async function validateProxyACLPolicy(
+  instanceId: string,
   configText: string,
   lists?: import("@/types/proxy").ProxyACLNamedListDraft[],
 ) {
@@ -167,7 +207,7 @@ export async function validateProxyACLPolicy(
     body.lists = lists;
   }
   return fetchApi<import("@/types/proxy").ProxyACLPolicyAnalyzeResult>(
-    "/api/proxy/acl/policy/validate",
+    inst(instanceId, "/acl/policy/validate"),
     "POST",
     body,
   );
@@ -212,46 +252,78 @@ export async function pollProxyACLNamedList(
   );
 }
 
-export async function getProxyACLStatus() {
-  return fetchApi<ProxyACLCompileStatus>("/api/proxy/acl/status", "GET");
+export async function getProxyACLStatus(instanceId: string) {
+  return fetchApi<ProxyACLCompileStatus>(inst(instanceId, "/acl/status"), "GET");
 }
 
-export async function evaluateProxyACL(body: ProxyACLEvaluateRequest) {
+export async function evaluateProxyACL(instanceId: string, body: ProxyACLEvaluateRequest) {
   return fetchApi<ProxyACLEvaluateResult>(
-    "/api/proxy/acl/evaluate",
+    inst(instanceId, "/acl/evaluate"),
     "POST",
     body,
   );
 }
 
-export async function getProxyInspectStatus() {
-  return fetchApi<ProxyInspectCompileStatus>("/api/proxy/inspect/status", "GET");
+export async function getProxyInspectStatus(instanceId: string) {
+  return fetchApi<ProxyInspectCompileStatus>(inst(instanceId, "/inspect/status"), "GET");
 }
 
-export async function listProxyInspectRules() {
-  return fetchApi<ProxyInspectRule[]>("/api/proxy/inspect/rules", "GET");
+export async function listProxyInspectRules(instanceId: string) {
+  return fetchApi<ProxyInspectRule[]>(inst(instanceId, "/inspect/rules"), "GET");
 }
 
-export async function getProxyInspectRule(id: string) {
+/** Все правила инспекции по инстансам (глобальный журнал / отчёты). */
+export async function listAllProxyInspectRules() {
+  const instances = await listProxyInstances();
+  const batches = await Promise.all(
+    instances.map((i) =>
+      listProxyInspectRules(i.id).catch(() => [] as ProxyInspectRule[]),
+    ),
+  );
+  return batches.flat();
+}
+
+export async function getProxyInspectRule(instanceId: string, ruleId: string) {
   return fetchApi<ProxyInspectRule>(
-    `/api/proxy/inspect/rules/${encodeURIComponent(id)}`,
+    `${inst(instanceId, "/inspect/rules")}/${encodeURIComponent(ruleId)}`,
     "GET",
   );
 }
 
-export async function syncProxyInspectRules(rules: ProxyInspectRuleDraft[]) {
+/** Ищет правило по id среди всех инстансов (глобальный журнал / отчёты). */
+export async function findProxyInspectRule(ruleId: string) {
+  const instances = await listProxyInstances();
+  for (const instRow of instances) {
+    try {
+      const rule = await getProxyInspectRule(instRow.id, ruleId);
+      return rule;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw new ApiError(404, "inspect rule not found");
+}
+
+export async function syncProxyInspectRules(
+  instanceId: string,
+  rules: ProxyInspectRuleDraft[],
+) {
   return fetchApi<ProxyInspectRuleListItem[]>(
-    "/api/proxy/inspect/rules",
+    inst(instanceId, "/inspect/rules"),
     "PUT",
     { rules },
   );
 }
 
 export async function validateProxyInspectScript(
+  instanceId: string,
   body: ValidateProxyInspectScriptPayload,
 ) {
   return fetchApi<ValidateProxyInspectScriptResponse>(
-    "/api/proxy/inspect/validate",
+    inst(instanceId, "/inspect/validate"),
     "POST",
     body,
   );
@@ -275,11 +347,23 @@ function buildAccessLogQuery(params: ListProxyAccessLogParams) {
   if (params.error_kind) {
     q.set("error_kind", params.error_kind);
   }
+  if (params.segment) {
+    q.set("segment", params.segment);
+  }
+  if (params.attack_kind) {
+    q.set("attack_kind", params.attack_kind);
+  }
+  if (params.policy_anomaly_q) {
+    q.set("policy_anomaly_q", params.policy_anomaly_q);
+  }
   if (params.decision_rule_ref) {
     q.set("decision_rule_ref", params.decision_rule_ref);
   }
   if (params.inspect_rule_id) {
     q.set("inspect_rule_id", params.inspect_rule_id);
+  }
+  if (params.instance_id) {
+    q.set("instance_id", params.instance_id);
   }
   const s = q.toString();
   return s ? `?${s}` : "";

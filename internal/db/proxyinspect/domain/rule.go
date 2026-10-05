@@ -16,6 +16,7 @@ const (
 
 type RuleSummary struct {
 	ID           uuid.UUID
+	InstanceID   uuid.UUID
 	Name         string
 	Action       int16
 	Enabled      bool
@@ -26,8 +27,9 @@ type RuleSummary struct {
 }
 
 type Rule struct {
-	ID        uuid.UUID
-	Name      string
+	ID         uuid.UUID
+	InstanceID uuid.UUID
+	Name       string
 	Script    string
 	Action    int16
 	Enabled   bool

@@ -7,32 +7,72 @@ package store
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
-const getProxyACLPolicy = `-- name: GetProxyACLPolicy :one
-SELECT id, config_text, updated_at
+const getProxyACLPolicyByInstance = `-- name: GetProxyACLPolicyByInstance :one
+SELECT id, instance_id, config_text, updated_at
 FROM proxy_acl_policy
-ORDER BY id
-LIMIT 1
+WHERE instance_id = $1
 `
 
-func (q *Queries) GetProxyACLPolicy(ctx context.Context) (ProxyAclPolicy, error) {
-	row := q.db.QueryRow(ctx, getProxyACLPolicy)
+func (q *Queries) GetProxyACLPolicyByInstance(ctx context.Context, instanceID uuid.UUID) (ProxyAclPolicy, error) {
+	row := q.db.QueryRow(ctx, getProxyACLPolicyByInstance, instanceID)
 	var i ProxyAclPolicy
-	err := row.Scan(&i.ID, &i.ConfigText, &i.UpdatedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.InstanceID,
+		&i.ConfigText,
+		&i.UpdatedAt,
+	)
 	return i, err
 }
 
-const upsertProxyACLPolicy = `-- name: UpsertProxyACLPolicy :one
-UPDATE proxy_acl_policy
-SET config_text = $1, updated_at = now()
-WHERE id = (SELECT id FROM proxy_acl_policy ORDER BY id LIMIT 1)
-RETURNING id, config_text, updated_at
+const listProxyACLPolicyInstanceIDs = `-- name: ListProxyACLPolicyInstanceIDs :many
+SELECT instance_id FROM proxy_acl_policy
 `
 
-func (q *Queries) UpsertProxyACLPolicy(ctx context.Context, configText string) (ProxyAclPolicy, error) {
-	row := q.db.QueryRow(ctx, upsertProxyACLPolicy, configText)
+func (q *Queries) ListProxyACLPolicyInstanceIDs(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listProxyACLPolicyInstanceIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var instance_id uuid.UUID
+		if err := rows.Scan(&instance_id); err != nil {
+			return nil, err
+		}
+		items = append(items, instance_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const upsertProxyACLPolicyByInstance = `-- name: UpsertProxyACLPolicyByInstance :one
+UPDATE proxy_acl_policy
+SET config_text = $2, updated_at = now()
+WHERE instance_id = $1
+RETURNING id, instance_id, config_text, updated_at
+`
+
+type UpsertProxyACLPolicyByInstanceParams struct {
+	InstanceID uuid.UUID `json:"instance_id"`
+	ConfigText string    `json:"config_text"`
+}
+
+func (q *Queries) UpsertProxyACLPolicyByInstance(ctx context.Context, arg UpsertProxyACLPolicyByInstanceParams) (ProxyAclPolicy, error) {
+	row := q.db.QueryRow(ctx, upsertProxyACLPolicyByInstance, arg.InstanceID, arg.ConfigText)
 	var i ProxyAclPolicy
-	err := row.Scan(&i.ID, &i.ConfigText, &i.UpdatedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.InstanceID,
+		&i.ConfigText,
+		&i.UpdatedAt,
+	)
 	return i, err
 }

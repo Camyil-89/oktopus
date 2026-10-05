@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oktopus — Примеры реализаций</title>
+  <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="ru" href="./ru/implementation-examples.html">
+  <link rel="alternate" hreflang="en" href="./en/implementation-examples.html">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        },
+        colors: { ink: '#08090a' }
+      }
+    }
+  }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body class="bg-ink text-zinc-400 font-sans antialiased overflow-hidden" data-copy="Копировать" data-copied="Скопировано">
+
+<div class="flex h-screen">
+
+  <aside class="w-[262px] flex-shrink-0 border-r border-white/5 flex flex-col bg-ink/50">
+    <div class="h-14 flex items-center gap-2.5 px-5 border-b border-white/5">
+      <img src="../assets/icon.svg" alt="" class="w-7 h-7 rounded-md border border-teal-400/25 bg-teal-400/10 p-0.5" width="28" height="28">
+      <span class="text-zinc-200 text-sm font-medium tracking-tight">Oktopus</span>
+      <span class="ml-auto text-[10px] font-mono text-zinc-600 border border-white/10 rounded px-1.5 py-0.5">docs</span>
+    </div>
+
+    <div class="px-3 pt-3 pb-1">
+      <div class="flex items-center gap-2 border border-white/8 rounded-lg px-3 py-2 bg-white/[0.02] focus-within:border-teal-400/30 transition">
+        <svg class="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+        <input id="nav-search" type="search" placeholder="Поиск по разделам…" class="bg-transparent text-[12.5px] text-zinc-300 w-full placeholder:text-zinc-600 font-mono outline-none">
+      </div>
+    </div>
+
+    <nav id="nav" class="flex-1 px-3 py-3 overflow-y-auto flex flex-col gap-4">
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Развёртывание</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="./quickstart.html" class="nav-item"><span class="dot"></span>Развёртывание</a>
+<a href="./implementation-examples.html" class="nav-item active"><span class="dot"></span>Примеры реализаций</a>
+        </div>
+      </div>
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Разработка</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="./index.html" class="nav-item"><span class="dot"></span>Разработчикам</a>
+        </div>
+      </div>
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Вход</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="./login.html" class="nav-item"><span class="dot"></span>Вход</a>
+        </div>
+      </div>
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Панель управления</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="./manage/index.html" class="nav-item"><span class="dot"></span>Главная</a>
+<a href="./manage/instance.html" class="nav-item"><span class="dot"></span>Статистика инстанса</a>
+<a href="./manage/rules.html" class="nav-item"><span class="dot"></span>Правила прокси</a>
+<a href="./manage/access-log.html" class="nav-item"><span class="dot"></span>Журнал доступа</a>
+<a href="./manage/reports.html" class="nav-item"><span class="dot"></span>Отчёты журнала</a>
+<a href="./manage/proxy.html" class="nav-item"><span class="dot"></span>Настройки прокси</a>
+<a href="./manage/users.html" class="nav-item"><span class="dot"></span>Пользователи</a>
+        </div>
+      </div>
+
+      <div>
+        <p class="px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700">Справочник</p>
+        <div class="flex flex-col gap-0.5">
+          <a href="./manage/rules-acl-syntax.html" class="nav-item"><span class="dot"></span>Синтаксис ACL</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="border-t border-white/5 p-3">
+      <a href="https://github.com/Camyil-89/oktopus" target="_blank" rel="noopener noreferrer"
+         class="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-white/[0.03] transition group">
+        <svg class="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        <div class="min-w-0">
+          <p class="text-[12px] text-zinc-400 group-hover:text-zinc-200 transition leading-tight">Camyil-89/oktopus</p>
+          <p class="text-[10.5px] font-mono text-zinc-600">исходный код</p>
+        </div>
+      </a>
+    </div>
+  </aside>
+
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="h-14 flex-shrink-0 border-b border-white/5 flex items-center px-7 gap-3 bg-ink/40 backdrop-blur">
+      <nav class="flex items-center gap-2 text-[12.5px] font-mono text-zinc-600 min-w-0" aria-label="Breadcrumb">
+        <span class="text-zinc-700">docs</span>
+        <span class="text-zinc-700">/</span>
+        <span class="text-zinc-600">ru</span>
+        <span class="text-zinc-700">/</span>
+        <span class="text-zinc-600">Развёртывание</span>
+        <span class="text-zinc-700">/</span>
+        <span class="text-zinc-300 truncate">Примеры реализаций</span>
+      </nav>
+      <div class="ml-auto flex items-center gap-3">
+        <div class="flex items-center gap-1 text-[12px] font-mono"><span class="text-zinc-500 border border-teal-400/30 text-teal-300 rounded px-2 py-0.5">RU</span>
+          <a href="./en/implementation-examples.html" class="text-zinc-500 border border-white/8 rounded px-2 py-0.5 hover:text-zinc-200 hover:bg-white/5 transition">EN</a></div>
+        <a href="https://github.com/Camyil-89/oktopus" target="_blank" rel="noopener noreferrer"
+           class="hidden sm:inline-flex items-center gap-1.5 text-[12px] text-zinc-400 border border-white/8 rounded-lg px-3 py-1.5 hover:bg-white/5 hover:text-zinc-200 transition">GitHub</a>
+      </div>
+    </header>
+
+    <main id="main" class="flex-1 overflow-y-auto grid-bg">
+      <div class="max-w-[1180px] mx-auto px-7 py-9 flex gap-12">
+        <div class="min-w-0 flex-1 max-w-[740px]">
+
+          <article class="doc doc-page">
+            <p class="text-[10.5px] font-mono uppercase tracking-[0.18em] text-teal-300/70 mb-3">Развёртывание</p>
+            <h1 class="text-[26px] font-medium text-zinc-100 tracking-tight leading-tight">Примеры реализаций</h1>
+            <p class="lead">Oktopus — форвард-прокси HTTP/HTTPS с ACL, аутентификацией клиентов и журналом доступа. Ниже — типовые схемы размещения <strong>сервера Oktopus</strong> (один узел: прокси, API и панель управления) и направления трафика клиентов.</p>
+
+            <h2 id="ix-role">Роль сервера</h2>
+            <p>Клиенты (браузер, ОС, приложение) отправляют запросы на <strong>listen-адрес</strong> прокси на том же сервере Oktopus. Процесс проверяет правила, при необходимости требует учётные данные, пишет событие в журнал и устанавливает исходящее соединение к целевому хосту. Администраторы открывают <strong>веб-панель</strong> на этом же сервере (через nginx в Docker-стеке) — правила, пользователи, мониторинг; с интернета к серверу обычно не ходят.</p>
+            <p>Подробности запуска — на странице <a href="quickstart.html">Развёртывание</a>; listen-порт и режим — в <a href="manage/proxy.html">настройках прокси</a>.</p>
+
+            <h2 id="ix-recommended">Рекомендуемая схема: прокси внутри контура</h2>
+            <p>Предпочтительный вариант — <strong>сервер Oktopus внутри защищённого контура</strong>, без доступа к нему из интернета. Клиенты отправляют трафик на его прокси; egress: <strong>контур → Oktopus → внешний роутер (firewall) → интернет</strong>. На границе firewall пропускает наружу только трафик от этого сервера (или от доверенного сегмента), а не произвольный обход с рабочих мест.</p>
+            <p>Для этой схемы обычно включают режим <strong>MITM</strong> в <a href="manage/proxy.html">настройках прокси</a>: прокси выпускает или использует корневой CA организации, администраторы <strong>устанавливают этот сертификат на клиенты</strong> (доверенные корневые). Тогда HTTPS расшифровывается на прокси — доступны журнал с деталями, инспекция Lua и политики по содержимому запросов, а не только метаданные CONNECT.</p>
+
+            <div class="note tip">
+              <div>
+                <span class="note-title">Рекомендуется</span>
+                <p>Единый контролируемый выход, ACL и полный журнал; MITM + CA организации для просмотра и политики HTTPS-трафика; доступ к серверу Oktopus — только из доверенных сегментов (VPN, админ-VLAN, jump-host).</p>
+              </div>
+            </div>
+
+            <div class="mermaid-wrap recommended">
+              <p class="mermaid-label">Контур → Oktopus → firewall → интернет</p>
+              <pre class="mermaid">
+flowchart TB
+  subgraph perimeter["Защищённый контур"]
+    direction TB
+    U["Рабочие места"]
+    S["Серверы"]
+    OKT["Oktopus · прокси, API, панель"]
+    ADM["Администратор"]
+    U -->|"proxy / PAC"| OKT
+    S -->|"proxy / PAC"| OKT
+    ADM -->|"браузер · UI"| OKT
+  end
+  FW["Внешний роутер · firewall"]
+  WEB["Интернет"]
+  OKT -->|"egress"| FW
+  FW --> WEB
+              </pre>
+            </div>
+
+            <h3 id="ix-rec-steps">Что настроить</h3>
+            <ul>
+              <li><strong>Сеть:</strong> разместите сервер Oktopus так, чтобы он был доступен только из локальной сети; с интернета к нему доступа быть не должно.</li>
+              <li><strong>Режим MITM:</strong> включить в панели, сгенерировать или загрузить CA, раздать корневой сертификат на рабочие места и серверы (GPO, MDM, вручную).</li>
+              <li><strong>Клиенты:</strong> системный или браузерный прокси, PAC или <code>HTTP_PROXY</code> / <code>HTTPS_PROXY</code> на адрес Oktopus.</li>
+              <li><strong>Политика:</strong> ACL на каждом инстансе, при необходимости аутентификация прокси; при MITM — вкладка инспекции в <a href="manage/rules.html">правилах инстанса</a>.</li>
+              <li><strong>Мониторинг:</strong> журнал доступа и отчёты для аудита исходящего трафика.</li>
+            </ul>
+
+            <h2 id="ix-alternatives">Другие варианты</h2>
+            <p>Их используют реже или как компромисс; для новых инсталляций обычно достаточно схемы выше.</p>
+
+            <h3 id="ix-dmz">Прокси в DMZ с доступом из интернета</h3>
+            <p>Сервер слушает на публичном или DMZ-адресе; удалённые пользователи подключаются к его прокси напрямую. Удобно для удалёнки без VPN, но поверхность атаки больше: нужны жёсткий ACL, rate limit, актуальные TLS и отдельная защита доступа к UI.</p>
+
+            <div class="mermaid-wrap">
+              <p class="mermaid-label">DMZ · удалённые клиенты через интернет</p>
+              <pre class="mermaid">
+flowchart LR
+  REM["Удалённые клиенты"] -->|"интернет"| DMZ["Oktopus в DMZ"]
+  DMZ --> WEB["Интернет"]
+  ADM["Админ"] -->|"VPN / bastion"| DMZ
+              </pre>
+            </div>
+
+            <h3 id="ix-egress">Жёсткий egress на firewall (дополнение)</h3>
+            <p>Чтобы пользователи не обходили прокси «напрямую в интернет», на <strong>внешнем роутере или firewall</strong> часто настраивают правило: в WAN уходит только трафик с IP Oktopus (или с выделенного egress-сегмента), остальным хостам — deny на интернет. Клиентам всё равно задают адрес прокси или PAC; для HTTPS-инспекции без предупреждений браузера нужны <strong>MITM</strong> и установленный CA организации — иначе остаётся режим tunnel с метаданными CONNECT.</p>
+            <p>Такая схема не заменяет рекомендуемую цепочку «контур → Oktopus → firewall → интернет», а усиливает её: сервер остаётся внутри контура, снаружи к нему по-прежнему не ходят.</p>
+
+            <h2 id="ix-summary">Сводка</h2>
+            <ul>
+              <li><strong>Оптимально:</strong> один сервер Oktopus внутри контура, egress через пограничный firewall; режим MITM и CA на клиентах — для просмотра и политики HTTPS-трафика.</li>
+              <li><strong>Администрирование</strong> — через UI на том же сервере, только из доверенных сетей.</li>
+              <li><strong>Дальше:</strong> <a href="quickstart.html">Развёртывание</a>, на <a href="manage/index.html">главной</a> создайте инстанс, затем <a href="manage/proxy.html">настройки</a> (MITM и CA), <a href="manage/rules.html">правила</a> и <a href="manage/rules-acl-syntax.html">синтаксис ACL</a>.</li>
+            </ul>
+
+          </article>
+
+<div class="flex items-center justify-between gap-3 mt-14 pt-6 border-t border-white/5"><a href="./quickstart.html" class="pager-link group text-left">
+        <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+        <span class="min-w-0">
+          <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Назад</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Развёртывание</span>
+        </span>
+      </a><a href="./login.html" class="pager-link group text-right ml-auto">
+        <span class="min-w-0">
+          <span class="block text-[10.5px] font-mono uppercase tracking-[0.12em] text-zinc-700">Далее</span>
+          <span class="pager-title block text-[13px] text-zinc-400 transition truncate">Вход</span>
+        </span>
+        <svg class="w-4 h-4 text-zinc-600 transition flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+      </a></div>
+
+          <footer class="mt-10 pb-4 flex items-center justify-between text-[11px] font-mono text-zinc-700">
+            <span>© 2026 Oktopus</span>
+            <span>docs / ru</span>
+          </footer>
+        </div>
+
+        <aside class="hidden xl:block w-[196px] flex-shrink-0">
+          <div class="sticky top-2">
+            <p class="text-[10px] font-mono uppercase tracking-[0.16em] text-zinc-700 mb-3">На этой странице</p>
+            <ul id="toc-list" class="flex flex-col gap-0.5"></ul>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../assets/docs-page.js"></script>
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+mermaid.initialize({
+  startOnLoad: true,
+  theme: "dark",
+  securityLevel: "loose",
+  flowchart: { nodeSpacing: 48, rankSpacing: 56, padding: 16, htmlLabels: true },
+});
+</script>
+</body>
+</html>

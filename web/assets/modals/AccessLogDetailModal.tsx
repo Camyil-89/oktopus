@@ -1,7 +1,8 @@
 "use client";
 
 import { ApiError } from "@/api/base";
-import { getProxyInspectRule } from "@/api/proxy";
+import { findProxyInspectRule, getProxyInspectRule } from "@/api/proxy";
+import { AccessLogPolicyAnomalyPanel } from "@/assets/modals/AccessLogPolicyAnomalyPanel";
 import { scrollableModalProps } from "@/assets/modals/modalConfig";
 import { ProxyInspectRuleViewModal } from "@/assets/modals/ProxyInspectRuleViewModal";
 import type { ProxyAccessLogRow } from "@/types/accessLog";
@@ -13,23 +14,31 @@ import {
   accessLogSystemRuleLabel,
   isSystemAccessLogRuleId,
   parseAccessLogExtra,
+  normalizePolicyAnomalies,
   ACCESS_LOG_RULE_INSPECT_ERROR,
 } from "@/utils/accessLogExtra";
 import { normalizeAccessLogRow } from "@/utils/accessLogRow";
 import { OktopusLoading } from "@/assets/components/oktopus/OktopusLoading";
 import { useTranslation } from "@/contexts/LocaleContext";
 import type { TranslateFn } from "@/i18n/translate";
-import { Descriptions, Modal, Typography } from "antd";
+import { Descriptions, Modal, Tabs, Typography } from "antd";
 import { useEffect, useState } from "react";
+
+const ACCESS_LOG_DETAIL_BODY_MAX_HEIGHT = "min(85vh, 720px)";
 
 type AccessLogDetailModalProps = {
   row: ProxyAccessLogRow | null;
   open: boolean;
   onClose: () => void;
   ruleNames?: ReadonlyMap<string, string>;
+  instanceNames?: ReadonlyMap<string, string>;
 };
 
-function useInspectRule(open: boolean, ruleId: string | undefined) {
+function useInspectRule(
+  open: boolean,
+  ruleId: string | undefined,
+  instanceId: string | undefined,
+) {
   const [rule, setRule] = useState<{ id: string; name: string } | null>(null);
   const [ruleMissing, setRuleMissing] = useState(false);
   const [ruleLoading, setRuleLoading] = useState(false);
@@ -45,7 +54,10 @@ function useInspectRule(open: boolean, ruleId: string | undefined) {
     setRuleLoading(true);
     setRule(null);
     setRuleMissing(false);
-    void getProxyInspectRule(ruleId)
+    const load = instanceId
+      ? () => getProxyInspectRule(instanceId, ruleId)
+      : () => findProxyInspectRule(ruleId);
+    void load()
       .then((r: ProxyInspectRule) => {
         if (!cancelled) {
           setRule({ id: r.id, name: r.name });
@@ -69,7 +81,7 @@ function useInspectRule(open: boolean, ruleId: string | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [open, ruleId]);
+  }, [open, ruleId, instanceId]);
 
   return { rule, ruleMissing, ruleLoading };
 }
@@ -124,11 +136,12 @@ export function AccessLogDetailModal({
   open,
   onClose,
   ruleNames,
+  instanceNames,
 }: AccessLogDetailModalProps) {
   const { t } = useTranslation();
   const emDash = t("common.emDash");
   const rowNorm = row ? normalizeAccessLogRow(row) : null;
-  const extra = rowNorm ? rowNorm.extra : {};
+  const extra = rowNorm ? parseAccessLogExtra(rowNorm.extra) : {};
   const extraJson =
     rowNorm != null
       ? JSON.stringify(parseAccessLogExtra(rowNorm.extra), null, 2)
@@ -136,12 +149,14 @@ export function AccessLogDetailModal({
   const inspectRuleId = rowNorm?.inspect_rule_id ?? undefined;
   const decisionRef = rowNorm?.decision_rule_ref?.trim() ?? "";
 
-  const inspect = useInspectRule(open, inspectRuleId);
+  const inspect = useInspectRule(open, inspectRuleId, rowNorm?.instance_id);
   const [inspectViewOpen, setInspectViewOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("general");
 
   useEffect(() => {
     if (!open) {
       setInspectViewOpen(false);
+      setActiveTab("general");
     }
   }, [open]);
 
@@ -151,6 +166,103 @@ export function AccessLogDetailModal({
     t,
     ruleNames,
   );
+  const detectedAnomalyCount = normalizePolicyAnomalies(
+    extra.policy_anomaly,
+    { detectedOnly: true },
+  ).length;
+  const attackTabLabel =
+    detectedAnomalyCount > 0 ? (
+      <span>
+        {t("accessLog.detailTabAttackVector")}
+        <span className="ml-1 font-medium text-red-400">
+          ({detectedAnomalyCount})
+        </span>
+      </span>
+    ) : (
+      t("accessLog.detailTabAttackVector")
+    );
+
+  const generalTab = rowNorm ? (
+    <Descriptions column={1} bordered size="small">
+      <Descriptions.Item label="ID">{rowNorm.id}</Descriptions.Item>
+      <Descriptions.Item label={t("accessLog.col.instance")}>
+        {instanceNames?.get(rowNorm.instance_id) ??
+          rowNorm.instance_id ??
+          emDash}
+      </Descriptions.Item>
+      <Descriptions.Item label={t("common.time")}>
+        {new Date(rowNorm.created_at).toLocaleString()}
+      </Descriptions.Item>
+      <Descriptions.Item label={t("common.source")}>
+        {rowNorm.source_address}
+      </Descriptions.Item>
+      <Descriptions.Item label={t("common.destination")}>
+        {rowNorm.destination_address}
+      </Descriptions.Item>
+      <Descriptions.Item label={t("common.user")}>
+        {rowNorm.user ?? emDash}
+      </Descriptions.Item>
+      <Descriptions.Item label={t("common.action")}>
+        <AccessLogActionTag
+          action={rowNorm.action}
+          decisionRuleRef={rowNorm.decision_rule_ref}
+          deniedBy={rowNorm.denied_by}
+        />
+      </Descriptions.Item>
+      <Descriptions.Item label={t("accessLog.detailAclDecision")}>
+        <Typography.Text className="break-all font-mono text-sm">
+          {aclDecisionLabel}
+        </Typography.Text>
+      </Descriptions.Item>
+      <Descriptions.Item label={t("accessLog.detailDecisionRule")}>
+        <Typography.Text className="break-all font-mono text-sm">
+          {decisionRuleLabel}
+        </Typography.Text>
+      </Descriptions.Item>
+      {inspectRuleId ? (
+        <Descriptions.Item label={t("accessLog.detailInspectRule")}>
+          <RuleLine
+            ruleId={inspectRuleId}
+            loading={inspect.ruleLoading}
+            missing={inspect.ruleMissing}
+            rule={inspect.rule}
+            onOpen={() => setInspectViewOpen(true)}
+            t={t}
+          />
+        </Descriptions.Item>
+      ) : rowNorm.denied_by === "inspect" &&
+        rowNorm.decision_rule_ref === ACCESS_LOG_RULE_INSPECT_ERROR ? (
+        <Descriptions.Item label={t("accessLog.detailInspect")}>
+          <Typography.Text type="secondary">
+            {accessLogSystemRuleLabel(rowNorm.decision_rule_ref, t)}
+            {extra.inspect_error ? (
+              <span className="block text-xs opacity-80">
+                {extra.inspect_error}
+              </span>
+            ) : null}
+          </Typography.Text>
+        </Descriptions.Item>
+      ) : null}
+      <Descriptions.Item label={t("accessLog.col.decide_duration_us")}>
+        {rowNorm.decide_duration_us}
+      </Descriptions.Item>
+      <Descriptions.Item label="URL">
+        <Typography.Text className="break-all">
+          {rowNorm.full_url}
+        </Typography.Text>
+      </Descriptions.Item>
+    </Descriptions>
+  ) : null;
+
+  const extraTab = (
+    <pre
+      className="m-0 overflow-auto whitespace-pre-wrap rounded-md border border-white/10 bg-black/25 p-4 font-mono text-xs leading-relaxed"
+      style={{ maxHeight: "min(62vh, 560px)" }}
+    >
+      {extraJson}
+    </pre>
+  );
+
   return (
     <>
       <Modal
@@ -159,91 +271,47 @@ export function AccessLogDetailModal({
         onCancel={onClose}
         footer={null}
         width={720}
-        {...scrollableModalProps}
+        destroyOnClose={scrollableModalProps.destroyOnClose}
+        styles={{
+          body: {
+            maxHeight: ACCESS_LOG_DETAIL_BODY_MAX_HEIGHT,
+            overflowY: "auto",
+          },
+        }}
       >
-        {rowNorm && (
-          <>
-            <Descriptions column={1} bordered size="small">
-              <Descriptions.Item label="ID">{rowNorm.id}</Descriptions.Item>
-              <Descriptions.Item label={t("common.time")}>
-                {new Date(rowNorm.created_at).toLocaleString()}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("common.source")}>
-                {rowNorm.source_address}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("common.destination")}>
-                {rowNorm.destination_address}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("common.user")}>
-                {rowNorm.user ?? emDash}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("common.action")}>
-                <AccessLogActionTag
-                  action={rowNorm.action}
-                  decisionRuleRef={rowNorm.decision_rule_ref}
-                  deniedBy={rowNorm.denied_by}
-                />
-              </Descriptions.Item>
-              <Descriptions.Item label={t("accessLog.detailAclDecision")}>
-                <Typography.Text className="break-all font-mono text-sm">
-                  {aclDecisionLabel}
-                </Typography.Text>
-              </Descriptions.Item>
-              <Descriptions.Item label={t("accessLog.detailDecisionRule")}>
-                <Typography.Text className="break-all font-mono text-sm">
-                  {decisionRuleLabel}
-                </Typography.Text>
-              </Descriptions.Item>
-              {inspectRuleId ? (
-                <Descriptions.Item label={t("accessLog.detailInspectRule")}>
-                  <RuleLine
-                    ruleId={inspectRuleId}
-                    loading={inspect.ruleLoading}
-                    missing={inspect.ruleMissing}
-                    rule={inspect.rule}
-                    onOpen={() => setInspectViewOpen(true)}
-                    t={t}
+        {rowNorm ? (
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            className="[&_.ant-tabs-content-holder]:pt-4"
+            items={[
+              {
+                key: "general",
+                label: t("accessLog.detailTabGeneral"),
+                children: generalTab,
+              },
+              {
+                key: "attack",
+                label: attackTabLabel,
+                children: (
+                  <AccessLogPolicyAnomalyPanel
+                    policyAnomaly={extra.policy_anomaly}
                   />
-                </Descriptions.Item>
-              ) : rowNorm.denied_by === "inspect" &&
-                rowNorm.decision_rule_ref === ACCESS_LOG_RULE_INSPECT_ERROR ? (
-                <Descriptions.Item label={t("accessLog.detailInspect")}>
-                  <Typography.Text type="secondary">
-                    {accessLogSystemRuleLabel(rowNorm.decision_rule_ref, t)}
-                    {extra.inspect_error ? (
-                      <span className="block text-xs opacity-80">
-                        {extra.inspect_error}
-                      </span>
-                    ) : null}
-                  </Typography.Text>
-                </Descriptions.Item>
-              ) : null}
-              <Descriptions.Item label={t("accessLog.col.decide_duration_us")}>
-                {rowNorm.decide_duration_us}
-              </Descriptions.Item>
-              <Descriptions.Item label="URL">
-                <Typography.Text className="break-all">
-                  {rowNorm.full_url}
-                </Typography.Text>
-              </Descriptions.Item>
-            </Descriptions>
-            <div className="mt-4">
-              <Typography.Text
-                type="secondary"
-                className="mb-2 block text-xs font-medium uppercase tracking-wide"
-              >
-                extra
-              </Typography.Text>
-              <pre className="m-0 max-h-96 overflow-auto whitespace-pre-wrap rounded-md border border-white/10 bg-black/25 p-3 font-mono text-xs leading-relaxed">
-                {extraJson}
-              </pre>
-            </div>
-          </>
-        )}
+                ),
+              },
+              {
+                key: "extra",
+                label: t("accessLog.detailTabExtra"),
+                children: extraTab,
+              },
+            ]}
+          />
+        ) : null}
       </Modal>
       <ProxyInspectRuleViewModal
         open={inspectViewOpen}
         ruleId={inspectRuleId ?? null}
+        instanceId={rowNorm?.instance_id}
         initialRule={null}
         onClose={() => setInspectViewOpen(false)}
       />

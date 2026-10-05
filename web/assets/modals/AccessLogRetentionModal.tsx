@@ -1,6 +1,6 @@
 "use client";
 
-import { getProxySettings } from "@/api/proxy";
+import { getHostSettings, patchHostSettings } from "@/api/proxy";
 import { scrollableModalProps } from "@/assets/modals/modalConfig";
 import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
 import { App, Checkbox, Form, InputNumber, Modal } from "antd";
@@ -39,7 +39,7 @@ export function AccessLogRetentionModal({
     setLoading(true);
     void (async () => {
       try {
-        const st = await getProxySettings();
+        const st = await getHostSettings();
         if (cancelled) return;
         const days = st.access_log_retention_days;
         form.setFieldsValue({

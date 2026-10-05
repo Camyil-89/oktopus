@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"oktopus/internal/db/proxyaccesslog/inspectlog"
 	"oktopus/internal/db/proxyaccesslog/repository"
 )
@@ -26,6 +28,7 @@ type ReportTimeRange struct {
 }
 
 type ReportSpecFilters struct {
+	InstanceID    string
 	User          string
 	Source        string
 	Destination   string
@@ -190,6 +193,7 @@ func (s *Service) RunReportTableWidget(
 
 func buildReportFilters(f ReportSpecFilters) (repository.ReportFilters, error) {
 	filters := repository.ReportFilters{
+		InstanceID:    strings.TrimSpace(f.InstanceID),
 		User:          strings.TrimSpace(f.User),
 		Source:        strings.TrimSpace(f.Source),
 		Destination:   strings.TrimSpace(f.Destination),
@@ -221,6 +225,11 @@ func buildReportFilters(f ReportSpecFilters) (repository.ReportFilters, error) {
 				continue
 			}
 			filters.InspectLog[key] = val
+		}
+	}
+	if inst := filters.InstanceID; inst != "" {
+		if _, err := uuid.Parse(inst); err != nil {
+			return repository.ReportFilters{}, fmt.Errorf("invalid filter instance_id")
 		}
 	}
 	if err := applyFieldNonempty(&filters.FieldNonempty, f.FieldNonempty, "filters.field_nonempty"); err != nil {

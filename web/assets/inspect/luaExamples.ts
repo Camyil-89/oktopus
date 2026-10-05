@@ -18,33 +18,32 @@ export const INSPECT_LUA_EXAMPLES: InspectLuaExample[] = [
     title: "Похоже на отправку файла (эвристика по заголовкам)",
     description:
       "POST/PUT/PATCH: multipart, бинарные и медиа Content-Type, Content-Disposition, имена файлов из тела (лимит 4 МБ). Пустой Content-Type без признаков файла не блокируется.",
-    script: `-- «Запретить» — сразу блок; «Разрешить» — дальше по списку правил.
-local PLAIN_TYPES = {
-  "application/octet-stream",
-  "application/pdf",
-  "application/zip",
-  "application/x-zip-compressed",
-  "application/gzip",
-  "application/x-gzip",
-  "application/x-tar",
-  "application/x-7z-compressed",
-  "application/vnd.rar",
-  "application/x-rar-compressed",
-}
+    script: `local function is_plausible_filename(s)
+  return type(s) == "string"
+    and s ~= ""
+    and #s <= 255
+    and not s:find("[\\r\\n%z]")
+end
 
-local function filenames_from_ctx(ctx)
-  local out = {}
-  local n = ctx.upload_filenames
-  if n == nil then
-    return out
-  end
-  for i = 1, #n do
-    local name = n[i]
-    if name ~= nil and name ~= "" then
-      out[#out + 1] = name
+local function collect_names(raw)
+  local raw_names, clean_names = {}, {}
+  if type(raw) == "table" then
+    for i = 1, #raw do
+      local v = raw[i]
+      if type(v) == "string" and v ~= "" then
+        raw_names[#raw_names + 1] = v
+        if is_plausible_filename(v) then
+          clean_names[#clean_names + 1] = v
+        end
+      end
+    end
+  elseif type(raw) == "string" and raw ~= "" then
+    raw_names[1] = raw
+    if is_plausible_filename(raw) then
+      clean_names[1] = raw
     end
   end
-  return out
+  return raw_names, clean_names
 end
 
 function inspect(ctx)
@@ -53,51 +52,82 @@ function inspect(ctx)
     return false
   end
 
-  local files = filenames_from_ctx(ctx)
-  ctx:log("checked_mime_types", PLAIN_TYPES)
-  ctx:log("upload_filenames", files)
+  local raw_names, clean_names = collect_names(ctx.upload_filenames)
 
-  local cd = ctx:header("Content-Disposition")
-  if cd ~= "" and string.lower(cd):find("filename=", 1, true) then
-    ctx:log("match_reason", "content_disposition")
+  local ct = string.lower(tostring(ctx.content_type or ""))
+  local base = ct:match("^%s*([^;]+)") or ""
+  base = (base:gsub("%s+$", ""))
+  local clen = tonumber(ctx.content_length) or -1
+
+  local header_cd = ctx:header("Content-Disposition") or ""
+  local header_has_filename =
+    header_cd ~= "" and string.lower(header_cd):find("filename=", 1, true) ~= nil
+
+  ctx:log("upload_method", method)
+  ctx:log("upload_content_type", base)
+  ctx:log("upload_content_length", clen)
+  ctx:log("upload_filenames_raw_count", #raw_names)
+  ctx:log("upload_filenames", clean_names)          -- без мусора
+  ctx:log("upload_header_has_filename", header_has_filename)
+
+  local function match(reason)
+    ctx:log("upload_block_reason", reason)
     return true
   end
-  if #files > 0 then
-    ctx:log("match_reason", "upload_filenames")
-    return true
+
+  -- A. Имена файлов: детект по сырому списку (как в исходном правиле).
+  if #raw_names > 0 then
+    return match("multipart_with_filenames")
   end
 
-  local ct = string.lower(ctx.content_type or "")
-  if ct == "" then
+  -- B. Явный filename= в заголовке запроса.
+  if header_has_filename then
+    return match("content_disposition_header_filename")
+  end
+
+  -- C. multipart без имён — обычная форма.
+  if base:find("multipart/", 1, true) then
     return false
   end
 
-  if ct:find("multipart/", 1, true) then
-    ctx:log("match_reason", "multipart")
-    return true
+  -- D. Нет Content-Type.
+  if base == "" then
+    return false
   end
 
-  for i = 1, #PLAIN_TYPES do
-    if ct:find(PLAIN_TYPES[i], 1, true) then
-      ctx:log("match_reason", "content_type")
-      ctx:log("matched_mime", PLAIN_TYPES[i])
-      return true
-    end
+  -- E. Пустое тело.
+  if clen == 0 then
+    return false
   end
 
-  if ct:find("^image/", 1) or ct:find("^video/", 1) or ct:find("^audio/", 1) then
-    ctx:log("match_reason", "media_prefix")
-    return true
+  local binary_exact = {
+    ["application/octet-stream"]     = true,
+    ["application/pdf"]              = true,
+    ["application/zip"]              = true,
+    ["application/x-zip-compressed"] = true,
+    ["application/gzip"]             = true,
+    ["application/x-gzip"]           = true,
+    ["application/x-tar"]            = true,
+    ["application/x-7z-compressed"]  = true,
+    ["application/vnd.rar"]          = true,
+    ["application/msword"]           = true,
+  }
+  if binary_exact[base] then
+    return match("binary_content_type:" .. base)
   end
 
-  if ct:find("^application/vnd%.", 1) or ct:find("^application/msword", 1) then
-    ctx:log("match_reason", "office_legacy")
-    return true
+  if base:find("^image/") or base:find("^video/") or base:find("^audio/") then
+    return match("media_content_type:" .. base)
   end
 
-  if ct:find("application/vnd%.openxmlformats%-officedocument", 1, true) then
-    ctx:log("match_reason", "office_openxml")
-    return true
+  if base:find("^application/vnd%.openxmlformats%-officedocument") then
+    return match("ooxml_content_type:" .. base)
+  end
+  if base:find("^application/vnd%.ms%-") then
+    return match("ms_office_content_type:" .. base)
+  end
+  if base:find("^application/vnd%.oasis%.opendocument") then
+    return match("odf_content_type:" .. base)
   end
 
   return false

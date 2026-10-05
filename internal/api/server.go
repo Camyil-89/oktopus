@@ -25,21 +25,23 @@ type Server struct {
 }
 
 // NewServer собирает маршруты API.
-func NewServer(cfg apiconfig.Config, runtime *db.Runtime, proxyStatus proxyview.StatusProvider) *Server {
+func NewServer(cfg apiconfig.Config, runtime *db.Runtime, fleet proxyview.FleetStatusProvider) *Server {
 	authLoginLockout := &authmw.LoginLockout{}
 	authGuard := authmw.NewGuard([]byte(cfg.JWTSecret), runtime.Users, authLoginLockout)
 	authH := authview.NewHandler(runtime.Users, authGuard, authLoginLockout, cfg.CookieSecure)
 	usersH := usersview.NewHandler(runtime.Users, authGuard)
-	proxyH := proxyview.NewHandler(runtime.ProxySettings, authGuard)
+	pagesH := proxyview.NewHandler(authGuard)
+	hostH := proxyview.NewHostSettingsHandler(runtime.HostSettings, authGuard)
+	instancesH := proxyview.NewInstancesHandler(runtime.ProxyInstances, authGuard)
 	proxyACLH := proxyview.NewACLHandler(runtime.ProxyACL, authGuard)
 	proxyInspectH := proxyview.NewInspectHandler(runtime.ProxyInspect, authGuard)
-	statusH := proxyview.NewStatusHandler(runtime.ProxySettings, runtime.ProxyACL, proxyStatus, authGuard)
+	statusH := proxyview.NewStatusHandler(runtime.ProxyInstances, runtime.ProxyACL, fleet, authGuard)
 	accessLogH := proxyview.NewAccessLogHandler(runtime.ProxyAccessLog, authGuard)
 
 	mux := http.NewServeMux()
 	authview.Register(mux, authH)
 	usersview.Register(mux, usersH)
-	proxyview.Register(mux, proxyH, proxyACLH, proxyInspectH, statusH, accessLogH)
+	proxyview.Register(mux, pagesH, hostH, instancesH, proxyACLH, proxyInspectH, statusH, accessLogH)
 
 	var h http.Handler = mux
 	h = cors.Middleware(cfg.CORSOrigins)(h)
@@ -49,7 +51,6 @@ func NewServer(cfg apiconfig.Config, runtime *db.Runtime, proxyStatus proxyview.
 }
 
 // ListenAndServe запускает HTTP-сервер до отмены контекста.
-// ready вызывается один раз после успешного bind (до приёма соединений).
 func (s *Server) ListenAndServe(ctx context.Context, ready func()) error {
 	ln, err := net.Listen("tcp", s.cfg.Listen)
 	if err != nil {

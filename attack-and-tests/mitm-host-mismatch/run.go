@@ -10,6 +10,8 @@ import (
 	"net"
 	"os"
 	"strings"
+
+	"oktopus/attack-and-tests/setup"
 )
 
 func cmdRun(args []string) int {
@@ -61,7 +63,7 @@ func runControlCheck(proxyAddr, internalURL, user, pass string) {
 	}
 	defer res.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
-	log.Printf("control: HTTP %d body=%q", res.StatusCode, strings.TrimSpace(string(body)))
+	log.Printf("control: %s", setup.FormatPOCHTTPResponse(res.StatusCode, string(body)))
 	if res.StatusCode == 200 && strings.Contains(string(body), "SECRET_INTERNAL_HIT") {
 		log.Println("control: internal доступен напрямую — ужесточите ACL")
 	}
@@ -117,8 +119,8 @@ func runBypassAttack(connectMode, proxyAddr, connectDest, sni, mode, evilURL, ev
 		return false, err
 	}
 	log.Printf("bypass: HTTP %d", resp.status)
-	if snippet := responseSnippet(resp.body); snippet != "" {
-		log.Printf("bypass: ответ (фрагмент): %s", snippet)
+	if snippet := setup.POCResponseSnippet(resp.status, resp.body); snippet != "" {
+		log.Printf("bypass: ответ: %s", snippet)
 	}
 	switch bypassVerdict(resp, evilURL, evilHost) {
 	case verdictConfirmedSecret:
@@ -162,31 +164,6 @@ func bypassVerdict(resp httpResp, evilURL, evilHost string) bypassVerdictKind {
 		return verdictDenied
 	}
 	return verdictUnknown
-}
-
-func responseSnippet(body string) string {
-	body = strings.TrimSpace(body)
-	if body == "" {
-		return ""
-	}
-	if strings.Contains(body, "errorDetail") {
-		const marker = `id="errorDetail">`
-		if i := strings.Index(body, marker); i >= 0 {
-			rest := body[i+len(marker):]
-			if j := strings.Index(rest, "</div>"); j > 0 {
-				rest = rest[:j]
-			}
-			rest = strings.TrimSpace(rest)
-			if len(rest) > 280 {
-				rest = rest[:280] + "…"
-			}
-			return rest
-		}
-	}
-	if len(body) > 200 {
-		return body[:200] + "…"
-	}
-	return body
 }
 
 type httpResp struct {

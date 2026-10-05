@@ -1,12 +1,12 @@
 package metrics
 
 import (
+	"context"
 	"math"
 	"sort"
 	"sync"
 	"time"
 
-	"oktopus/internal/proxy/bytecount"
 )
 
 const window = 5 * time.Minute
@@ -74,6 +74,15 @@ type Collector struct {
 	mu           sync.Mutex
 	bySec        map[int64]*secondBucket
 	bytesBySec   map[int64]byteTotals
+	liveByteSec  int64
+	liveUpAllow  int64
+	liveUpDeny   int64
+	liveDownAllow int64
+	liveDownDeny  int64
+	totalUpAllow   uint64
+	totalUpDeny    uint64
+	totalDownAllow uint64
+	totalDownDeny  uint64
 	pruneSec     int64
 	decideRecent decideRing
 	inspectRecent inspectRing
@@ -105,23 +114,23 @@ func Percentile95(values []int64) int64 {
 }
 
 // ObserveDecision регистрирует одно ACL-решение (CONNECT или HTTP).
-func ObserveDecision(allow bool, spend time.Duration, parts DecideParts, user, source string) {
-	defaultCollector.observe(allow, spend, parts, user, source, false)
+func ObserveDecision(ctx context.Context, allow bool, spend time.Duration, parts DecideParts, user, source string) {
+	collectorFromContext(ctx).observe(allow, spend, parts, user, source, false)
 }
 
 // ObserveDecisionWithPolicy — ACL + policy total за один захват mutex (CONNECT hot path).
-func ObserveDecisionWithPolicy(allow bool, spend time.Duration, parts DecideParts, user, source string) {
-	defaultCollector.observe(allow, spend, parts, user, source, true)
+func ObserveDecisionWithPolicy(ctx context.Context, allow bool, spend time.Duration, parts DecideParts, user, source string) {
+	collectorFromContext(ctx).observe(allow, spend, parts, user, source, true)
 }
 
 // ObserveInspect регистрирует один проход Lua-инспекции (HTTP после ACL allow).
-func ObserveInspect(spend time.Duration, parts InspectParts) {
-	defaultCollector.observeInspect(spend, parts)
+func ObserveInspect(ctx context.Context, spend time.Duration, parts InspectParts) {
+	collectorFromContext(ctx).observeInspect(spend, parts)
 }
 
 // ObservePolicyTotal — полное время политики на запрос: ACL (+ inspect на HTTP allow в MITM).
-func ObservePolicyTotal(spend time.Duration) {
-	defaultCollector.observePolicy(spend)
+func ObservePolicyTotal(ctx context.Context, spend time.Duration) {
+	collectorFromContext(ctx).observePolicy(spend)
 }
 
 func (c *Collector) observe(allow bool, spend time.Duration, parts DecideParts, user, source string, withPolicy bool) {
@@ -223,12 +232,12 @@ func (c *Collector) pruneLocked(now time.Time) {
 
 func (c *Collector) snapshot() Snapshot {
 	now := time.Now()
-	bytecount.Rotate(now.Unix())
 	cutoffSec := now.Add(-window).Unix()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.advanceByteSecLocked(now.Unix())
 	c.pruneLocked(now)
 
 	var (
@@ -282,7 +291,10 @@ func (c *Collector) snapshot() Snapshot {
 	policyNs := c.policyRecent.values()
 	avgPolicyUs, policyP95, policyP99, _ := statsFromNs(policyNs)
 
-	upA, upD, downA, downD := bytecount.Totals()
+	upA := c.totalUpAllow
+	upD := c.totalUpDeny
+	downA := c.totalDownAllow
+	downD := c.totalDownDeny
 
 	return Snapshot{
 		RequestsPerSecAvg5m:   float64(totalReq) / window.Seconds(),

@@ -42,7 +42,12 @@ func RunContext(ctx context.Context, cfg Config, h *Hooks, logger *log.Logger) e
 }
 
 type Manager = server.Manager
+type Fleet = server.Fleet
 
 func NewManager(h *Hooks, logger *log.Logger) *Manager {
 	return server.NewManager(h, logger)
+}
+
+func NewFleet(h *Hooks, logger *log.Logger) *Fleet {
+	return server.NewFleet(h, logger)
 }

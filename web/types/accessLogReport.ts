@@ -6,6 +6,7 @@ export type AccessLogReportSpec = {
 };
 
 export type AccessLogReportFilters = {
+  instance_id?: string;
   user?: string;
   source?: string;
   destination?: string;
@@ -44,6 +45,7 @@ export type AccessLogReportWidgetQuery = {
 };
 
 export type AccessLogReportColumnField =
+  | "instance_id"
   | "destination_address"
   | "source_address"
   | "user"

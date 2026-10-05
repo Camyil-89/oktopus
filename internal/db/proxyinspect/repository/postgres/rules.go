@@ -23,8 +23,8 @@ func NewRulesRepository(pool *pgxpool.Pool, q *store.Queries) repository.RulesRe
 	return &RulesRepository{pool: pool, q: q}
 }
 
-func (r *RulesRepository) List(ctx context.Context) ([]domain.Rule, error) {
-	rows, err := r.q.ListProxyInspectRules(ctx)
+func (r *RulesRepository) ListByInstance(ctx context.Context, instanceID uuid.UUID) ([]domain.Rule, error) {
+	rows, err := r.q.ListProxyInspectRulesByInstance(ctx, instanceID)
 	if err != nil {
 		return nil, fmt.Errorf("postgres list proxy inspect rules: %w", err)
 	}
@@ -35,8 +35,8 @@ func (r *RulesRepository) List(ctx context.Context) ([]domain.Rule, error) {
 	return out, nil
 }
 
-func (r *RulesRepository) ListSummary(ctx context.Context) ([]domain.RuleSummary, error) {
-	rows, err := r.q.ListProxyInspectRulesSummary(ctx)
+func (r *RulesRepository) ListSummaryByInstance(ctx context.Context, instanceID uuid.UUID) ([]domain.RuleSummary, error) {
+	rows, err := r.q.ListProxyInspectRulesSummaryByInstance(ctx, instanceID)
 	if err != nil {
 		return nil, fmt.Errorf("postgres list proxy inspect rules summary: %w", err)
 	}
@@ -58,15 +58,23 @@ func (r *RulesRepository) GetByID(ctx context.Context, id uuid.UUID) (domain.Rul
 	return toDomain(row), nil
 }
 
-func (r *RulesRepository) Count(ctx context.Context) (int64, error) {
-	n, err := r.q.CountProxyInspectRules(ctx)
+func (r *RulesRepository) CountByInstance(ctx context.Context, instanceID uuid.UUID) (int64, error) {
+	n, err := r.q.CountProxyInspectRulesByInstance(ctx, instanceID)
 	if err != nil {
 		return 0, fmt.Errorf("postgres count proxy inspect rules: %w", err)
 	}
 	return n, nil
 }
 
-func (r *RulesRepository) ReplaceAll(ctx context.Context, rules []domain.Rule) error {
+func (r *RulesRepository) ListInstanceIDs(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := r.q.ListProxyInspectRuleInstanceIDs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("postgres list inspect instance ids: %w", err)
+	}
+	return rows, nil
+}
+
+func (r *RulesRepository) ReplaceAllForInstance(ctx context.Context, instanceID uuid.UUID, rules []domain.Rule) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -81,7 +89,10 @@ func (r *RulesRepository) ReplaceAll(ctx context.Context, rules []domain.Rule) e
 		}
 		keepIDs = append(keepIDs, rule.ID)
 	}
-	if err := q.DeleteProxyInspectRulesExcept(ctx, keepIDs); err != nil {
+	if err := q.DeleteProxyInspectRulesByInstanceExcept(ctx, store.DeleteProxyInspectRulesByInstanceExceptParams{
+		InstanceID: instanceID,
+		KeepIds:    keepIDs,
+	}); err != nil {
 		return fmt.Errorf("delete removed rules: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -92,31 +103,34 @@ func (r *RulesRepository) ReplaceAll(ctx context.Context, rules []domain.Rule) e
 
 func upsertParams(r domain.Rule) store.UpsertProxyInspectRuleParams {
 	return store.UpsertProxyInspectRuleParams{
-		ID:        r.ID,
-		Name:      r.Name,
-		Script:    r.Script,
-		Action:    r.Action,
-		Enabled:   r.Enabled,
-		SortOrder: int32(r.SortOrder),
+		ID:         r.ID,
+		InstanceID: r.InstanceID,
+		Name:       r.Name,
+		Script:     r.Script,
+		Action:     r.Action,
+		Enabled:    r.Enabled,
+		SortOrder:  int32(r.SortOrder),
 	}
 }
 
 func toDomain(row store.ProxyInspectRule) domain.Rule {
 	return domain.Rule{
-		ID:        row.ID,
-		Name:      row.Name,
-		Script:    row.Script,
-		Action:    row.Action,
-		Enabled:   row.Enabled,
-		SortOrder: int(row.SortOrder),
-		CreatedAt: row.CreatedAt.Time,
-		UpdatedAt: row.UpdatedAt.Time,
+		ID:         row.ID,
+		InstanceID: row.InstanceID,
+		Name:       row.Name,
+		Script:     row.Script,
+		Action:     row.Action,
+		Enabled:    row.Enabled,
+		SortOrder:  int(row.SortOrder),
+		CreatedAt:  row.CreatedAt.Time,
+		UpdatedAt:  row.UpdatedAt.Time,
 	}
 }
 
-func toDomainSummary(row store.ListProxyInspectRulesSummaryRow) domain.RuleSummary {
+func toDomainSummary(row store.ListProxyInspectRulesSummaryByInstanceRow) domain.RuleSummary {
 	return domain.RuleSummary{
 		ID:           row.ID,
+		InstanceID:   row.InstanceID,
 		Name:         row.Name,
 		Action:       row.Action,
 		Enabled:      row.Enabled,

@@ -174,3 +174,39 @@ a.nav-item { color: #71717a; }
 .ai-prompt-block { margin-top: 36px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.06); }
 .ai-prompt-block > p { font-size: 13px; color: #a1a1aa; }
 .ai-prompt-block pre { max-height: 420px; overflow-y: auto; }
+
+.mermaid-wrap {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 18px 12px 8px;
+  margin: 18px 0 22px;
+  overflow-x: auto;
+}
+.mermaid-wrap.recommended {
+  border-color: rgba(94, 234, 212, 0.22);
+  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.06);
+  padding: 22px 16px 14px;
+  min-height: 480px;
+}
+.mermaid-wrap.recommended .mermaid,
+.mermaid-wrap.recommended pre.mermaid {
+  min-height: 400px;
+}
+.mermaid-wrap.recommended svg {
+  width: 100% !important;
+  max-width: 680px;
+  height: auto !important;
+  min-height: 380px;
+  display: block;
+  margin: 0 auto;
+}
+.mermaid-wrap .mermaid-label {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #71717a;
+  padding: 0 6px 10px;
+}
+.mermaid-wrap.recommended .mermaid-label { color: #5eead4; }

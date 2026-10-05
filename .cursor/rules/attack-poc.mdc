@@ -30,11 +30,27 @@ attack-and-tests/<kebab-name>/
   README.md
 ```
 
-Общий пакет **`attack-and-tests/setup`**: login, PATCH settings, PUT ACL, скачать CA, proxy-auth `attack-poc`.
+Общий пакет **`attack-and-tests/setup`**: login, `EnsureTestInstance()` (инстанс `attack-and-tests` на `127.0.0.1:9000`), PATCH instance, PUT ACL, CA, proxy-auth `attack-poc`.
 
 - **`package main`**, модуль **`oktopus`**, запуск: `go run ./attack-and-tests/<name> all`.
 - **`all`**: lab → для **mitm** и **tunnel** настроить прокси → control + bypass → **`RESULT: OK`** (атака не удалась) / **`FAIL`** (удалась).
-- Индекс: **`attack-and-tests/README.md`**.
+- Индекс и **полный перечень команд запуска**: **`attack-and-tests/README.md`** → секция **`## Команды запуска`**.
+
+## Команды запуска (обновлять README)
+
+**Канонический список** — только в `attack-and-tests/README.md`, блок **`## Команды запуска`**. При любом новом каталоге в `attack-and-tests/` дополняй этот блок одной строкой:
+
+| Тип | Строка в README |
+|-----|-----------------|
+| PoC с `all` | `go run ./attack-and-tests/<kebab-name> all` |
+| ACL / auth / compile-сьют | `go run ./attack-and-tests/<kebab-name>` |
+| Новый сьют только в `aclrun` | строка в подблок **ACL** + регистрация в `aclrun` / `run-all-acl` (агрегатор менять не нужно, если сьют уже в `AllSuites()`) |
+
+Порядок в README: сначала `run-all-acl`, затем ACL по алфавиту папки, затем PoC по алфавиту (как в CI: `scripts/ci-backend-integration.sh`).
+
+PoC в CI: явные `echo` + `go run … all` или цикл `for poc in …` — **добавить имя папки**, если PoC должен гоняться в integration.
+
+Не дублировать полный список команд в этом правиле — только ссылка на README и таблицу выше.
 
 ## Сценарий control / bypass
 
@@ -58,7 +74,7 @@ attack-and-tests/<kebab-name>/
 
 - Отдельная папка `attack-and-tests/<kebab-name>/` с `policy.squid` + `main.go`.
 - Раннер `aclrun.RunEvaluateSuite` или `RunCompileSuite` для `ssl_verify` / `delay_*`.
-- Список в `attack-and-tests/README.md`, агрегатор `run-all-acl`.
+- Строка `go run ./attack-and-tests/<name>` в **`README.md` → Команды запуска**; сьют в `aclrun` / `run-all-acl`.
 
 ## CI (обязательно при новом каталоге)
 
@@ -74,7 +90,7 @@ attack-and-tests/<kebab-name>/
 ## Чеклист новой атаки
 
 1. Папка `attack-and-tests/<name>/`, README + `acl.example.squid`.
-2. `all` с mitm/tunnel и RESULT OK/FAIL.
-3. Запись в `attack-and-tests/README.md`.
+2. `all` с mitm/tunnel и RESULT OK/FAIL (для PoC).
+3. **Команда** в `attack-and-tests/README.md` → `## Команды запуска` (и строка в таблице описаний при необходимости).
 4. Регрессия в `internal/.../test/`.
-5. **CI:** шаг в `scripts/ci-backend-integration.sh` (PoC `all`) или `run-all-acl` / `aclrun` (ACL).
+5. **CI:** шаг в `scripts/ci-backend-integration.sh` (PoC `all`) или `aclrun` + README (ACL).

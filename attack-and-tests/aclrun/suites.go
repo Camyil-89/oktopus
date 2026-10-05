@@ -127,12 +127,15 @@ func ACLPort() Suite {
 }
 
 func ACLURLRegex() Suite {
+	const labPort = 9090
+	host := "localhost"
 	return Suite{
-		Name:   "acl-url-regex",
-		POCDir: POCDir("acl-url-regex"),
+		Name:    "acl-url-regex",
+		POCDir:  POCDir("acl-url-regex"),
+		HTTPLab: true,
 		Cases: []Case{
-			{Name: "deny /secret path", Input: setup.EvaluateInput{SNI: domainAllow, Path: "/secret/data"}, WantAllowed: false, SkipProxy: true},
-			{Name: "allow /public", Input: setup.EvaluateInput{SNI: domainAllow, Path: "/public"}, WantAllowed: true, SkipProxy: true},
+			{Name: "deny /secret path", Input: setup.EvaluateInput{SNI: host, Path: "/secret/data", DstPort: labPort}, WantAllowed: false, ProxyMode: setup.ProxyProbeHTTP},
+			{Name: "allow /public", Input: setup.EvaluateInput{SNI: host, Path: "/public", DstPort: labPort}, WantAllowed: true, ProxyMode: setup.ProxyProbeHTTP},
 		},
 	}
 }

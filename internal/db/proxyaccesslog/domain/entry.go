@@ -9,6 +9,7 @@ import (
 // Entry — строка журнала ACL.
 type Entry struct {
 	ID                 uuid.UUID
+	InstanceID         uuid.UUID
 	CreatedAt          time.Time
 	SourceAddress      string
 	DestinationAddress string

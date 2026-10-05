@@ -6,6 +6,8 @@ import (
 	"net"
 	"sync"
 
+	"github.com/google/uuid"
+
 	"oktopus/internal/proxy/bytecount"
 	"oktopus/internal/proxy/ratelimit"
 	"oktopus/internal/proxy/wsactive"
@@ -45,24 +47,28 @@ var relayBufPool = sync.Pool{
 
 // RelayPair проксирует WebSocket-фреймы до закрытия одной из сторон.
 func RelayPair(clientWrite net.Conn, clientRead io.Reader, upstream net.Conn, upstreamBR *bufio.Reader, flow *ratelimit.Flow) {
+	RelayPairInstance(clientWrite, clientRead, upstream, upstreamBR, flow, uuid.Nil)
+}
+
+func RelayPairInstance(clientWrite net.Conn, clientRead io.Reader, upstream net.Conn, upstreamBR *bufio.Reader, flow *ratelimit.Flow, instanceID uuid.UUID) {
 	wsactive.Inc()
 	defer wsactive.Dec()
 
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		relayWS(upstream, &relayEndpoint{r: clientRead, c: clientWrite}, flow, true)
+		relayWS(upstream, &relayEndpoint{r: clientRead, c: clientWrite}, flow, true, instanceID)
 		wg.Done()
 	}()
 	go func() {
-		relayWS(clientWrite, &relayEndpoint{r: upstreamBR, c: upstream}, flow, false)
+		relayWS(clientWrite, &relayEndpoint{r: upstreamBR, c: upstream}, flow, false, instanceID)
 		wg.Done()
 	}()
 	wg.Wait()
 }
 
 // relayWS: fromClient=true — байты client→upstream (исх).
-func relayWS(dst io.WriteCloser, src io.ReadCloser, flow *ratelimit.Flow, fromClient bool) {
+func relayWS(dst io.WriteCloser, src io.ReadCloser, flow *ratelimit.Flow, fromClient bool, instanceID uuid.UUID) {
 	defer dst.Close()
 	defer src.Close()
 	buf := relayBufPool.Get().(*[]byte)
@@ -71,9 +77,9 @@ func relayWS(dst io.WriteCloser, src io.ReadCloser, flow *ratelimit.Flow, fromCl
 		nr, er := src.Read(*buf)
 		if nr > 0 {
 			if fromClient {
-				bytecount.ObserveUp(nr)
+				bytecount.ObserveUpInstance(instanceID, nr, false)
 			} else {
-				bytecount.ObserveDown(nr)
+				bytecount.ObserveDownInstance(instanceID, nr, false)
 			}
 			if flow != nil {
 				if err := flow.Acquire(nr); err != nil {

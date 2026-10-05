@@ -12,8 +12,8 @@ import (
 	"oktopus/internal/db/proxyacl/domain"
 )
 
-func (r *RulesRepository) GetPolicy(ctx context.Context) (domain.Policy, error) {
-	row, err := r.q.GetProxyACLPolicy(ctx)
+func (r *RulesRepository) GetPolicy(ctx context.Context, instanceID uuid.UUID) (domain.Policy, error) {
+	row, err := r.q.GetProxyACLPolicyByInstance(ctx, instanceID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Policy{}, nil
@@ -23,12 +23,23 @@ func (r *RulesRepository) GetPolicy(ctx context.Context) (domain.Policy, error) 
 	return domain.Policy{ConfigText: row.ConfigText, UpdatedAt: row.UpdatedAt.Time}, nil
 }
 
-func (r *RulesRepository) SetPolicy(ctx context.Context, configText string) (domain.Policy, error) {
-	row, err := r.q.UpsertProxyACLPolicy(ctx, configText)
+func (r *RulesRepository) SetPolicy(ctx context.Context, instanceID uuid.UUID, configText string) (domain.Policy, error) {
+	row, err := r.q.UpsertProxyACLPolicyByInstance(ctx, store.UpsertProxyACLPolicyByInstanceParams{
+		InstanceID: instanceID,
+		ConfigText: configText,
+	})
 	if err != nil {
 		return domain.Policy{}, fmt.Errorf("postgres set proxy acl policy: %w", err)
 	}
 	return domain.Policy{ConfigText: row.ConfigText, UpdatedAt: row.UpdatedAt.Time}, nil
+}
+
+func (r *RulesRepository) ListPolicyInstanceIDs(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := r.q.ListProxyACLPolicyInstanceIDs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("postgres list policy instance ids: %w", err)
+	}
+	return rows, nil
 }
 
 func (r *RulesRepository) ListNamedListsByNames(ctx context.Context, names []string) ([]domain.NamedList, error) {

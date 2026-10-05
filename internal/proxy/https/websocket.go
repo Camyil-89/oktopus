@@ -25,6 +25,10 @@ func (m *MITM) serveWebSocketUpgrade(
 	defaultHost string,
 	hostPort string,
 ) bool {
+	reqCtx := observe.WithCONNECTDestHostPort(ctx, hostPort)
+	reqCtx = observe.WithMITMClientHelloSNI(reqCtx, defaultHost)
+	req = req.WithContext(reqCtx)
+
 	outReq, d := applyMITMHTTPPolicy(ctx, m.Hooks, req, defaultHost)
 	outReq.Header.Del("Proxy-Connection")
 
@@ -77,7 +81,11 @@ func (s *mitmWSSink) DeliverUpstream(ctx context.Context, outReq *stdhttp.Reques
 }
 
 func prepareMITMOutboundRequest(ctx context.Context, req *stdhttp.Request, defaultHost string) *stdhttp.Request {
-	outReq := req.WithContext(ctx)
+	base := ctx
+	if req != nil && req.Context() != nil {
+		base = req.Context()
+	}
+	outReq := req.WithContext(base)
 	outReq.URL.Scheme = "https"
 	if outReq.URL.Host == "" {
 		outReq.URL.Host = req.Host
