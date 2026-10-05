@@ -17,6 +17,9 @@ func startACLHTTPLab() (func(), error) {
 	mux.HandleFunc("/public", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = fmt.Fprint(w, "PUBLIC_OK\n")
 	})
+	mux.HandleFunc("/other", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, "OTHER_OK\n")
+	})
 	mux.HandleFunc("/secret/data", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = fmt.Fprint(w, poclib.SecretMarker+"\n")
 	})

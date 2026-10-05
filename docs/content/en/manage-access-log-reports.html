@@ -44,4 +44,9 @@
               </div>
             </div>
 
-            <p>Pick a report, set the interval, and review trends. For a single incident, start from Access log.</p>
+            <ol>
+              <li>The <strong>Summary</strong> tab is the built-in dashboard; add your own tabs with the <strong>Tab</strong> button.</li>
+              <li>On a custom tab, set the time range; <strong>Edit dashboard</strong> is a JSON array of <code>widgets</code> (the AI prompt uses the same format) — saving persists it on the server.</li>
+              <li>Time series support calendar buckets (10&nbsp;min, hour, day) and aggregates by hour of day, day of week, and month of year.</li>
+            </ol>
+            <p>For a single incident, start from Access log; reports are for ongoing monitoring.</p>

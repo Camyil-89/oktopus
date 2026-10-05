@@ -18,6 +18,7 @@ type RunAllItem struct {
 	Eval    *Suite
 	Compile *CompileSuite
 	Auth    *AuthSuite
+	Inspect *InspectSuite
 }
 
 // AllSuites — порядок прогона run-all-acl.
@@ -36,8 +37,11 @@ func AllSuites() []RunAllItem {
 		{Compile: ptrCompile(DelayAccess())},
 		{Auth: ptrAuth(ProxyAuthStatic())},
 		{Auth: ptrAuth(ProxyAuthLDAP())},
+		{Inspect: ptrInspect(InspectAllowDeny())},
 	}
 }
+
+func ptrInspect(v InspectSuite) *InspectSuite { return &v }
 
 func ptrAuth(v AuthSuite) *AuthSuite { return &v }
 
@@ -189,6 +193,58 @@ func ProxyAuthStatic() AuthSuite {
 			{Name: "no credentials", User: "", Pass: "", WantAccept: false},
 			{Name: "wrong password", User: setup.ProxyAuthUser, Pass: "wrong", WantAccept: false},
 			{Name: "not in static list", User: "nobody-listed", Pass: "any", WantAccept: false},
+		},
+	}
+}
+
+const (
+	inspectRuleDenySecretID  = "018f0000-0000-7000-8000-000000000101"
+	inspectRuleAllowPublicID = "018f0000-0000-7000-8000-000000000102"
+)
+
+const inspectScriptDenySecret = `function inspect(ctx)
+  return string.find(ctx.path, "/secret", 1, true) ~= nil
+end`
+
+const inspectScriptAllowPublic = `function inspect(ctx)
+  return string.find(ctx.path, "/public", 1, true) ~= nil
+end`
+
+func InspectAllowDeny() InspectSuite {
+	const labPort = 9090
+	host := "localhost"
+	return InspectSuite{
+		Name:   "inspect-allow-deny",
+		POCDir: POCDir("inspect-allow-deny"),
+		Rules: []InspectRule{
+			{
+				ID: inspectRuleDenySecretID, Name: "deny-secret-path", Script: inspectScriptDenySecret,
+				Action: 0, Enabled: true, SortOrder: 0,
+			},
+			{
+				ID: inspectRuleAllowPublicID, Name: "allow-public-path", Script: inspectScriptAllowPublic,
+				Action: 1, Enabled: true, SortOrder: 1,
+			},
+		},
+		Cases: []Case{
+			{
+				Name:        "inspect deny /secret",
+				Input:       setup.EvaluateInput{SNI: host, Path: "/secret/data", DstPort: labPort},
+				WantAllowed: false,
+				ProxyMode:   setup.ProxyProbeHTTP,
+			},
+			{
+				Name:        "inspect allow /public (action allow on match)",
+				Input:       setup.EvaluateInput{SNI: host, Path: "/public", DstPort: labPort},
+				WantAllowed: true,
+				ProxyMode:   setup.ProxyProbeHTTP,
+			},
+			{
+				Name:        "inspect no match passes",
+				Input:       setup.EvaluateInput{SNI: host, Path: "/other", DstPort: labPort},
+				WantAllowed: true,
+				ProxyMode:   setup.ProxyProbeHTTP,
+			},
 		},
 	}
 }

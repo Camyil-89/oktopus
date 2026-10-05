@@ -57,3 +57,26 @@ func (s *Service) Update(ctx context.Context, patch UpdateInput) (domain.Setting
 	}
 	return updated, nil
 }
+
+func (s *Service) ReportsDashboard(ctx context.Context) ([]byte, error) {
+	st, err := s.repo.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return st.ReportsDashboard, nil
+}
+
+func (s *Service) UpdateReportsDashboard(ctx context.Context, body []byte) ([]byte, error) {
+	cur, err := s.repo.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if body == nil {
+		body = domain.DefaultReportsDashboard
+	}
+	updated, err := s.repo.UpdateReportsDashboard(ctx, cur.ID, body)
+	if err != nil {
+		return nil, apperr.Internal(apperr.UpdateReportsDashboardFailed, err)
+	}
+	return updated.ReportsDashboard, nil
+}

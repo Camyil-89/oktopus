@@ -3,12 +3,15 @@
 import type {
   AccessLogReportWidgetData,
   AccessLogReportWidgetResult,
+  AccessLogReportWidgetSpec,
   AccessLogReportWidgetType,
 } from "@/types/accessLogReport";
 import { ReportRuleRefLabel } from "@/assets/components/accessLog/ReportRuleRefLabel";
 import type { ProxyRuleKind } from "@/assets/hooks/useProxyRuleNameMap";
 import { SkeletonLoader } from "@/assets/components/SkeletonLoader";
-import { Card, Input, Table, Tooltip } from "antd";
+import { AccessLogReportTimeseriesChart } from "@/assets/components/accessLog/AccessLogReportTimeseriesChart";
+import { DeleteOutlined } from "@ant-design/icons";
+import { Button, Card, Input, Popconfirm, Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { formatDurationUs } from "@/utils/formatDurationUs";
 import { useTranslation } from "@/contexts/LocaleContext";
@@ -40,6 +43,7 @@ export type ReportWidgetQueryMeta = {
   groupBy?: string;
   groupByCols?: string[];
   searchColumns?: string[];
+  groupByTime?: string;
 };
 
 export type ReportTableFetchParams = {
@@ -90,130 +94,42 @@ function formatTick(value: number): string {
   return String(Math.round(value));
 }
 
-function seriesColor(label: string, index: number): string {
-  if (label === "allow") return "bg-teal-400/80";
-  if (label === "deny") return "bg-red-400/75";
-  const palette = [
-    "bg-teal-400/70",
-    "bg-sky-400/70",
-    "bg-amber-400/70",
-    "bg-violet-400/70",
-  ];
-  return palette[index % palette.length];
+function normalizeWidgetData(
+  data: AccessLogReportWidgetData | string | undefined,
+): AccessLogReportWidgetData {
+  if (!data) {
+    return {};
+  }
+  if (typeof data === "string") {
+    try {
+      return JSON.parse(data) as AccessLogReportWidgetData;
+    } catch {
+      return {};
+    }
+  }
+  return data;
 }
 
 function TimeseriesBody({
   data,
   metric,
+  groupByTime,
 }: {
   data: AccessLogReportWidgetData;
   metric?: string;
+  groupByTime?: string;
 }) {
   const { t, localeTag } = useTranslation();
-  const series = data.series ?? [];
-  const bucketKeys = useMemo(() => {
-    const set = new Set<string>();
-    for (const s of series) {
-      for (const p of s.points) {
-        set.add(p.t);
-      }
-    }
-    return [...set].sort();
-  }, [series]);
-
-  const totals = useMemo(
-    () =>
-      bucketKeys.map((t) => {
-        let sum = 0;
-        for (const s of series) {
-          const p = s.points.find((x) => x.t === t);
-          if (p) sum += p.value;
-        }
-        return sum;
-      }),
-    [bucketKeys, series],
-  );
-
-  const yMax = useMemo(() => chartYMax(totals), [totals]);
-
-  if (bucketKeys.length === 0) {
-    return (
-      <p className="m-0 py-8 text-center font-mono text-[12px] text-zinc-500">
-        {t("reports.noData")}
-      </p>
-    );
-  }
+  const series = normalizeWidgetData(data).series ?? [];
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex gap-2">
-        <div
-          className="flex h-36 w-10 shrink-0 flex-col justify-between py-px text-right font-mono text-[10px] text-zinc-500"
-          aria-hidden
-        >
-          {[yMax, Math.round(yMax / 2), 0].map((tick) => (
-            <span key={tick}>{formatMetricAxisTick(tick, metric)}</span>
-          ))}
-        </div>
-        <div className="relative flex h-36 min-w-0 flex-1 items-end gap-1">
-          {bucketKeys.map((t, bi) => {
-            const total = totals[bi] ?? 0;
-            const totalH = (total / yMax) * 100;
-            return (
-              <Tooltip
-                key={t}
-                title={
-                  <div className="flex flex-col gap-1 font-mono text-[11px]">
-                    <span>{new Date(t).toLocaleString(localeTag)}</span>
-                    {series.map((s) => {
-                      const p = s.points.find((x) => x.t === t);
-                      if (!p || p.value <= 0) return null;
-                      return (
-                        <span key={s.key}>
-                          {s.label}: {formatMetricValue(p.value, metric, localeTag)}
-                        </span>
-                      );
-                    })}
-                  </div>
-                }
-              >
-                <div className="flex h-full min-w-0 flex-1 flex-col justify-end gap-[1px]">
-                  {series.map((s, si) => {
-                    const p = s.points.find((x) => x.t === t);
-                    const v = p?.value ?? 0;
-                    const h =
-                      total > 0 ? (v / total) * totalH : 0;
-                    if (h <= 0) return null;
-                    return (
-                      <div
-                        key={s.key}
-                        className={`min-h-[2px] w-full rounded-sm ${seriesColor(s.label, si)}`}
-                        style={{ height: `${h}%` }}
-                      />
-                    );
-                  })}
-                  {total === 0 ? (
-                    <div className="h-[2px] w-full rounded-sm bg-white/5" />
-                  ) : null}
-                </div>
-              </Tooltip>
-            );
-          })}
-        </div>
-      </div>
-      {series.length > 1 ? (
-        <div className="flex flex-row flex-wrap gap-3 pl-12 font-mono text-[10px] text-zinc-500">
-          {series.map((s, i) => (
-            <span key={s.key} className="flex items-center gap-1.5">
-              <span
-                className={`inline-block h-2 w-2 rounded-sm ${seriesColor(s.label, i)}`}
-              />
-              {s.label}
-            </span>
-          ))}
-        </div>
-      ) : null}
-    </div>
+    <AccessLogReportTimeseriesChart
+      series={series}
+      metric={metric}
+      groupByTime={groupByTime}
+      localeTag={localeTag}
+      emptyLabel={t("reports.noData")}
+    />
   );
 }
 
@@ -453,7 +369,13 @@ function WidgetInner({
 }) {
   switch (type) {
     case "timeseries":
-      return <TimeseriesBody data={data} metric={metric} />;
+      return (
+        <TimeseriesBody
+          data={data}
+          metric={metric}
+          groupByTime={queryMeta?.groupByTime}
+        />
+      );
     case "bar":
       return (
         <BarBody
@@ -490,7 +412,21 @@ type ReportWidgetCardProps = {
   loading?: boolean;
   onFetchTable?: ReportTableFetchFn;
   onTableData?: (data: AccessLogReportWidgetData) => void;
+  onRemove?: () => void;
 };
+
+function widgetSkeletonClass(type: AccessLogReportWidgetType): string {
+  switch (type) {
+    case "timeseries":
+      return "h-60";
+    case "table":
+      return "h-52";
+    case "bar":
+      return "h-40";
+    default:
+      return "h-24";
+  }
+}
 
 export function AccessLogReportWidgetCard({
   widget,
@@ -500,7 +436,10 @@ export function AccessLogReportWidgetCard({
   loading,
   onFetchTable,
   onTableData,
+  onRemove,
 }: ReportWidgetCardProps) {
+  const { t } = useTranslation();
+  const skClass = widgetSkeletonClass(widget.type);
   return (
     <Card
       size="small"
@@ -513,11 +452,30 @@ export function AccessLogReportWidgetCard({
           <span className="font-mono text-[12px] text-zinc-500">{widget.id}</span>
         )
       }
+      extra={
+        onRemove
+          ? (
+              <Popconfirm
+                title={t("reports.removeWidgetConfirm")}
+                onConfirm={onRemove}
+              >
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  aria-label={t("reports.removeWidget")}
+                />
+              </Popconfirm>
+            )
+          : null
+      }
       className="border-white/10 bg-white/[0.03]"
     >
       {loading ? (
-        <SkeletonLoader className="h-24" loaderSize="md">
-          <div className="h-24 animate-pulse rounded bg-white/5" />
+        <SkeletonLoader className={skClass} loaderSize="md">
+          <div
+            className={`${skClass} animate-pulse rounded bg-white/5`}
+          />
         </SkeletonLoader>
       ) : (
         <WidgetInner
@@ -537,6 +495,8 @@ export function AccessLogReportWidgetCard({
 
 type ReportGridProps = {
   widgets: AccessLogReportWidgetResult[];
+  /** Плейсхолдеры карточек, пока widgets пустой и идёт загрузка. */
+  placeholderSpecs?: AccessLogReportWidgetSpec[];
   loading?: boolean;
   widgetMetrics?: Record<string, string>;
   widgetQueryMeta?: Record<string, ReportWidgetQueryMeta>;
@@ -546,23 +506,41 @@ type ReportGridProps = {
     widgetId: string,
     data: AccessLogReportWidgetData,
   ) => void;
+  onRemoveWidget?: (widgetId: string) => void;
 };
 
 export function AccessLogReportWidgetGrid({
   widgets,
+  placeholderSpecs,
   loading,
   widgetMetrics,
   widgetQueryMeta,
   rules,
   onFetchTable,
   onTableWidgetData,
+  onRemoveWidget,
 }: ReportGridProps) {
-  if (!loading && widgets.length === 0) {
+  const displayWidgets = useMemo((): AccessLogReportWidgetResult[] => {
+    if (widgets.length > 0) {
+      return widgets;
+    }
+    if (loading && placeholderSpecs && placeholderSpecs.length > 0) {
+      return placeholderSpecs.map((s) => ({
+        id: s.id,
+        type: s.type,
+        title: s.title,
+        data: {},
+      }));
+    }
+    return [];
+  }, [widgets, loading, placeholderSpecs]);
+
+  if (!loading && displayWidgets.length === 0) {
     return null;
   }
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      {widgets.map((w) => (
+      {displayWidgets.map((w) => (
         <div
           key={w.id}
           className={w.type === "table" ? "lg:col-span-2" : undefined}
@@ -578,6 +556,9 @@ export function AccessLogReportWidgetGrid({
               onTableWidgetData
                 ? (data) => onTableWidgetData(w.id, data)
                 : undefined
+            }
+            onRemove={
+              onRemoveWidget ? () => onRemoveWidget(w.id) : undefined
             }
           />
         </div>

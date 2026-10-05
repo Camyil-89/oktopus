@@ -14,6 +14,8 @@ func Register(
 ) {
 	mux.HandleFunc("GET /api/proxy/host-settings", host.withAuth(host.Get))
 	mux.HandleFunc("PATCH /api/proxy/host-settings", host.withAuth(host.Patch))
+	mux.HandleFunc("GET /api/proxy/reports-dashboard", host.withAuth(host.GetReportsDashboard))
+	mux.HandleFunc("PATCH /api/proxy/reports-dashboard", host.withAuth(host.PatchReportsDashboard))
 
 	mux.HandleFunc("GET /api/proxy/instances", instances.withAuth(instances.List))
 	mux.HandleFunc("POST /api/proxy/instances", instances.withAuth(instances.Create))

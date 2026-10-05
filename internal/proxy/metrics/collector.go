@@ -103,6 +103,11 @@ func (c *Collector) RecordDecision(allow bool, spend time.Duration, parts Decide
 	c.observe(allow, spend, parts, user, source, false)
 }
 
+// RecordInspectDeny — см. ObserveInspectDeny (для тестов экземпляра).
+func (c *Collector) RecordInspectDeny() {
+	c.reclassifyACLAllowAsDeny()
+}
+
 // TrafficSnapshot — снимок метрик этого экземпляра.
 func (c *Collector) TrafficSnapshot() Snapshot {
 	return c.snapshot()
@@ -126,6 +131,11 @@ func ObserveDecisionWithPolicy(ctx context.Context, allow bool, spend time.Durat
 // ObserveInspect регистрирует один проход Lua-инспекции (HTTP после ACL allow).
 func ObserveInspect(ctx context.Context, spend time.Duration, parts InspectParts) {
 	collectorFromContext(ctx).observeInspect(spend, parts)
+}
+
+// ObserveInspectDeny — итоговый deny после ACL allow (правило инспекции или сбой Lua).
+func ObserveInspectDeny(ctx context.Context) {
+	collectorFromContext(ctx).reclassifyACLAllowAsDeny()
 }
 
 // ObservePolicyTotal — полное время политики на запрос: ACL (+ inspect на HTTP allow в MITM).
@@ -190,6 +200,25 @@ func (c *Collector) observeInspect(spend time.Duration, parts InspectParts) {
 	defer c.mu.Unlock()
 
 	c.inspectRecent.push(inspectSample{ns: ns, parts: pns})
+	c.maybePruneLocked(now)
+}
+
+func (c *Collector) reclassifyACLAllowAsDeny() {
+	now := time.Now()
+	sec := now.Unix()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	b := c.bySec[sec]
+	if b == nil {
+		b = &secondBucket{}
+		c.bySec[sec] = b
+	}
+	if b.allow > 0 {
+		b.allow--
+	}
+	b.deny++
 	c.maybePruneLocked(now)
 }
 

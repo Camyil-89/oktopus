@@ -86,16 +86,11 @@ func metricExpr(metric string) (string, error) {
 }
 
 func timeBucketExpr(bucket string) (string, error) {
-	switch bucket {
-	case "10m":
-		return "toStartOfInterval(al.created_at, INTERVAL 10 minute)", nil
-	case "1h":
-		return "toStartOfHour(al.created_at)", nil
-	case "1d":
-		return "toStartOfDay(al.created_at)", nil
-	default:
-		return "", fmt.Errorf("unsupported group_by_time")
+	cfg, err := timeseriesBucketConfigFor(bucket)
+	if err != nil {
+		return "", err
 	}
+	return cfg.sqlExpr, nil
 }
 
 func (r *Repository) queryTimeseries(
@@ -104,10 +99,11 @@ func (r *Repository) queryTimeseries(
 	f repository.ReportFilters,
 	q repository.WidgetQuery,
 ) (*repository.TimeseriesData, error) {
-	bucketExpr, err := timeBucketExpr(q.GroupByTime)
+	bucketCfg, err := timeseriesBucketConfigFor(q.GroupByTime)
 	if err != nil {
 		return nil, err
 	}
+	bucketExpr := bucketCfg.sqlExpr
 	metric, err := metricExpr(q.Metric)
 	if err != nil {
 		return nil, err
@@ -144,11 +140,9 @@ ORDER BY bucket%s`, bucketExpr, selectSplit, metric, where, groupSplit, orderSpl
 	seriesOrder := []string{}
 
 	for rows.Next() {
-		var bucket time.Time
-		var splitKey string
-		var value float64
-		if err := rows.Scan(&bucket, &splitKey, &value); err != nil {
-			return nil, fmt.Errorf("timeseries scan: %w", err)
+		bucketTime, splitKey, value, scanErr := scanTimeseriesRow(rows, bucketCfg.kind)
+		if scanErr != nil {
+			return nil, fmt.Errorf("timeseries scan: %w", scanErr)
 		}
 		if math.IsNaN(value) {
 			value = 0
@@ -162,7 +156,7 @@ ORDER BY bucket%s`, bucketExpr, selectSplit, metric, where, groupSplit, orderSpl
 			seriesMap[splitKey] = s
 			seriesOrder = append(seriesOrder, splitKey)
 		}
-		s.Points = append(s.Points, repository.TimeseriesPoint{T: bucket.UTC(), Value: value})
+		s.Points = append(s.Points, repository.TimeseriesPoint{T: bucketTime, Value: value})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -172,7 +166,43 @@ ORDER BY bucket%s`, bucketExpr, selectSplit, metric, where, groupSplit, orderSpl
 	for _, k := range seriesOrder {
 		out.Series = append(out.Series, *seriesMap[k])
 	}
+	fillTimeseriesGaps(from, to, q.GroupByTime, bucketCfg.kind, &out)
 	return &out, nil
+}
+
+func scanTimeseriesRow(rows interface {
+	Scan(dest ...any) error
+}, kind timeseriesBucketKind) (time.Time, string, float64, error) {
+	var splitKey string
+	var value float64
+	switch kind {
+	case bucketCalendar:
+		var bucket time.Time
+		if err := rows.Scan(&bucket, &splitKey, &value); err != nil {
+			return time.Time{}, "", 0, err
+		}
+		return bucket.UTC(), splitKey, value, nil
+	case bucketHourOfDay:
+		var h uint8
+		if err := rows.Scan(&h, &splitKey, &value); err != nil {
+			return time.Time{}, "", 0, err
+		}
+		return hourOfDayBucketTime(int(h)), splitKey, value, nil
+	case bucketDayOfWeek:
+		var d uint8
+		if err := rows.Scan(&d, &splitKey, &value); err != nil {
+			return time.Time{}, "", 0, err
+		}
+		return dayOfWeekBucketTime(int(d)), splitKey, value, nil
+	case bucketMonthOfYear:
+		var m uint8
+		if err := rows.Scan(&m, &splitKey, &value); err != nil {
+			return time.Time{}, "", 0, err
+		}
+		return monthOfYearBucketTime(int(m)), splitKey, value, nil
+	default:
+		return time.Time{}, "", 0, fmt.Errorf("unsupported bucket kind")
+	}
 }
 
 func splitLabel(splitBy, key string) string {

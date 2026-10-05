@@ -102,15 +102,9 @@ export function collectInspectLogKeysFromExtras(
   return [...keys].sort();
 }
 
+/** Ключи ctx:log только из переданных Lua-скриптов (правила инспекции). */
 export function mergedInspectLogFieldKeys(luaScripts: string[]): string[] {
-  const keys = new Set<string>();
-  for (const f of INSPECT_LOG_UPLOAD_FIELDS) {
-    keys.add(f.key);
-  }
-  for (const k of parseCtxLogKeysFromLuaScripts(luaScripts)) {
-    keys.add(k);
-  }
-  return [...keys].sort();
+  return parseCtxLogKeysFromLuaScripts(luaScripts);
 }
 
 export function formatInspectLogValue(value: unknown): string {
@@ -163,13 +157,21 @@ export function formatInspectLogFieldsForPrompt(fieldKeys: string[]): string {
     "  В group_by / group_by_cols: inspect_log.<ключ>",
     "  В filters.inspect_log: { \"<ключ>\": \"подстрока\" } (ILIKE по строковому значению)",
   ];
-  for (const key of fieldKeys) {
-    const desc = metaByKey[key];
-    const note = desc ? ` — ${desc}` : "";
-    lines.push(`  inspect_log.${key}${note}`);
+  if (fieldKeys.length === 0) {
+    lines.push(
+      "  (в правилах инспекции нет ctx:log — список пуст; см. секцию правил ниже)",
+    );
+  } else {
+    for (const key of fieldKeys) {
+      const desc = metaByKey[key];
+      const note = desc ? ` — ${desc}` : "";
+      lines.push(`  inspect_log.${key}${note}`);
+    }
+    if (fieldKeys.includes("upload_filenames")) {
+      lines.push(
+        "  upload_filenames в group_by — JSON-массив как текст; для отдельных имён нужен свой ключ в Lua.",
+      );
+    }
   }
-  lines.push(
-    "  upload_filenames в group_by — JSON-массив как текст; для отдельных имён нужен свой ключ в Lua.",
-  );
   return lines.join("\n");
 }

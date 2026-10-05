@@ -95,3 +95,25 @@ func TestCollectorSnapshot(t *testing.T) {
 		t.Fatalf("bucket requests sum: %d want 3", sum)
 	}
 }
+
+func TestCollectorInspectDenyReclassify(t *testing.T) {
+	t.Parallel()
+	c := metrics.NewCollector()
+	c.RecordDecision(true, 10*time.Microsecond, metrics.DecideParts{}, "", "")
+	c.RecordInspectDeny()
+
+	s := c.TrafficSnapshot()
+	if s.Allowed5m != 0 || s.Denied5m != 1 {
+		t.Fatalf("after inspect deny: allow=%d deny=%d", s.Allowed5m, s.Denied5m)
+	}
+	if s.Buckets10s[len(s.Buckets10s)-1].Allow != 0 || s.Buckets10s[len(s.Buckets10s)-1].Deny != 1 {
+		t.Fatalf("bucket allow/deny not reclassified")
+	}
+	var sumReq int64
+	for _, b := range s.Buckets10s {
+		sumReq += b.Requests
+	}
+	if sumReq != 1 {
+		t.Fatalf("requests count unchanged: %d", sumReq)
+	}
+}

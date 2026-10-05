@@ -34,6 +34,7 @@ go run ./attack-and-tests/proxy-auth-static
 go run ./attack-and-tests/proxy-auth-ldap
 go run ./attack-and-tests/ssl-verify
 go run ./attack-and-tests/delay-access
+go run ./attack-and-tests/inspect-allow-deny
 ```
 
 ### PoC обхода (`all` = lab + mitm/tunnel + сценарий)
@@ -99,5 +100,6 @@ go run ./attack-and-tests/dstdomain-normalization all
 | [proxy-auth-ldap](./proxy-auth-ldap/) | Proxy-Authorization, backend `ldap` (нужен OpenLDAP на `127.0.0.1:1389`) |
 | [ssl-verify](./ssl-verify/) | `ssl_verify skip/require` (compile + publish) |
 | [delay-access](./delay-access/) | `delay_pools` / `delay_access` (compile + publish) |
+| [inspect-allow-deny](./inspect-allow-deny/) | Lua-инспекция: action deny/allow on match (HTTP lab, только MITM) |
 
 Общий код: [`setup/`](./setup/), раннер: [`aclrun/`](./aclrun/).

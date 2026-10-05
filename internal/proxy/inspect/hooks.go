@@ -75,9 +75,11 @@ func HTTPMiddleware(runner *Runner, rec accesslog.Recorder, enabled bool) hooks.
 		record(out)
 
 		if err != nil {
+			metrics.ObserveInspectDeny(hookCtx)
 			return hooks.DenyDecision()
 		}
 		if res.Matched && res.Deny {
+			metrics.ObserveInspectDeny(hookCtx)
 			return hooks.DenyDecision()
 		}
 		return hooks.AllowDecision()

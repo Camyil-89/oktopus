@@ -2,6 +2,7 @@ package view
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"time"
 
@@ -51,6 +52,33 @@ func (h *HostSettingsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		AccessLogRetentionDays: updated.AccessLogRetentionDays,
 		UpdatedAt:              updated.UpdatedAt.UTC().Format(time.RFC3339),
 	})
+}
+
+func (h *HostSettingsHandler) GetReportsDashboard(w http.ResponseWriter, r *http.Request) {
+	body, err := h.host.ReportsDashboard(r.Context())
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, string(apperr.LoadReportsDashboardFailed))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(body)
+}
+
+func (h *HostSettingsHandler) PatchReportsDashboard(w http.ResponseWriter, r *http.Request) {
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, string(apperr.InvalidJSON))
+		return
+	}
+	updated, err := h.host.UpdateReportsDashboard(r.Context(), raw)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, string(apperr.UpdateReportsDashboardFailed))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(updated)
 }
 
 func (h *HostSettingsHandler) withAuth(next http.HandlerFunc) http.HandlerFunc {
