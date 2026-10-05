@@ -38,6 +38,15 @@ func main() {
 				failed = true
 			}
 			log.Println("")
+			continue
+		}
+		if item.Inspect != nil {
+			ins := *item.Inspect
+			log.Printf("=== %s ===", ins.Name)
+			if aclrun.RunInspectSuite(ins, args) != 0 {
+				failed = true
+			}
+			log.Println("")
 		}
 	}
 
