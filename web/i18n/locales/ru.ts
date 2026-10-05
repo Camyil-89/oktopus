@@ -335,6 +335,8 @@ export const ru = {
   "nav.proxyRules": "Правила прокси",
   "nav.proxySettings": "Настройки",
   "nav.instanceStats": "Статистика",
+  "nav.instanceStatusRunning": "Работает",
+  "nav.instanceStatusStopped": "Остановлен",
   "instance.nameRequired": "Укажите имя прокси",
   "instance.nameTaken": "Имя уже занято",
   "instance.listenInUse": "Порт уже используется",

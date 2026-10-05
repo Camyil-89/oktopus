@@ -336,6 +336,8 @@ export const en: Record<keyof typeof ru, string> = {
   "nav.home": "Home",
   "nav.proxyRules": "Proxy rules",
   "nav.instanceStats": "Statistics",
+  "nav.instanceStatusRunning": "Running",
+  "nav.instanceStatusStopped": "Stopped",
   "instance.nameRequired": "Instance name is required",
   "instance.nameTaken": "Name already in use",
   "instance.listenInUse": "Listen address already in use",

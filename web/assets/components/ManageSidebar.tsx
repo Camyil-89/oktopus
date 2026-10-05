@@ -11,10 +11,12 @@ import {
 } from "@ant-design/icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AuthUser } from "@/types/auth";
 import * as proxyApi from "@/api/proxy";
-import type { ProxyInstance } from "@/types/proxy";
+import type { ProxyInstance, ProxyInstanceRuntimeStatus } from "@/types/proxy";
+import { ProxyInstanceNavStatus } from "@/assets/components/ProxyInstanceNavStatus";
+import { runtimeStatusFingerprint } from "@/utils/runtimeStatusFingerprint";
 import { OktopusIcon } from "@/assets/components/oktopus/OktopusIcon";
 import { manageNavLabel } from "@/assets/components/manageNav";
 import { AppVersion } from "@/assets/components/AppVersion";
@@ -30,6 +32,10 @@ export function ManageSidebar({ user, onLogout }: ManageSidebarProps) {
   const pathname = usePathname();
   const { t } = useTranslation();
   const [instances, setInstances] = useState<ProxyInstance[]>([]);
+  const [runtimeById, setRuntimeById] = useState<
+    Record<string, ProxyInstanceRuntimeStatus>
+  >({});
+  const runtimeFpRef = useRef<string | null>(null);
 
   useEffect(() => {
     const reload = () => {
@@ -38,6 +44,28 @@ export function ManageSidebar({ user, onLogout }: ManageSidebarProps) {
     reload();
     window.addEventListener(PROXY_INSTANCES_CHANGED_EVENT, reload);
     return () => window.removeEventListener(PROXY_INSTANCES_CHANGED_EVENT, reload);
+  }, []);
+
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const st = await proxyApi.getProxyRuntimeStatus();
+        const fp = runtimeStatusFingerprint(st);
+        if (fp !== runtimeFpRef.current) {
+          runtimeFpRef.current = fp;
+          const next: Record<string, ProxyInstanceRuntimeStatus> = {};
+          for (const row of st.instances) {
+            next[row.id] = row;
+          }
+          setRuntimeById(next);
+        }
+      } catch {
+        /* сайдбар не блокируем при недоступном status */
+      }
+    };
+    void poll();
+    const timer = setInterval(() => void poll(), 3000);
+    return () => clearInterval(timer);
   }, []);
 
   const globalItems = [
@@ -80,7 +108,11 @@ export function ManageSidebar({ user, onLogout }: ManageSidebarProps) {
                 href={base}
                 className={`nav-item text-[13px] font-medium ${inInstance ? "nav-item-active" : ""}`}
               >
-                {inst.name}
+                <ProxyInstanceNavStatus
+                  runtime={runtimeById[inst.id]}
+                  listenFallback={inst.listen}
+                />
+                <span className="min-w-0 truncate">{inst.name}</span>
               </Link>
               {inInstance ? (
                 <div className="ml-3 flex flex-col gap-0.5 border-l border-white/10 pl-2">
