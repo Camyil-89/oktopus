@@ -87,6 +87,7 @@ $prevApiInternalPort = Read-EnvFileValue -Path $EnvFile -Key 'OKTOPUS_API_INTERN
 
 $prevOktopusImage = Read-EnvFileValue -Path $EnvFile -Key 'OKTOPUS_IMAGE'
 $prevNginxImage = Read-EnvFileValue -Path $EnvFile -Key 'OKTOPUS_NGINX_IMAGE'
+$prevAdminPass = Read-EnvFileValue -Path $EnvFile -Key 'OKTOPUS_ADMIN_PASSWORD'
 
 if (Test-Path -LiteralPath $EnvFile) {
     Remove-Item -LiteralPath $EnvFile -Force
@@ -125,7 +126,13 @@ if ($env:CLICKHOUSE_PASSWORD) {
     $chPass = New-HexSecret
 }
 
-$adminPass = New-HexSecret
+if ($env:OKTOPUS_ADMIN_PASSWORD) {
+    $adminPass = $env:OKTOPUS_ADMIN_PASSWORD.Trim()
+} elseif ($prevAdminPass) {
+    $adminPass = $prevAdminPass
+} else {
+    $adminPass = New-HexSecret
+}
 $apiHost = Get-ApiHostInteractive
 $apiPort = Get-ApiPortInteractive
 if ($env:OKTOPUS_API_INTERNAL_PORT) {

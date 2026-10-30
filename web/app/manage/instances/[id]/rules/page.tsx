@@ -6,12 +6,12 @@ import { useRulesPageNavigationGuard } from "@/assets/hooks/useRulesPageNavigati
 import { useTranslation } from "@/contexts/LocaleContext";
 import type { RulesSectionUnsaved } from "@/types/rulesUnsaved";
 import { Tabs } from "antd";
-import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
+import { useManageInstanceId } from "@/assets/hooks/useManageInstanceId";
 
 export default function InstanceRulesPage() {
   const { t } = useTranslation();
-  const instanceId = useParams().id as string;
+  const instanceId = useManageInstanceId();
   const [aclUnsaved, setAclUnsaved] = useState<RulesSectionUnsaved | null>(
     null,
   );
@@ -26,6 +26,10 @@ export default function InstanceRulesPage() {
   }, []);
 
   useRulesPageNavigationGuard(aclUnsaved, inspectUnsaved);
+
+  if (!instanceId) {
+    return null;
+  }
 
   return (
     <Tabs

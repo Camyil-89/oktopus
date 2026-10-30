@@ -1,6 +1,6 @@
 /**
  * Static export (nginx image): one placeholder path so Next can pre-render shells.
- * Real instance IDs are resolved client-side; nginx falls back to index.html for other paths.
+ * Real instance IDs come from the browser URL (`useManageInstanceId`); nginx serves this shell for other ids.
  */
 export function generateStaticParams() {
   return [{ id: "_" }];

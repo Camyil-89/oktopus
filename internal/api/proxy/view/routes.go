@@ -27,6 +27,8 @@ func Register(
 	mux.HandleFunc("GET /api/proxy/instances/{id}/ca/key", instances.withAuth(instances.DownloadKey))
 	mux.HandleFunc("POST /api/proxy/instances/{id}/ca/generate", instances.withAuth(instances.GenerateCA))
 	mux.HandleFunc("POST /api/proxy/instances/{id}/ca/upload", instances.withAuth(instances.UploadCA))
+	mux.HandleFunc("GET /api/proxy/instances/{id}/config/export", instances.withAuth(instances.ExportConfig))
+	mux.HandleFunc("POST /api/proxy/instances/{id}/config/import", instances.withAuth(instances.ImportConfig))
 
 	mux.HandleFunc("GET /api/proxy/forbidden/status", pages.withAuth(pages.ForbiddenStatus))
 	mux.HandleFunc("GET /api/proxy/forbidden/preview", pages.withAuth(pages.ForbiddenPreview))

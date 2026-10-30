@@ -78,7 +78,7 @@ function instanceFp(i: ProxyInstanceRuntimeStatus): string {
 
 /** Стабильная строка для сравнения poll-ответов без лишнего setState. */
 export function runtimeStatusFingerprint(st: ProxyRuntimeStatus): string {
-  const instances = [...st.instances]
+  const instances = [...(st.instances ?? [])]
     .sort((a, b) => a.id.localeCompare(b.id))
     .map(instanceFp)
     .join("||");

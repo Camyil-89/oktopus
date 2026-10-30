@@ -54,7 +54,7 @@ export function ManageSidebar({ user, onLogout }: ManageSidebarProps) {
         if (fp !== runtimeFpRef.current) {
           runtimeFpRef.current = fp;
           const next: Record<string, ProxyInstanceRuntimeStatus> = {};
-          for (const row of st.instances) {
+          for (const row of st.instances ?? []) {
             next[row.id] = row;
           }
           setRuntimeById(next);

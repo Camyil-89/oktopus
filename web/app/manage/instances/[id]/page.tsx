@@ -5,8 +5,8 @@ import { InstanceRuntimeDashboardLayout } from "@/assets/components/dashboard/In
 import type { ProxyInstance, ProxyInstanceRuntimeStatus } from "@/types/proxy";
 import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
 import { Alert } from "antd";
-import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useManageInstanceId } from "@/assets/hooks/useManageInstanceId";
 
 function emptyRuntimeStub(
   id: string,
@@ -52,7 +52,7 @@ function emptyRuntimeStub(
 }
 
 export default function InstanceDashboardPage() {
-  const instanceId = useParams().id as string;
+  const instanceId = useManageInstanceId();
   const { t } = useTranslation();
   const formatApiError = useApiErrorMessage();
   const [meta, setMeta] = useState<ProxyInstance | null>(null);
@@ -61,6 +61,9 @@ export default function InstanceDashboardPage() {
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const load = useCallback(async () => {
+    if (!instanceId) {
+      return;
+    }
     try {
       const [st, instances] = await Promise.all([
         proxyApi.getProxyRuntimeStatus(),
