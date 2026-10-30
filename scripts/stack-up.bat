@@ -6,12 +6,15 @@ set "ENV_FILE=%CD%\.env"
 set "COMPOSE_FILE=%CD%\docker-compose.desktop.yml"
 
 set "WRITE_ONLY=0"
+set "COMPOSE_BUILD=0"
 :parse_args
 if "%~1"=="" goto args_done
 if /i "%~1"=="--write-env-only" set "WRITE_ONLY=1"
+if /i "%~1"=="--build" set "COMPOSE_BUILD=1"
 if /i "%~1"=="--help" (
-  echo Usage: %~nx0 [--write-env-only]
+  echo Usage: %~nx0 [--write-env-only] [--build]
   echo   --write-env-only  generate .env only ^(for Portainer^)
+  echo   --build           build oktopus/nginx locally instead of pulling from registry
   echo   Set OKTOPUS_API_HOST / OKTOPUS_API_PORT in the environment to skip prompts.
   exit /b 0
 )
@@ -52,8 +55,13 @@ if "%WRITE_ONLY%"=="1" (
   exit /b 0
 )
 
-docker compose --env-file "%ENV_FILE%" -f "%COMPOSE_FILE%" up --build -d
-if errorlevel 1 exit /b 1
+if "%COMPOSE_BUILD%"=="1" (
+  docker compose --env-file "%ENV_FILE%" -f "%COMPOSE_FILE%" up --build -d
+) else (
+  docker compose --env-file "%ENV_FILE%" -f "%COMPOSE_FILE%" pull oktopus nginx
+  if errorlevel 1 exit /b 1
+  docker compose --env-file "%ENV_FILE%" -f "%COMPOSE_FILE%" up -d
+)
 
 for /f "usebackq tokens=1,* delims==" %%A in (`findstr /B "OKTOPUS_ADMIN_USERNAME=" "%ENV_FILE%"`) do set "ADMIN_USER=%%B"
 for /f "usebackq tokens=1,* delims==" %%A in (`findstr /B "OKTOPUS_ADMIN_PASSWORD=" "%ENV_FILE%"`) do set "ADMIN_PASS=%%B"
