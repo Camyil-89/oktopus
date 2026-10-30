@@ -112,6 +112,7 @@ write_env() {
   prev_api_internal="$(read_env_var OKTOPUS_API_INTERNAL_PORT "$ENV_FILE")"
   prev_oktopus_image="$(read_env_var OKTOPUS_IMAGE "$ENV_FILE")"
   prev_nginx_image="$(read_env_var OKTOPUS_NGINX_IMAGE "$ENV_FILE")"
+  prev_admin_pass="$(read_env_var OKTOPUS_ADMIN_PASSWORD "$ENV_FILE")"
   rm -f "$ENV_FILE"
 
   local pg_user="${POSTGRES_USER:-oktopus}"
@@ -147,7 +148,13 @@ write_env() {
   else
     ch_pass="$(gen_secret)"
   fi
-  admin_pass="$(gen_secret)"
+  if [[ -n "${OKTOPUS_ADMIN_PASSWORD:-}" ]]; then
+    admin_pass="$OKTOPUS_ADMIN_PASSWORD"
+  elif [[ -n "$prev_admin_pass" ]]; then
+    admin_pass="$prev_admin_pass"
+  else
+    admin_pass="$(gen_secret)"
+  fi
   api_host="$(prompt_api_host)"
   api_port="$(prompt_api_port)"
   if [[ -n "${OKTOPUS_API_INTERNAL_PORT:-}" ]]; then
@@ -213,7 +220,7 @@ fi
 compose_up() {
   local -a cmd=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
   if [[ "$COMPOSE_BUILD" == true ]]; then
-    "${cmd[@]}" up --build -d
+    "${cmd[@]}" up --build -d --pull never
   else
     "${cmd[@]}" pull oktopus nginx
     "${cmd[@]}" up -d

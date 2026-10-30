@@ -29,7 +29,8 @@ import {
 } from "antd";
 import type { UploadFile } from "antd/es/upload";
 import { PROXY_INSTANCES_CHANGED_EVENT } from "@/assets/modals/CreateProxyInstanceModal";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useManageInstanceId } from "@/assets/hooks/useManageInstanceId";
 import { useCallback, useEffect, useState } from "react";
 
 function keyBitsOptions(t: TranslateFn) {
@@ -92,9 +93,8 @@ function caStatusText(
 }
 
 export default function InstanceSettingsPage() {
-  const params = useParams();
   const router = useRouter();
-  const instanceId = params.id as string;
+  const instanceId = useManageInstanceId();
   const { message, modal } = App.useApp();
   const formatApiError = useApiErrorMessage();
   const { t, localeTag } = useTranslation();
@@ -127,13 +127,16 @@ export default function InstanceSettingsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const loadCAStatus = useCallback(async () => {
+    if (!instanceId) {
+      return;
+    }
     try {
       const st = await proxyApi.getProxyCAStatus(instanceId);
       setCaStatus(st);
     } catch {
       setCaStatus(null);
     }
-  }, []);
+  }, [instanceId]);
 
   const loadForbiddenStatus = useCallback(async () => {
     try {
@@ -184,6 +187,9 @@ export default function InstanceSettingsPage() {
   );
 
   const load = useCallback(async () => {
+    if (!instanceId) {
+      return;
+    }
     setLoading(true);
     try {
       const s = await proxyApi.getProxyInstance(instanceId);

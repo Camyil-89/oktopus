@@ -17,6 +17,13 @@ server {
         proxy_read_timeout 300s;
     }
 
+    # Static export: only /manage/instances/_/… is built; map any instance id to that shell (URL unchanged).
+    location ~ ^/manage/instances/[^/]+ {
+        rewrite ^/manage/instances/[^/]+(/.*)?$ /manage/instances/_$1 break;
+        root /usr/share/nginx/html;
+        try_files $uri $uri.html $uri/ /manage/instances/_.html;
+    }
+
     location / {
         root /usr/share/nginx/html;
         try_files $uri $uri.html $uri/ /index.html;

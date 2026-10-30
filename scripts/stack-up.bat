@@ -56,7 +56,8 @@ if "%WRITE_ONLY%"=="1" (
 )
 
 if "%COMPOSE_BUILD%"=="1" (
-  docker compose --env-file "%ENV_FILE%" -f "%COMPOSE_FILE%" up --build -d
+  docker compose --env-file "%ENV_FILE%" -f "%COMPOSE_FILE%" up --build -d --pull never
+  if errorlevel 1 exit /b 1
 ) else (
   docker compose --env-file "%ENV_FILE%" -f "%COMPOSE_FILE%" pull oktopus nginx
   if errorlevel 1 exit /b 1

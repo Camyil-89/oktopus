@@ -60,7 +60,7 @@ import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import Link from "next/link";
 import { useApiErrorMessage, useTranslation } from "@/contexts/LocaleContext";
 import type { MessageKey } from "@/i18n/translate";
-import { useParams } from "next/navigation";
+import { useManageInstanceId } from "@/assets/hooks/useManageInstanceId";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -228,7 +228,7 @@ function accessLogListParams(
 }
 
 export default function ManageAccessLogPage() {
-  const instanceId = useParams().id as string;
+  const instanceId = useManageInstanceId();
   const { message, modal } = App.useApp();
   const { t } = useTranslation();
   const formatApiError = useApiErrorMessage();
@@ -309,6 +309,9 @@ export default function ManageAccessLogPage() {
   );
 
   useEffect(() => {
+    if (!instanceId) {
+      return;
+    }
     void listProxyInspectRules(instanceId)
       .then((inspect) => {
         const m = new Map<string, string>();
@@ -323,6 +326,9 @@ export default function ManageAccessLogPage() {
   }, [instanceId]);
 
   const load = useCallback(async () => {
+    if (!instanceId) {
+      return;
+    }
     setLoading(true);
     try {
       const res = await listProxyAccessLog({
