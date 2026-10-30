@@ -9,7 +9,14 @@
       "id": "quickstart",
       "docPath": "quickstart.html",
       "webRoute": null,
-      "sources": ["scripts/stack-up.sh", "scripts/stack-up.bat", "docker-compose.yml", "docker-compose.desktop.yml"]
+      "sources": [
+        "scripts/stack-up.sh",
+        "scripts/stack-up.bat",
+        "scripts/ci-release-bundle.sh",
+        "docker-compose.yml",
+        "docker-compose.desktop.yml",
+        ".github/workflows/ci.yml"
+      ]
     },
     {
       "id": "implementation-examples",

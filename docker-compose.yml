@@ -46,9 +46,11 @@ services:
       start_period: 15s
 
   oktopus:
+    image: ${OKTOPUS_IMAGE:-ghcr.io/camyil-89/oktopus/oktopus:latest}
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile.oktopus
+    pull_policy: always
     network_mode: host
     depends_on:
       postgres:
@@ -69,11 +71,13 @@ services:
       - oktopus_onprem_config:/app/config
 
   nginx:
+    image: ${OKTOPUS_NGINX_IMAGE:-ghcr.io/camyil-89/oktopus/nginx:latest}
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile.nginx
       args:
         NEXT_PUBLIC_API_URL: ""
+    pull_policy: always
     environment:
       OKTOPUS_API_UPSTREAM_HOST: ${OKTOPUS_API_UPSTREAM_HOST:-host.docker.internal}
       OKTOPUS_API_INTERNAL_PORT: ${OKTOPUS_API_INTERNAL_PORT:-18002}

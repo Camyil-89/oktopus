@@ -152,8 +152,17 @@
 cd oktopus</code></pre>
             </div>
 
+            <h2 id="qs-versions">Версии и образы</h2>
+            <p>Версия продукта — SemVer в <code>web/package.json</code> (видна в UI). После успешного CI на ветке <code>main</code> GitHub Actions публикует образы в <a href="https://github.com/Camyil-89/oktopus/pkgs/container/oktopus%2Foktopus">GHCR</a> с тегами <code>&lt;версия&gt;</code> и <code>latest</code>, создаёт тег <code>v&lt;версия&gt;</code> и <a href="https://github.com/Camyil-89/oktopus/releases">Release</a> с архивом для развёртывания.</p>
+            <ul>
+              <li><code>ghcr.io/camyil-89/oktopus/oktopus:latest</code> — API и прокси</li>
+              <li><code>ghcr.io/camyil-89/oktopus/nginx:latest</code> — UI и reverse proxy</li>
+            </ul>
+            <p>Скрипт развёртывания по умолчанию делает <code>docker compose pull</code> для этих образов (значения в <code>OKTOPUS_IMAGE</code> и <code>OKTOPUS_NGINX_IMAGE</code> в <code>.env</code>). Локальная сборка: <code>./scripts/stack-up.sh --build</code> или <code>OKTOPUS_COMPOSE_BUILD=1</code>.</p>
+            <p>Если образы в GHCR приватные, на сервере один раз выполните <code>docker login ghcr.io</code> (PAT с правом <code>read:packages</code>) или сделайте пакеты публичными в настройках GitHub.</p>
+
             <h2 id="qs-linux">Linux и macOS</h2>
-            <p>Скрипт <code>scripts/stack-up.sh</code> спросит хост и порт API (или задайте <code>OKTOPUS_API_HOST</code> и <code>OKTOPUS_API_PORT</code> в окружении), пересоздаст <code>.env</code> и выполнит <code>docker compose -f docker-compose.yml up --build -d</code>.</p>
+            <p>Скрипт <code>scripts/stack-up.sh</code> спросит хост и порт API (или задайте <code>OKTOPUS_API_HOST</code> и <code>OKTOPUS_API_PORT</code> в окружении), пересоздаст <code>.env</code>, подтянет образы из registry и выполнит <code>docker compose -f docker-compose.yml up -d</code>.</p>
             <div class="code">
               <div class="code-head"><span class="code-name">bash</span><button type="button" class="copy-btn" onclick="copyCode(this)">Копировать</button></div>
               <pre><code>chmod +x scripts/stack-up.sh

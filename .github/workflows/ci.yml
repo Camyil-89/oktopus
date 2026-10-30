@@ -80,3 +80,80 @@ jobs:
           fi
           git commit -m "chore(version): bump web to ${NEW_VERSION} [skip ci]"
           git push origin HEAD:${{ github.ref_name }}
+
+  release:
+    name: Publish images and GitHub Release
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, bump-web-version]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      packages: write
+    concurrency:
+      group: release-main
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync version bump on main
+        run: git fetch origin main && git checkout -B main origin/main
+
+      - name: Read product version
+        id: ver
+        run: echo "version=$(node -p "require('./web/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push oktopus image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile.oktopus
+          push: true
+          tags: |
+            ghcr.io/camyil-89/oktopus/oktopus:${{ steps.ver.outputs.version }}
+            ghcr.io/camyil-89/oktopus/oktopus:latest
+
+      - name: Build and push nginx image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile.nginx
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=
+          tags: |
+            ghcr.io/camyil-89/oktopus/nginx:${{ steps.ver.outputs.version }}
+            ghcr.io/camyil-89/oktopus/nginx:latest
+
+      - name: Deploy bundle for release
+        run: |
+          chmod +x scripts/ci-release-bundle.sh
+          scripts/ci-release-bundle.sh "${{ steps.ver.outputs.version }}"
+
+      - name: Tag and create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists; skipping tag and release."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+          gh release create "$TAG" \
+            --title "Oktopus $TAG" \
+            --generate-notes \
+            "dist/oktopus-${VERSION}-deploy.tar.gz"

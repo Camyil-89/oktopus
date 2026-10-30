@@ -152,8 +152,17 @@
 cd oktopus</code></pre>
             </div>
 
+            <h2 id="qs-versions">Versions and container images</h2>
+            <p>Product version is SemVer in <code>web/package.json</code> (shown in the UI). After CI succeeds on <code>main</code>, GitHub Actions publishes images to <a href="https://github.com/Camyil-89/oktopus/pkgs/container/oktopus%2Foktopus">GHCR</a> with tags <code>&lt;version&gt;</code> and <code>latest</code>, creates git tag <code>v&lt;version&gt;</code>, and a <a href="https://github.com/Camyil-89/oktopus/releases">GitHub Release</a> with a deploy tarball.</p>
+            <ul>
+              <li><code>ghcr.io/camyil-89/oktopus/oktopus:latest</code> — API and proxy</li>
+              <li><code>ghcr.io/camyil-89/oktopus/nginx:latest</code> — UI and reverse proxy</li>
+            </ul>
+            <p>The stack script runs <code>docker compose pull</code> for these images by default (<code>OKTOPUS_IMAGE</code> and <code>OKTOPUS_NGINX_IMAGE</code> in <code>.env</code>). Local build: <code>./scripts/stack-up.sh --build</code> or <code>OKTOPUS_COMPOSE_BUILD=1</code>.</p>
+            <p>If GHCR packages are private, run <code>docker login ghcr.io</code> on the server (PAT with <code>read:packages</code>) or make the packages public in GitHub settings.</p>
+
             <h2 id="qs-linux">Linux and macOS</h2>
-            <p><code>scripts/stack-up.sh</code> prompts for API host and port (or set <code>OKTOPUS_API_HOST</code> / <code>OKTOPUS_API_PORT</code>), regenerates <code>.env</code>, then runs <code>docker compose -f docker-compose.yml up --build -d</code>.</p>
+            <p><code>scripts/stack-up.sh</code> prompts for API host and port (or set <code>OKTOPUS_API_HOST</code> / <code>OKTOPUS_API_PORT</code>), regenerates <code>.env</code>, pulls images from the registry, then runs <code>docker compose -f docker-compose.yml up -d</code>.</p>
             <div class="code">
               <div class="code-head"><span class="code-name">bash</span><button type="button" class="copy-btn" onclick="copyCode(this)">Copy</button></div>
               <pre><code>chmod +x scripts/stack-up.sh
