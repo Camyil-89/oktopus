@@ -16,6 +16,8 @@
     "@codemirror/commands": "^6.11.1",
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.13",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
     "antd": "^6.6.5",
     "mobx": "^7.0.5",
     "mobx-react-lite": "^5.1.0",
