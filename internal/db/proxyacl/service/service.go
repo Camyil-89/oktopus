@@ -203,6 +203,10 @@ func (s *Service) GetNamedList(ctx context.Context, id uuid.UUID) (domain.NamedL
 	return s.repo.GetNamedList(ctx, id)
 }
 
+func (s *Service) ListNamedListsByNames(ctx context.Context, names []string) ([]domain.NamedList, error) {
+	return s.repo.ListNamedListsByNames(ctx, names)
+}
+
 func (s *Service) SyncNamedListsAndPublish(ctx context.Context, inputs []SyncNamedListInput) ([]domain.NamedList, error) {
 	lists, err := normalizeNamedLists(inputs)
 	if err != nil {
@@ -239,6 +243,76 @@ func (s *Service) SyncNamedListsAndPublish(ctx context.Context, inputs []SyncNam
 	}
 	s.requestPublishAllInstances(ctx)
 	return out, nil
+}
+
+// MergeNamedListsAndPublish обновляет или добавляет lists по имени, не удаляя остальные.
+func (s *Service) MergeNamedListsAndPublish(ctx context.Context, inputs []SyncNamedListInput) error {
+	updates, err := normalizeNamedLists(inputs)
+	if err != nil {
+		return err
+	}
+	updates, err = s.preserveRemoteListBodies(ctx, updates)
+	if err != nil {
+		return err
+	}
+	updates, err = s.ensureRemoteListBodies(ctx, updates)
+	if err != nil {
+		return err
+	}
+	current, err := s.repo.ListNamedLists(ctx)
+	if err != nil {
+		return err
+	}
+	merged := mergeNamedListsByName(current, updates)
+	ids, err := s.repo.ListPolicyInstanceIDs(ctx)
+	if err != nil {
+		return err
+	}
+	for _, instanceID := range ids {
+		if err := validateSquidCompile(ctx, &policyValidateRepo{s: s, instanceID: instanceID, draftLists: merged, hasLists: true}); err != nil {
+			return err
+		}
+	}
+	if err := s.repo.ReplaceNamedLists(ctx, merged); err != nil {
+		return err
+	}
+	for _, l := range merged {
+		if l.SourceMode == domain.ListSourceModeRemote && s.listPoll != nil {
+			s.listPoll.scheduleSoon(l.ID)
+		}
+	}
+	s.requestPublishAllInstances(ctx)
+	return nil
+}
+
+func mergeNamedListsByName(current, updates []domain.NamedList) []domain.NamedList {
+	byName := make(map[string]domain.NamedList, len(current)+len(updates))
+	order := make([]string, 0, len(current)+len(updates))
+	for _, c := range current {
+		key := strings.ToLower(c.Name)
+		byName[key] = c
+		order = append(order, key)
+	}
+	for _, u := range updates {
+		key := strings.ToLower(u.Name)
+		if existing, ok := byName[key]; ok {
+			u.ID = existing.ID
+			byName[key] = u
+		} else {
+			byName[key] = u
+			order = append(order, key)
+		}
+	}
+	out := make([]domain.NamedList, 0, len(byName))
+	seen := make(map[string]struct{}, len(byName))
+	for _, key := range order {
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, byName[key])
+	}
+	return out
 }
 
 // policyValidateRepo подставляет черновик policy/lists для проверки компиляции.

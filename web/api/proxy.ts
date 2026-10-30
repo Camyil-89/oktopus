@@ -89,6 +89,46 @@ export async function deleteProxyInstance(instanceId: string) {
   return fetchApi<void>(inst(instanceId, ""), "DELETE");
 }
 
+export async function exportProxyInstanceConfig(instanceId: string) {
+  const path = inst(instanceId, "/config/export");
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "GET",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let msg = res.statusText;
+    try {
+      const j = JSON.parse(text) as { error?: string };
+      if (j.error) msg = j.error;
+    } catch {
+      if (text) msg = text;
+    }
+    throw new ApiError(res.status, msg);
+  }
+  let filename = "instance-oktopus.zip";
+  const disp = res.headers.get("Content-Disposition");
+  if (disp) {
+    const m = /filename="([^"]+)"/.exec(disp);
+    if (m?.[1]) filename = m[1];
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function importProxyInstanceConfig(instanceId: string, form: FormData) {
+  return fetchApiForm<import("@/types/proxy").ProxyInstance>(
+    inst(instanceId, "/config/import"),
+    "POST",
+    form,
+  );
+}
+
 export async function getProxyCAStatus(instanceId: string) {
   return fetchApi<ProxyCAStatus>(inst(instanceId, "/ca/status"), "GET");
 }

@@ -29,6 +29,10 @@ const (
 	UpdateReportsDashboardFailed Code = "update_reports_dashboard_failed"
 	CAStatusFailed           Code = "ca_status_failed"
 	ReadFileFailed           Code = "read_file_failed"
+	ConfigBundleInvalid      Code = "config_bundle_invalid"
+	ConfigBundleReadFailed   Code = "config_bundle_read_failed"
+	InstanceConfigImportFailed Code = "instance_config_import_failed"
+	BundleFileRequired       Code = "bundle_file_required"
 	ClearForbiddenPageFailed Code = "clear_forbidden_page_failed"
 	ClearGatewayPageFailed   Code = "clear_gateway_page_failed"
 

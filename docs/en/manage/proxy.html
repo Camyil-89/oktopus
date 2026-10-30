@@ -194,6 +194,7 @@
 
             <h2 id="mp-instance">Instance lifecycle</h2>
             <p>Rename the instance, change listen when the port is free, disable with <strong>enabled</strong>, or delete the instance (ACL and inspect config removed; access log rows kept). Create new instances on <a href="index.html">Home</a>.</p>
+            <p><strong>Export / import</strong> — ZIP with instance name and parameters, Squid ACL, inspect rules, referenced ACL Lists, and CA (<code>GET/POST /api/proxy/instances/{id}/config/export|import</code>). If the name or listen is already used by another instance, that field is left unchanged; lists with matching names are updated globally.</p>
 
             <h2 id="mp-after">After changes</h2>
             <p>Save and confirm RUNNING on <a href="instance.html">instance statistics</a> or Home. For MITM, distribute the CA to clients.</p>

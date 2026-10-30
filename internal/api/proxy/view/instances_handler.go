@@ -1,8 +1,10 @@
 package view
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -193,6 +195,59 @@ func (h *InstancesHandler) UploadCA(w http.ResponseWriter, r *http.Request) {
 	defer keyFile.Close()
 	updated, err := h.instances.UploadCA(r.Context(), id, certFile, keyFile)
 	if err != nil {
+		response.ErrorFrom(w, http.StatusBadRequest, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, toInstanceResponse(updated))
+}
+
+func (h *InstancesHandler) ExportConfig(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseInstanceID(w, r)
+	if !ok {
+		return
+	}
+	data, filename, err := h.instances.ExportInstanceBundle(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			response.Error(w, http.StatusNotFound, string(apperr.InstanceNotFound))
+			return
+		}
+		response.Error(w, http.StatusInternalServerError, string(apperr.LoadProxySettingsFailed))
+		return
+	}
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+
+func (h *InstancesHandler) ImportConfig(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseInstanceID(w, r)
+	if !ok {
+		return
+	}
+	const maxBody = 32 << 20
+	if err := r.ParseMultipartForm(maxBody); err != nil {
+		response.Error(w, http.StatusBadRequest, string(apperr.InvalidMultipartForm))
+		return
+	}
+	bundleFile, _, err := r.FormFile("bundle")
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, string(apperr.BundleFileRequired))
+		return
+	}
+	defer bundleFile.Close()
+	raw, err := io.ReadAll(bundleFile)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, string(apperr.ConfigBundleReadFailed))
+		return
+	}
+	updated, err := h.instances.ImportInstanceBundle(r.Context(), id, bytes.NewReader(raw), int64(len(raw)))
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			response.Error(w, http.StatusNotFound, string(apperr.InstanceNotFound))
+			return
+		}
 		response.ErrorFrom(w, http.StatusBadRequest, err)
 		return
 	}

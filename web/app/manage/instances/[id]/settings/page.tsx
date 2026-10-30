@@ -125,6 +125,10 @@ export default function InstanceSettingsPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [exportingConfig, setExportingConfig] = useState(false);
+  const [configImportOpen, setConfigImportOpen] = useState(false);
+  const [configImporting, setConfigImporting] = useState(false);
+  const [configZipFiles, setConfigZipFiles] = useState<UploadFile[]>([]);
 
   const loadCAStatus = useCallback(async () => {
     if (!instanceId) {
@@ -259,6 +263,55 @@ export default function InstanceSettingsPage() {
       message.error(formatApiError(e, t("proxy.saveFailed")));
     } finally {
       setRenaming(false);
+    }
+  };
+
+  const handleExportConfig = async () => {
+    setExportingConfig(true);
+    try {
+      await proxyApi.exportProxyInstanceConfig(instanceId);
+      message.success(t("instance.configExported"));
+    } catch (e) {
+      message.error(formatApiError(e, t("instance.configExportFailed")));
+    } finally {
+      setExportingConfig(false);
+    }
+  };
+
+  const confirmImportConfig = () => {
+    modal.confirm({
+      title: t("instance.configImportConfirmTitle"),
+      content: t("instance.configImportConfirmBody"),
+      okText: t("instance.configImportButton"),
+      cancelText: t("common.cancel"),
+      okButtonProps: { danger: true },
+      onOk: () => setConfigImportOpen(true),
+    });
+  };
+
+  const handleImportConfig = async () => {
+    const zip = configZipFiles[0]?.originFileObj;
+    if (!zip) {
+      message.error(t("instance.configSelectZip"));
+      return;
+    }
+    setConfigImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append("bundle", zip);
+      const updated = await proxyApi.importProxyInstanceConfig(instanceId, fd);
+      setInstanceName(updated.name);
+      setNameDraft(updated.name);
+      window.dispatchEvent(new Event(PROXY_INSTANCES_CHANGED_EVENT));
+      applyToForm(updated);
+      await loadCAStatus();
+      setConfigZipFiles([]);
+      setConfigImportOpen(false);
+      message.success(t("instance.configImported"));
+    } catch (e) {
+      message.error(formatApiError(e, t("instance.configImportFailed")));
+    } finally {
+      setConfigImporting(false);
     }
   };
 
@@ -595,6 +648,17 @@ export default function InstanceSettingsPage() {
         </div>
       </Card>
 
+      <Card title={t("instance.configExport")} loading={loading}>
+        <div className="flex max-w-3xl flex-col gap-4">
+          <Space wrap>
+            <Button loading={exportingConfig} onClick={() => void handleExportConfig()}>
+              {t("instance.configExportButton")}
+            </Button>
+            <Button onClick={confirmImportConfig}>{t("instance.configImportButton")}</Button>
+          </Space>
+        </div>
+      </Card>
+
       <Card title={t("instance.cardTitle")} loading={loading}>
         <div className="flex max-w-3xl flex-col gap-4">
           <div className="flex flex-col gap-2">
@@ -677,6 +741,26 @@ export default function InstanceSettingsPage() {
           </Space>
         </div>
       </Card>
+
+      <Modal
+        title={t("instance.configImport")}
+        open={configImportOpen}
+        onCancel={() => setConfigImportOpen(false)}
+        onOk={() => void handleImportConfig()}
+        confirmLoading={configImporting}
+        okText={t("instance.configImportButton")}
+        cancelText={t("common.cancel")}
+      >
+        <Upload
+          beforeUpload={() => false}
+          maxCount={1}
+          fileList={configZipFiles}
+          onChange={({ fileList }) => setConfigZipFiles(fileList)}
+          accept=".zip,application/zip"
+        >
+          <Button icon={<UploadOutlined />}>ZIP</Button>
+        </Upload>
+      </Modal>
 
       <Modal
         title={t("proxy.upload502")}
