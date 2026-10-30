@@ -43,6 +43,9 @@ jobs:
       - name: Build (Dockerfile.web)
         run: docker build -f deploy/docker/Dockerfile.web --target build .
 
+      - name: Build static UI (Dockerfile.nginx export)
+        run: docker build -f deploy/docker/Dockerfile.nginx --build-arg NEXT_PUBLIC_API_URL= .
+
   bump-web-version:
     name: Bump web version
     runs-on: ubuntu-latest
@@ -111,27 +114,41 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push oktopus image
+      - name: Build oktopus image (local)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: deploy/docker/Dockerfile.oktopus
-          push: true
+          push: false
+          load: true
           tags: |
             ghcr.io/camyil-89/oktopus/oktopus:${{ steps.ver.outputs.version }}
             ghcr.io/camyil-89/oktopus/oktopus:latest
 
-      - name: Build and push nginx image
+      - name: Build nginx image (local)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: deploy/docker/Dockerfile.nginx
-          push: true
+          push: false
+          load: true
           build-args: |
             NEXT_PUBLIC_API_URL=
           tags: |
             ghcr.io/camyil-89/oktopus/nginx:${{ steps.ver.outputs.version }}
             ghcr.io/camyil-89/oktopus/nginx:latest
+
+      - name: Push container images
+        run: |
+          set -euo pipefail
+          V="${{ steps.ver.outputs.version }}"
+          for ref in \
+            "ghcr.io/camyil-89/oktopus/oktopus:${V}" \
+            "ghcr.io/camyil-89/oktopus/oktopus:latest" \
+            "ghcr.io/camyil-89/oktopus/nginx:${V}" \
+            "ghcr.io/camyil-89/oktopus/nginx:latest"; do
+            docker push "$ref"
+          done
 
       - name: Deploy bundle for release
         run: |
