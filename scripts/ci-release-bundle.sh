@@ -17,6 +17,9 @@ tar -czf "$OUT" \
   scripts/stack-up.bat \
   scripts/stack-up-env.ps1 \
   scripts/stack-up-banner.ps1 \
+  scripts/install.sh \
+  scripts/install.ps1 \
+  scripts/install.bat \
   deploy/clickhouse/init
 
 echo "bundle=$OUT"
