@@ -53,10 +53,19 @@ prompt_api_host() {
   fi
   local suggested reply
   suggested="$(detect_api_host)"
-  echo ""
-  echo "API host (server IP for browser URL and CORS)."
-  echo "Use a static IP (DHCP reservation or fixed address) for stable operation."
-  read -r -p "API host [${suggested}]: " reply
+  if [[ ! -t 0 ]] && [[ ! -r /dev/tty ]]; then
+    echo "No TTY; using API host ${suggested} (set OKTOPUS_API_HOST to override)." >&2
+    echo "$suggested"
+    return
+  fi
+  echo "" >&2
+  echo "API host (server IP for browser URL and CORS)." >&2
+  echo "Use a static IP (DHCP reservation or fixed address) for stable operation." >&2
+  if [[ -r /dev/tty ]]; then
+    read -r -p "API host [${suggested}]: " reply </dev/tty
+  else
+    read -r -p "API host [${suggested}]: " reply
+  fi
   if [[ -z "${reply// }" ]]; then
     echo "$suggested"
   else
@@ -70,8 +79,17 @@ prompt_api_port() {
     return
   fi
   local suggested="8000" reply
-  echo "Public HTTP port (nginx). Prefer 8000 on Docker Desktop (port 80 is often taken or restricted)."
-  read -r -p "API port [${suggested}]: " reply
+  if [[ ! -t 0 ]] && [[ ! -r /dev/tty ]]; then
+    echo "No TTY; using API port ${suggested} (set OKTOPUS_API_PORT to override)." >&2
+    echo "$suggested"
+    return
+  fi
+  echo "Public HTTP port (nginx). Prefer 8000 on Docker Desktop (port 80 is often taken or restricted)." >&2
+  if [[ -r /dev/tty ]]; then
+    read -r -p "API port [${suggested}]: " reply </dev/tty
+  else
+    read -r -p "API port [${suggested}]: " reply
+  fi
   if [[ -z "${reply// }" ]]; then
     echo "$suggested"
   else
@@ -130,7 +148,7 @@ write_env() {
     pg_pass="$POSTGRES_PASSWORD"
   elif docker_volume_exists_any "$COMPOSE_PG_VOLUME" "$LEGACY_PG_VOLUME" && [[ -n "$prev_pg_pass" ]]; then
     pg_pass="$prev_pg_pass"
-    echo "Keeping Postgres password (existing Docker volume)."
+    echo "Keeping Postgres password (existing Docker volume)." >&2
   elif docker_volume_exists_any "$COMPOSE_PG_VOLUME" "$LEGACY_PG_VOLUME"; then
     echo "Postgres volume exists but POSTGRES_PASSWORD is unknown. Run: docker compose down -v then stack-up again." >&2
     exit 1
@@ -141,7 +159,7 @@ write_env() {
     ch_pass="$CLICKHOUSE_PASSWORD"
   elif docker_volume_exists_any "$COMPOSE_CH_VOLUME" "$LEGACY_CH_VOLUME" && [[ -n "$prev_ch_pass" ]]; then
     ch_pass="$prev_ch_pass"
-    echo "Keeping ClickHouse password (existing Docker volume)."
+    echo "Keeping ClickHouse password (existing Docker volume)." >&2
   elif docker_volume_exists_any "$COMPOSE_CH_VOLUME" "$LEGACY_CH_VOLUME"; then
     echo "ClickHouse volume exists but CLICKHOUSE_PASSWORD is unknown. Run: docker compose down -v then stack-up again." >&2
     exit 1
