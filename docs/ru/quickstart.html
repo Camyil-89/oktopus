@@ -158,11 +158,11 @@ cd oktopus</code></pre>
               <li><code>ghcr.io/camyil-89/oktopus/oktopus:latest</code> — API и прокси</li>
               <li><code>ghcr.io/camyil-89/oktopus/nginx:latest</code> — UI и reverse proxy</li>
             </ul>
-            <p>Скрипт развёртывания по умолчанию делает <code>docker compose pull</code> для этих образов (значения в <code>OKTOPUS_IMAGE</code> и <code>OKTOPUS_NGINX_IMAGE</code> в <code>.env</code>). Локальная сборка: <code>./scripts/stack-up.sh --build</code> или <code>OKTOPUS_COMPOSE_BUILD=1</code>.</p>
+            <p>Скрипт развёртывания по умолчанию делает <code>docker compose pull</code> для этих образов (значения в <code>OKTOPUS_IMAGE</code> и <code>OKTOPUS_NGINX_IMAGE</code> в конфигурации стека). Локальная сборка: <code>./scripts/stack-up.sh --build</code> или <code>OKTOPUS_COMPOSE_BUILD=1</code>.</p>
             <p>Если образы в GHCR приватные, на сервере один раз выполните <code>docker login ghcr.io</code> (PAT с правом <code>read:packages</code>) или сделайте пакеты публичными в настройках GitHub.</p>
 
             <h2 id="qs-linux">Linux и macOS</h2>
-            <p>Скрипт <code>scripts/stack-up.sh</code> спросит хост и порт API (или задайте <code>OKTOPUS_API_HOST</code> и <code>OKTOPUS_API_PORT</code> в окружении), пересоздаст <code>.env</code>, подтянет образы из registry и выполнит <code>docker compose -f docker-compose.yml up -d</code>.</p>
+            <p>Скрипт <code>scripts/stack-up.sh</code> спросит хост и порт API (или задайте <code>OKTOPUS_API_HOST</code> и <code>OKTOPUS_API_PORT</code> в окружении), сохранит настройки в <code>/etc/oktopus/stack.env</code>, подтянет образы из registry и выполнит <code>docker compose -f docker-compose.yml up -d</code>.</p>
             <div class="code">
               <div class="code-head"><span class="code-name">bash</span><button type="button" class="copy-btn" onclick="copyCode(this)">Копировать</button></div>
               <pre><code>chmod +x scripts/stack-up.sh
@@ -171,12 +171,12 @@ cd oktopus</code></pre>
             <p>Только сгенерировать <code>.env</code> без запуска (например, для Portainer): <code>./scripts/stack-up.sh --write-env-only</code>.</p>
 
             <h2 id="qs-windows">Windows</h2>
-            <p>Скрипт <code>scripts\stack-up.bat</code> использует <code>docker-compose.desktop.yml</code> (сеть bridge для Docker Desktop). Запуск из корня репозитория:</p>
+            <p>Скрипт <code>scripts\stack-up.bat</code> использует <code>docker-compose.desktop.yml</code> (сеть bridge для Docker Desktop). Повторный запуск обнаруживает установленный стек и предлагает обновить или удалить его. Пример запуска из корня репозитория:</p>
             <div class="code">
               <div class="code-head"><span class="code-name">cmd</span><button type="button" class="copy-btn" onclick="copyCode(this)">Копировать</button></div>
               <pre><code>scripts\stack-up.bat</code></pre>
             </div>
-            <p>Только <code>.env</code>: <code>scripts\stack-up.bat --write-env-only</code>. Переменные <code>OKTOPUS_API_HOST</code> / <code>OKTOPUS_API_PORT</code> тоже отключают интерактивные вопросы.</p>
+            <p>Только <code>.env</code>: <code>scripts\stack-up.bat --write-env-only</code>. Переменные <code>OKTOPUS_API_HOST</code> / <code>OKTOPUS_API_PORT</code> отключают вопросы о хосте и порте при первой установке. Настройки хранятся в <code>%ProgramData%\Oktopus\stack.env</code>.</p>
 
             <h2 id="qs-after">После запуска</h2>
             <ol>

@@ -68,7 +68,48 @@ Oktopus — это прокси для контроля исходящего и�
 
 ## Быстрый старт (Docker)
 
-Нужны Git и [Docker Compose](https://docs.docker.com/compose/). Пошагово — в [документации: развёртывание](https://camyil-89.github.io/oktopus/ru/quickstart.html).
+Нужны [Docker Compose](https://docs.docker.com/compose/) и Docker (на Windows — [Docker Desktop](https://www.docker.com/products/docker-desktop/)). Полная пошаговая инструкция — в [документации: развёртывание](https://camyil-89.github.io/oktopus/ru/quickstart.html).
+
+Образы публикуются в GHCR после CI; минимальный набор для запуска (compose, скрипты, init ClickHouse) — в [GitHub Releases](https://github.com/Camyil-89/oktopus/releases) (`oktopus-<версия>-deploy.tar.gz`). **Клонировать весь репозиторий не обязательно.**
+
+### Linux и macOS
+
+Одна команда: скачать release-архив, распаковать в `./oktopus` и запустить `stack-up` (pull образов + `docker compose up`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Camyil-89/oktopus/main/scripts/install.sh | bash
+```
+
+Без вопросов про хост и порт — задайте переменные до запуска:
+
+```bash
+export OKTOPUS_API_HOST=203.0.113.10 OKTOPUS_API_PORT=8000
+curl -fsSL https://raw.githubusercontent.com/Camyil-89/oktopus/main/scripts/install.sh | bash
+```
+
+Конкретная версия и каталог: `bash -s -- --version 1.2.3 --dir /opt/oktopus` (после `curl … | bash`).
+
+Из уже скачанного архива или клона: `chmod +x scripts/stack-up.sh && ./scripts/stack-up.sh`.
+
+### Windows
+
+PowerShell (скачивание release и запуск через `docker-compose.desktop.yml`):
+
+```powershell
+irm https://raw.githubusercontent.com/Camyil-89/oktopus/main/scripts/install.ps1 | iex
+```
+
+Или из каталога с распакованным архивом / из клона: `scripts\install.bat` или `scripts\stack-up.bat`.
+
+Повторный запуск установщика из любой папки обнаруживает проект `oktopus-onprem` в текущем Docker и предлагает обновить или удалить его. Обновление использует каталог существующей установки. Для установки из релиза установщик проверяет наличие новой версии. Удаление после подтверждения очищает контейнеры, тома и сети проекта, а также образы, которые больше не используются другими контейнерами.
+
+Настройки и пароли хранятся в `/etc/oktopus/stack.env` на Linux и `%ProgramData%\Oktopus\stack.env` на Windows. Для первого запуска нужны права на запись в системный каталог. Если у существующей установки есть `.env`, скрипт копирует его в системный каталог при первом обновлении. Опция `--write-env-only` по-прежнему создаёт локальный `.env` для Portainer.
+
+Чтобы установить dev-сборку, добавьте строку `TAG=dev` в `.env` в каталоге, из которого запускаете установщик, или в каталоге установки. Установщик скачает свежий prerelease `v<версия>-dev` и образы `oktopus/dev:latest` и `nginx/dev:latest` из GHCR. Для конкретной dev-версии передайте `--version 1.2.3-dev` или `-Version 1.2.3-dev`. После установки канал определяется по версии установленного архива. Для возврата на стабильный канал укажите `TAG=stable`.
+
+Для неинтерактивного запуска: `$env:OKTOPUS_API_HOST='203.0.113.10'; $env:OKTOPUS_API_PORT='8000'` перед `install.ps1`.
+
+### Клонирование (опционально)
 
 ```bash
 git clone https://github.com/Camyil-89/oktopus.git

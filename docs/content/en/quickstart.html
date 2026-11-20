@@ -31,11 +31,11 @@ cd oktopus</code></pre>
               <li><code>ghcr.io/camyil-89/oktopus/oktopus:latest</code> — API and proxy</li>
               <li><code>ghcr.io/camyil-89/oktopus/nginx:latest</code> — UI and reverse proxy</li>
             </ul>
-            <p>The stack script runs <code>docker compose pull</code> for these images by default (<code>OKTOPUS_IMAGE</code> and <code>OKTOPUS_NGINX_IMAGE</code> in <code>.env</code>). Local build: <code>./scripts/stack-up.sh --build</code> or <code>OKTOPUS_COMPOSE_BUILD=1</code>.</p>
+            <p>The stack script runs <code>docker compose pull</code> for these images by default (<code>OKTOPUS_IMAGE</code> and <code>OKTOPUS_NGINX_IMAGE</code> in the stack configuration). Local build: <code>./scripts/stack-up.sh --build</code> or <code>OKTOPUS_COMPOSE_BUILD=1</code>.</p>
             <p>If GHCR packages are private, run <code>docker login ghcr.io</code> on the server (PAT with <code>read:packages</code>) or make the packages public in GitHub settings.</p>
 
             <h2 id="qs-linux">Linux and macOS</h2>
-            <p><code>scripts/stack-up.sh</code> prompts for API host and port (or set <code>OKTOPUS_API_HOST</code> / <code>OKTOPUS_API_PORT</code>), regenerates <code>.env</code>, pulls images from the registry, then runs <code>docker compose -f docker-compose.yml up -d</code>.</p>
+            <p><code>scripts/stack-up.sh</code> prompts for API host and port (or set <code>OKTOPUS_API_HOST</code> / <code>OKTOPUS_API_PORT</code>), stores the settings in <code>/etc/oktopus/stack.env</code>, pulls images from the registry, then runs <code>docker compose -f docker-compose.yml up -d</code>.</p>
             <div class="code">
               <div class="code-head"><span class="code-name">bash</span><button type="button" class="copy-btn" onclick="copyCode(this)">Copy</button></div>
               <pre><code>chmod +x scripts/stack-up.sh
@@ -49,7 +49,7 @@ cd oktopus</code></pre>
               <div class="code-head"><span class="code-name">cmd</span><button type="button" class="copy-btn" onclick="copyCode(this)">Copy</button></div>
               <pre><code>scripts\stack-up.bat</code></pre>
             </div>
-            <p>Env only: <code>scripts\stack-up.bat --write-env-only</code>. <code>OKTOPUS_API_HOST</code> / <code>OKTOPUS_API_PORT</code> skip prompts.</p>
+            <p>Env only: <code>scripts\stack-up.bat --write-env-only</code>. <code>OKTOPUS_API_HOST</code> / <code>OKTOPUS_API_PORT</code> skip the host and port prompts on first install. Settings are stored in <code>%ProgramData%\Oktopus\stack.env</code>.</p>
 
             <h2 id="qs-after">After startup</h2>
             <ol>
