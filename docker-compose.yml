@@ -38,6 +38,7 @@ services:
     volumes:
       - oktopus_onprem_ch:/var/lib/clickhouse
       - ./deploy/clickhouse/init:/docker-entrypoint-initdb.d:ro
+      - ./deploy/clickhouse/config.d/memory.xml:/etc/clickhouse-server/config.d/oktopus-memory.xml:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8123/ping | grep -q Ok"]
       interval: 5s
@@ -81,6 +82,7 @@ services:
     environment:
       OKTOPUS_API_UPSTREAM_HOST: ${OKTOPUS_API_UPSTREAM_HOST:-host.docker.internal}
       OKTOPUS_API_INTERNAL_PORT: ${OKTOPUS_API_INTERNAL_PORT:-18002}
+      OKTOPUS_NGINX_WORKERS: ${OKTOPUS_NGINX_WORKERS:-2}
     depends_on:
       oktopus:
         condition: service_started

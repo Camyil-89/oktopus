@@ -34,14 +34,13 @@ func HTTPMiddleware(runner *Runner, rec accesslog.Recorder, enabled bool) hooks.
 			rec.Record(accesslog.FinalHTTPEntryAfterInspect(ctx, req, aclDec.RuleRef, aclDec.Spend, out))
 		}
 
-		start := time.Now()
 		if runner == nil || runner.Empty() {
-			metrics.ObserveInspect(ctx, 0, metrics.InspectParts{})
-			metrics.ObservePolicyTotal(ctx, aclDec.Spend)
+			metrics.ObserveInspectWithPolicy(ctx, 0, metrics.InspectParts{}, aclDec.Spend)
 			record(accesslog.InspectHTTPOutcome{})
 			return hooks.AllowDecision()
 		}
 
+		start := time.Now()
 		hookCtx := ctx
 		if req != nil {
 			if c := req.Context(); c != nil {
@@ -61,8 +60,7 @@ func HTTPMiddleware(runner *Runner, rec accesslog.Recorder, enabled bool) hooks.
 			Body:    bodyEnd.Sub(prepareEnd),
 			Eval:    evalEnd.Sub(bodyEnd),
 		}
-		metrics.ObserveInspect(hookCtx, inspectSpend, parts)
-		metrics.ObservePolicyTotal(hookCtx, aclDec.Spend+inspectSpend)
+		metrics.ObserveInspectWithPolicy(hookCtx, inspectSpend, parts, aclDec.Spend+inspectSpend)
 
 		out := accesslog.InspectHTTPOutcome{
 			Spend:    inspectSpend,

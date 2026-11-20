@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Generates .env and starts docker-compose.yml (repository root).
+# Starts docker-compose.yml using the system configuration.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
+ROOT="${OKTOPUS_STACK_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 ENV_FILE="$ROOT/.env"
 COMPOSE_FILE="$ROOT/docker-compose.yml"
 
@@ -22,6 +21,12 @@ for arg in "$@"; do
       ;;
   esac
 done
+
+if [[ "$WRITE_ONLY" == false && "${OKTOPUS_STACK_MANAGED:-}" != 1 ]]; then
+  export OKTOPUS_LOCAL_STACK=1
+  exec bash "$ROOT/scripts/install.sh" "$@"
+fi
+cd "$ROOT"
 
 gen_secret() {
   if command -v openssl >/dev/null 2>&1; then
@@ -53,7 +58,7 @@ prompt_api_host() {
   fi
   local suggested reply
   suggested="$(detect_api_host)"
-  if [[ ! -t 0 ]] && [[ ! -r /dev/tty ]]; then
+  if [[ ! -t 0 ]] && ! ( : </dev/tty ) 2>/dev/null; then
     echo "No TTY; using API host ${suggested} (set OKTOPUS_API_HOST to override)." >&2
     echo "$suggested"
     return
@@ -61,10 +66,10 @@ prompt_api_host() {
   echo "" >&2
   echo "API host (server IP for browser URL and CORS)." >&2
   echo "Use a static IP (DHCP reservation or fixed address) for stable operation." >&2
-  if [[ -r /dev/tty ]]; then
-    read -r -p "API host [${suggested}]: " reply </dev/tty
+  if [[ ! -t 0 ]]; then
+    read -r -p "API host [${suggested}]: " reply </dev/tty || reply=""
   else
-    read -r -p "API host [${suggested}]: " reply
+    read -r -p "API host [${suggested}]: " reply || reply=""
   fi
   if [[ -z "${reply// }" ]]; then
     echo "$suggested"
@@ -79,16 +84,16 @@ prompt_api_port() {
     return
   fi
   local suggested="8000" reply
-  if [[ ! -t 0 ]] && [[ ! -r /dev/tty ]]; then
+  if [[ ! -t 0 ]] && ! ( : </dev/tty ) 2>/dev/null; then
     echo "No TTY; using API port ${suggested} (set OKTOPUS_API_PORT to override)." >&2
     echo "$suggested"
     return
   fi
   echo "Public HTTP port (nginx). Prefer 8000 on Docker Desktop (port 80 is often taken or restricted)." >&2
-  if [[ -r /dev/tty ]]; then
-    read -r -p "API port [${suggested}]: " reply </dev/tty
+  if [[ ! -t 0 ]]; then
+    read -r -p "API port [${suggested}]: " reply </dev/tty || reply=""
   else
-    read -r -p "API port [${suggested}]: " reply
+    read -r -p "API port [${suggested}]: " reply || reply=""
   fi
   if [[ -z "${reply// }" ]]; then
     echo "$suggested"
@@ -100,7 +105,7 @@ prompt_api_port() {
 read_env_var() {
   local key="$1" file="$2"
   if [[ -f "$file" ]]; then
-    grep -E "^${key}=" "$file" 2>/dev/null | head -1 | cut -d= -f2-
+    awk -v key="$key" 'index($0, key "=") == 1 {print substr($0, length(key) + 2); exit}' "$file"
   fi
 }
 
@@ -124,14 +129,13 @@ LEGACY_PG_VOLUME="oktopus-local_oktopus_local_pg"
 LEGACY_CH_VOLUME="oktopus-local_oktopus_local_ch"
 
 write_env() {
-  local prev_pg_pass prev_ch_pass prev_api_internal prev_oktopus_image prev_nginx_image
+  local prev_pg_pass prev_ch_pass prev_api_internal prev_oktopus_image prev_nginx_image prev_admin_pass
   prev_pg_pass="$(read_env_var POSTGRES_PASSWORD "$ENV_FILE")"
   prev_ch_pass="$(read_env_var CLICKHOUSE_PASSWORD "$ENV_FILE")"
   prev_api_internal="$(read_env_var OKTOPUS_API_INTERNAL_PORT "$ENV_FILE")"
   prev_oktopus_image="$(read_env_var OKTOPUS_IMAGE "$ENV_FILE")"
   prev_nginx_image="$(read_env_var OKTOPUS_NGINX_IMAGE "$ENV_FILE")"
   prev_admin_pass="$(read_env_var OKTOPUS_ADMIN_PASSWORD "$ENV_FILE")"
-  rm -f "$ENV_FILE"
 
   local pg_user="${POSTGRES_USER:-oktopus}"
   local pg_db="${POSTGRES_DB:-oktopus}"
@@ -217,14 +221,34 @@ EOF
   chmod 600 "$ENV_FILE" 2>/dev/null || true
 }
 
-echo "Note: .env is recreated each run; DB passwords are kept when Docker volumes already exist."
-write_env
-echo "Wrote $ENV_FILE"
-
 if [[ "$WRITE_ONLY" == true ]]; then
+  write_env
+  echo "Wrote $ENV_FILE"
   echo "Env only; copy variables to Portainer or run without --write-env-only to start stack."
   exit 0
 fi
+
+legacy_env="$ENV_FILE"
+ENV_FILE="$OKTOPUS_STACK_CONFIG"
+umask 077
+mkdir -p -- "$(dirname "$ENV_FILE")"
+chmod 700 -- "$(dirname "$ENV_FILE")"
+if [[ ! -f "$ENV_FILE" ]]; then
+  pending_env=$(mktemp "${ENV_FILE}.XXXXXX")
+  trap 'rm -f -- "$pending_env"' EXIT
+  if [[ -f "$legacy_env" ]] && grep -E '^[[:space:]]*[[:alpha:]_][[:alnum:]_]*[[:space:]]*=' "$legacy_env" | grep -vE '^[[:space:]]*TAG[[:space:]]*=' >/dev/null; then
+    cp -- "$legacy_env" "$pending_env"
+  else
+    ENV_FILE="$pending_env" write_env
+  fi
+  if ! ln -- "$pending_env" "$ENV_FILE"; then
+    [[ -f "$ENV_FILE" ]] || exit 1
+  fi
+  rm -f -- "$pending_env"
+  trap - EXIT
+fi
+chmod 600 -- "$ENV_FILE"
+printf '%s\n' "$ROOT" >"$(dirname "$ENV_FILE")/install-dir"
 
 if ! docker compose version >/dev/null 2>&1; then
   echo "docker compose not found." >&2
@@ -236,7 +260,11 @@ if [[ "${OKTOPUS_COMPOSE_BUILD:-}" == "1" ]]; then
 fi
 
 compose_up() {
-  local -a cmd=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
+  local -a cmd=(docker compose -p "$OKTOPUS_STACK_PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
+  if [[ "${OKTOPUS_STACK_CHANNEL:-}" == dev ]]; then
+    export OKTOPUS_IMAGE="ghcr.io/camyil-89/oktopus/oktopus/dev:${OKTOPUS_STACK_IMAGE_TAG}"
+    export OKTOPUS_NGINX_IMAGE="ghcr.io/camyil-89/oktopus/nginx/dev:${OKTOPUS_STACK_IMAGE_TAG}"
+  fi
   if [[ "$COMPOSE_BUILD" == true ]]; then
     "${cmd[@]}" up --build -d --pull never
   else
@@ -247,10 +275,10 @@ compose_up() {
 
 compose_up
 
-admin_user="$(grep -E '^OKTOPUS_ADMIN_USERNAME=' "$ENV_FILE" | cut -d= -f2-)"
-admin_pass="$(grep -E '^OKTOPUS_ADMIN_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)"
-api_host="$(grep -E '^OKTOPUS_API_HOST=' "$ENV_FILE" | cut -d= -f2-)"
-api_port="$(grep -E '^OKTOPUS_API_PORT=' "$ENV_FILE" | cut -d= -f2-)"
+admin_user="$(read_env_var OKTOPUS_ADMIN_USERNAME "$ENV_FILE")"
+admin_pass="$(read_env_var OKTOPUS_ADMIN_PASSWORD "$ENV_FILE")"
+api_host="$(read_env_var OKTOPUS_API_HOST "$ENV_FILE")"
+api_port="$(read_env_var OKTOPUS_API_PORT "$ENV_FILE")"
 
 echo ""
 cat <<'EOF'

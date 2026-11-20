@@ -60,7 +60,7 @@ func (e *Engine) DelayFlowConnectFor(id auth.Identity, hostPort string, srcIP ne
 
 // DelayFlowHTTP выбирает pool для HTTP-запроса.
 func (e *Engine) DelayFlowHTTP(ctx context.Context, req *stdhttp.Request) *ratelimit.Flow {
-	if e == nil || req == nil {
+	if e == nil || e.rateLimit == nil || len(e.squidDelayAccess) == 0 || req == nil {
 		return nil
 	}
 	id, _ := auth.IdentityFromContext(ctx)

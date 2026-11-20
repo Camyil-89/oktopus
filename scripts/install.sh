@@ -27,6 +27,7 @@ Options:
   -h, --help
 
 stack-up options (after --): --write-env-only, --build
+Set TAG=dev in .env to use dev prereleases and images.
 
 Environment:
   OKTOPUS_VERSION, OKTOPUS_INSTALL_DIR, OKTOPUS_GITHUB_REPO
@@ -82,11 +83,113 @@ repo_root=""
 if [[ -n "$script_dir" && -f "$script_dir/../docker-compose.yml" ]]; then
   repo_root="$(cd "$script_dir/.." && pwd)"
 fi
+local_runner="${repo_root:+$repo_root/scripts/stack-up.sh}"
 
-if [[ -n "$repo_root" && "$FETCH_RELEASE" == false && -z "$VERSION" && "$FORCE" == false ]]; then
-  echo "Using local checkout at $repo_root (pass --fetch to download a release bundle instead)."
+export OKTOPUS_STACK_CONFIG=/etc/oktopus/stack.env
+export OKTOPUS_STACK_PROJECT=oktopus-onprem
+export OKTOPUS_STACK_MANAGED=1
+
+manage_stack() {
+  local ids container installed_dir choice confirmation images image used resources
+  local -a containers volumes networks
+  local project_filter="label=com.docker.compose.project=$OKTOPUS_STACK_PROJECT"
+  ids=$(docker ps -aq --filter "$project_filter")
+  if [[ -z "$ids" ]]; then
+    resources=$(docker volume ls -q --filter "$project_filter")
+    [[ -n "$resources" && -s /etc/oktopus/install-dir ]] || return 0
+    IFS= read -r installed_dir </etc/oktopus/install-dir
+  else
+    container=${ids%%$'\n'*}
+    installed_dir=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$container")
+    [[ "$installed_dir" == /* ]] || { echo 'Cannot determine the Oktopus installation directory.' >&2; exit 1; }
+  fi
+
+  echo "Oktopus installation: $installed_dir"
+  if ! read_stack_reply 'Update [u], delete [d], or cancel [Enter]: ' choice; then
+    echo 'An interactive terminal is required to manage the installed stack.' >&2
+    exit 1
+  fi
+  case "$choice" in
+    u|U)
+      INSTALL_DIR=$installed_dir
+      repo_root=$installed_dir
+      if [[ -f "$installed_dir/.oktopus-bundle-version" && "${OKTOPUS_LOCAL_STACK:-}" != 1 ]]; then
+        FETCH_RELEASE=true
+      fi
+      ;;
+    d|D)
+      read_stack_reply 'Type delete to permanently remove Oktopus Docker volumes and their data: ' confirmation
+      [[ "$confirmation" == delete ]] || exit 0
+      if [[ -n "$ids" ]]; then
+        mapfile -t containers <<<"$ids"
+        images=$(docker inspect --format '{{.Image}}' "${containers[@]}" | sort -u)
+        docker rm -f "${containers[@]}"
+        while IFS= read -r image; do
+          used=$(docker ps -aq --filter "ancestor=$image")
+          [[ -z "$used" ]] || continue
+          docker image rm "$image" || echo "Image retained: $image" >&2
+        done <<<"$images"
+      fi
+      resources=$(docker volume ls -q --filter "$project_filter")
+      if [[ -n "$resources" ]]; then
+        mapfile -t volumes <<<"$resources"
+        docker volume rm "${volumes[@]}"
+      fi
+      resources=$(docker network ls -q --filter "$project_filter")
+      if [[ -n "$resources" ]]; then
+        mapfile -t networks <<<"$resources"
+        docker network rm "${networks[@]}"
+      fi
+      rm -f -- "$OKTOPUS_STACK_CONFIG" /etc/oktopus/install-dir
+      exit 0
+      ;;
+    *) exit 0 ;;
+  esac
+}
+
+read_stack_reply() {
+  if [[ -t 0 ]]; then
+    read -r -p "$1" "$2"
+  else
+    read -r -p "$1" "$2" </dev/tty
+  fi
+}
+
+if [[ "$FETCH_ONLY" == false && " ${STACK_UP_ARGS[*]} " != *' --write-env-only '* ]]; then
+  manage_stack
+fi
+
+read_channel() {
+  [[ -f "$1" ]] || return 0
+  sed -nE "s/^[[:space:]]*TAG[[:space:]]*=[[:space:]]*['\"]?(dev|stable)['\"]?([[:space:]]*#.*|[[:space:]]*)$/\1/p" "$1" | tail -1
+}
+
+channel=$(read_channel "$PWD/.env")
+[[ -n "$channel" ]] || channel=$(read_channel "$INSTALL_DIR/.env")
+if [[ -z "$channel" && -n "$repo_root" ]]; then
+  channel=$(read_channel "$repo_root/.env")
+fi
+VERSION=${VERSION#v}
+if [[ "$channel" == dev || "$VERSION" == *-dev ]]; then
+  channel=dev
+  FETCH_RELEASE=true
+elif [[ -f "$INSTALL_DIR/.oktopus-bundle-version" &&
+        "$(cat "$INSTALL_DIR/.oktopus-bundle-version")" == *-dev ]]; then
+  if [[ "$channel" == stable ]]; then
+    FETCH_RELEASE=true
+  elif [[ -z "$channel" ]]; then
+    channel=dev
+  fi
+fi
+export OKTOPUS_STACK_CHANNEL="$channel"
+export OKTOPUS_STACK_IMAGE_TAG=latest
+
+if [[ -n "$repo_root" && "$FETCH_ONLY" == false ]] &&
+   [[ "$FETCH_RELEASE" == false && ( "${OKTOPUS_LOCAL_STACK:-}" == 1 || ( -z "$VERSION" && "$FORCE" == false ) ) ]]; then
+  echo "Using deployment at $repo_root (pass --fetch to download a release bundle instead)."
   cd "$repo_root"
-  exec "$repo_root/scripts/stack-up.sh" "${STACK_UP_ARGS[@]+"${STACK_UP_ARGS[@]}"}"
+  export OKTOPUS_STACK_ROOT="$repo_root"
+  exec bash "${local_runner:-$repo_root/scripts/stack-up.sh}" "${STACK_UP_ARGS[@]+"${STACK_UP_ARGS[@]}"}"
 fi
 
 need_cmd() {
@@ -102,6 +205,22 @@ need_cmd docker
 
 resolve_latest_version() {
   local api="https://api.github.com/repos/${REPO}/releases/latest"
+  if [[ "$channel" == dev ]]; then
+    local page=1 response tags tag
+    while :; do
+      response=$(curl -fsSL "${api%/latest}?per_page=100&page=$page") || return 1
+      tags=$(grep -oE '"tag_name"[[:space:]]*:[[:space:]]*"[^"]+"' <<<"$response" | cut -d '"' -f 4 || true)
+      tag=$(awk '/^v.*-dev$/ {print; exit}' <<<"$tags")
+      if [[ -n "$tag" ]]; then
+        echo "${tag#v}"
+        return
+      fi
+      [[ $(wc -l <<<"$tags") -ge 100 ]] || break
+      page=$((page + 1))
+    done
+    echo 'No dev prerelease found.' >&2
+    return 1
+  fi
   if command -v jq >/dev/null 2>&1; then
     local tag
     tag="$(curl -fsSL "$api" | jq -r '.tag_name')"
@@ -124,8 +243,11 @@ resolve_latest_version() {
 }
 
 if [[ -z "$VERSION" ]]; then
-  echo "Resolving latest release..."
+  echo "Resolving latest ${channel:-stable} release..."
   VERSION="$(resolve_latest_version)"
+elif [[ "$channel" == dev ]]; then
+  VERSION="${VERSION%-dev}-dev"
+  export OKTOPUS_STACK_IMAGE_TAG="$VERSION"
 fi
 
 INSTALL_DIR="$(mkdir -p "$INSTALL_DIR" && cd "$INSTALL_DIR" && pwd)"
@@ -137,7 +259,10 @@ should_download=true
 if [[ -f "$INSTALL_DIR/docker-compose.yml" && "$FORCE" == false ]]; then
   if [[ -f "$MARKER" ]] && [[ "$(cat "$MARKER")" == "$VERSION" ]]; then
     should_download=false
-  elif [[ ! -f "$MARKER" ]]; then
+  elif [[ ! -f "$MARKER" && "$channel" == dev && -e "$INSTALL_DIR/.git" ]]; then
+    echo 'Use --dir with a separate directory, or --force to replace files in this checkout.' >&2
+    exit 1
+  elif [[ ! -f "$MARKER" && "$channel" != dev ]]; then
     echo "Install directory already contains compose files; use --force to replace or set --version."
     should_download=false
   fi
@@ -166,4 +291,5 @@ if [[ "$FETCH_ONLY" == true ]]; then
 fi
 
 cd "$INSTALL_DIR"
-exec "$INSTALL_DIR/scripts/stack-up.sh" "${STACK_UP_ARGS[@]+"${STACK_UP_ARGS[@]}"}"
+export OKTOPUS_STACK_ROOT="$INSTALL_DIR"
+exec bash "${local_runner:-$INSTALL_DIR/scripts/stack-up.sh}" "${STACK_UP_ARGS[@]+"${STACK_UP_ARGS[@]}"}"

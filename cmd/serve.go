@@ -12,15 +12,16 @@ import (
 	"syscall"
 	"time"
 
-	apiconfig "oktopus/internal/api/config"
 	"oktopus/internal/api"
+	apiconfig "oktopus/internal/api/config"
 	"oktopus/internal/db"
 	proxyinstancesservice "oktopus/internal/db/proxyinstances/service"
-	proxyserver "oktopus/internal/proxy/server"
 	"oktopus/internal/proxy"
 	"oktopus/internal/proxy/accesslog"
 	"oktopus/internal/proxy/forbidden"
 	"oktopus/internal/proxy/gateway"
+	"oktopus/internal/proxy/metrics"
+	proxyserver "oktopus/internal/proxy/server"
 	"oktopus/internal/startup"
 )
 
@@ -29,8 +30,14 @@ const panicRecoveryDelay = 5 * time.Second
 func runServe(args []string) int {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	migrations := fs.String("migrations", "db/migrations", "каталог goose-миграций")
+	accessLogMaxBatch := fs.Int("access-log-max-batch", 32_768, "максимум записей в одной пачке журнала доступа")
+	accessLogMaxWait := fs.Duration("access-log-max-wait", 9*time.Second, "максимальное окно накопления журнала доступа (от 3s)")
 	fs.SetOutput(os.Stderr)
 	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *accessLogMaxBatch < 1 || *accessLogMaxWait < 3*time.Second {
+		log.Print("serve: -access-log-max-batch должен быть больше нуля, -access-log-max-wait должен быть не меньше 3s")
 		return 2
 	}
 
@@ -74,7 +81,10 @@ func runServe(args []string) int {
 	accessBatcher := accesslog.NewBatcher(func(flushCtx context.Context, batch []accesslog.Entry) error {
 		return rt.ProxyAccessLog.FlushAccessLog(flushCtx, batch)
 	}, accesslog.BatcherConfig{
-		OnFlushError: func(err error) { logger.Printf("access log flush: %v", err) },
+		MaxBatch:         *accessLogMaxBatch,
+		MaxFlushInterval: *accessLogMaxWait,
+		RequestsPerSec:   metrics.DefaultRegistry().RecentRequestsPerSec,
+		OnFlushError:     func(err error) { logger.Printf("access log flush: %v", err) },
 	})
 	defer accessBatcher.Close()
 	fleet.SetAccessRecorder(accessBatcher)

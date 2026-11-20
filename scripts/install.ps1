@@ -5,6 +5,7 @@ param(
     [switch] $Force,
     [switch] $FetchOnly,
     [switch] $Fetch,
+    [switch] $LocalStack,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]] $StackUpArgs
 )
@@ -20,6 +21,7 @@ Usage: install.ps1 [-Version VER] [-InstallDir PATH] [-Force] [-FetchOnly] [-Fet
   then runs scripts\stack-up.bat.
 
   stack-up: -WriteEnvOnly maps to --write-env-only; -Build maps to --build
+  Set TAG=dev in .env to use dev prereleases and images.
 
 Environment: OKTOPUS_VERSION, OKTOPUS_INSTALL_DIR, OKTOPUS_GITHUB_REPO
 
@@ -36,29 +38,124 @@ if ($StackUpArgs -contains '-h' -or $StackUpArgs -contains '--help' -or $StackUp
     exit 0
 }
 
-$scriptDir = $PSScriptRoot
-if ($scriptDir -and (Test-Path -LiteralPath (Join-Path $scriptDir '..\docker-compose.yml'))) {
-    $repoRoot = (Resolve-Path (Join-Path $scriptDir '..')).Path
-    if (-not $Fetch -and -not $Version -and -not $Force) {
-        Write-Host "Using local checkout at $repoRoot (pass -Fetch to download a release bundle instead)."
-        Push-Location $repoRoot
-        try {
-            $bat = Join-Path $repoRoot 'scripts\stack-up.bat'
-            if ($StackUpArgs.Count -gt 0) {
-                & $bat @StackUpArgs
-            } else {
-                & $bat
+function Invoke-Docker {
+    & docker @args
+    if ($LASTEXITCODE -ne 0) { throw "Docker command failed ($LASTEXITCODE)." }
+}
+
+function Start-InstallStack ($Root) {
+    $runner = Join-Path $Root 'scripts\stack-up.ps1'
+    if ($localRunner -and (Test-Path -LiteralPath $localRunner)) {
+        $runner = $localRunner
+    }
+    if (Test-Path -LiteralPath $runner) {
+        & $runner -Root $Root -Config $config -Project $project -Channel $channel -ImageTag $imageTag `
+            -WriteOnly:($StackUpArgs -contains '--write-env-only' -or $StackUpArgs -contains '-WriteEnvOnly') `
+            -Build:($StackUpArgs -contains '--build' -or $StackUpArgs -contains '-Build')
+    } else {
+        & (Join-Path $Root 'scripts\stack-up.bat') @StackUpArgs
+        if ($LASTEXITCODE -ne 0) { throw "Stack startup failed ($LASTEXITCODE)." }
+    }
+}
+
+$project = 'oktopus-onprem'
+$stateDir = Join-Path $env:ProgramData 'Oktopus'
+$config = Join-Path $stateDir 'stack.env'
+$locationFile = Join-Path $stateDir 'install-dir'
+$repoRoot = $null
+$localRunner = $null
+if ($PSScriptRoot -and (Test-Path -LiteralPath (Join-Path $PSScriptRoot '..\docker-compose.yml'))) {
+    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    $localRunner = Join-Path $PSScriptRoot 'stack-up.ps1'
+}
+
+if (-not $FetchOnly -and $StackUpArgs -notcontains '--write-env-only' -and $StackUpArgs -notcontains '-WriteEnvOnly') {
+    $filter = "label=com.docker.compose.project=$project"
+    $containers = @(Invoke-Docker ps -aq --filter $filter)
+    $installedDir = $null
+    if ($containers.Count) {
+        $container = (Invoke-Docker inspect $containers[0] | Out-String | ConvertFrom-Json)[0]
+        $installedDir = $container.Config.Labels.'com.docker.compose.project.working_dir'
+        if (-not $installedDir -or -not [IO.Path]::IsPathRooted($installedDir)) {
+            throw 'Cannot determine the Oktopus installation directory.'
+        }
+    } elseif ((Test-Path -LiteralPath $locationFile) -and @(Invoke-Docker volume ls -q --filter $filter).Count) {
+        $installedDir = (Get-Content -LiteralPath $locationFile -Raw).TrimEnd("`r", "`n")
+    }
+
+    if ($installedDir) {
+        Write-Host "Oktopus installation: $installedDir"
+        switch (Read-Host 'Update [u], delete [d], or cancel [Enter]') {
+            'u' {
+                $InstallDir = $repoRoot = $installedDir
+                if (-not $LocalStack -and (Test-Path -LiteralPath (Join-Path $installedDir '.oktopus-bundle-version'))) {
+                    $Fetch = $true
+                }
             }
-            exit $LASTEXITCODE
-        } finally {
-            Pop-Location
+            'd' {
+                if ((Read-Host 'Type delete to permanently remove Oktopus Docker volumes and their data') -cne 'delete') { exit 0 }
+                if ($containers.Count) {
+                    $images = @(Invoke-Docker inspect --format '{{.Image}}' @containers | Sort-Object -Unique)
+                    Invoke-Docker rm -f @containers
+                    foreach ($image in $images) {
+                        if (@(Invoke-Docker ps -aq --filter "ancestor=$image").Count) { continue }
+                        & docker image rm $image
+                        if ($LASTEXITCODE -ne 0) { Write-Warning "Image retained: $image" }
+                    }
+                }
+                $volumes = @(Invoke-Docker volume ls -q --filter $filter)
+                if ($volumes.Count) { Invoke-Docker volume rm @volumes }
+                $networks = @(Invoke-Docker network ls -q --filter $filter)
+                if ($networks.Count) { Invoke-Docker network rm @networks }
+                foreach ($file in @($config, $locationFile)) {
+                    if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file -Force }
+                }
+                exit 0
+            }
+            default { exit 0 }
         }
     }
+}
+
+function Read-Channel ($Path) {
+    if (Test-Path -LiteralPath $Path -PathType Leaf) {
+        foreach ($line in Get-Content -LiteralPath $Path) {
+            if ($line -cmatch '^\s*TAG\s*=\s*[''"]?(dev|stable)[''"]?\s*(?:#.*)?$') { $Matches[1] }
+        }
+    }
+}
+
+$channel = Read-Channel (Join-Path (Get-Location).Path '.env') | Select-Object -Last 1
+if (-not $channel) { $channel = Read-Channel (Join-Path $InstallDir '.env') | Select-Object -Last 1 }
+if (-not $channel -and $repoRoot) { $channel = Read-Channel (Join-Path $repoRoot '.env') | Select-Object -Last 1 }
+$marker = Join-Path $InstallDir '.oktopus-bundle-version'
+$Version = $Version -replace '^v', ''
+if ($channel -eq 'dev' -or $Version -like '*-dev') {
+    $channel = 'dev'
+    $Fetch = $true
+} elseif ((Test-Path -LiteralPath $marker) -and (Get-Content -LiteralPath $marker -Raw).Trim() -like '*-dev') {
+    if ($channel -eq 'stable') { $Fetch = $true }
+    elseif (-not $channel) { $channel = 'dev' }
+}
+$imageTag = 'latest'
+
+if ($repoRoot -and -not $FetchOnly -and -not $Fetch -and ($LocalStack -or (-not $Version -and -not $Force))) {
+    Start-InstallStack $repoRoot
+    exit 0
 }
 
 function Get-LatestVersion {
     param([string] $Repository)
     $uri = "https://api.github.com/repos/$Repository/releases/latest"
+    if ($channel -eq 'dev') {
+        $uri = "https://api.github.com/repos/$Repository/releases"
+        for ($page = 1; ; $page++) {
+            $releases = Invoke-RestMethod -Uri "${uri}?per_page=100&page=$page" -Headers @{ 'User-Agent' = 'oktopus-install' }
+            $latest = $releases | Where-Object { $_.prerelease -and $_.tag_name -like 'v*-dev' } | Select-Object -First 1
+            if ($latest) { return ($latest.tag_name -replace '^v', '') }
+            if (@($releases).Count -lt 100) { throw 'No dev prerelease found.' }
+        }
+    }
     $release = Invoke-RestMethod -Uri $uri -Headers @{ 'User-Agent' = 'oktopus-install' }
     if (-not $release.tag_name) {
         throw 'Could not read latest release tag from GitHub.'
@@ -71,9 +168,13 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 }
 
 if ($Version) {
-    $Version = $Version -replace '^v', ''
+    if ($channel -eq 'dev') {
+        $Version = ($Version -replace '-dev$', '') + '-dev'
+        $imageTag = $Version
+    }
 } else {
-    Write-Host 'Resolving latest release...'
+    $releaseChannel = if ($channel) { $channel } else { 'stable' }
+    Write-Host "Resolving latest $releaseChannel release..."
     $Version = Get-LatestVersion -Repository $Repo
 }
 
@@ -95,7 +196,9 @@ $composeFile = Join-Path $installPath 'docker-compose.yml'
 if ((Test-Path -LiteralPath $composeFile) -and -not $Force) {
     if ((Test-Path -LiteralPath $marker) -and ((Get-Content -LiteralPath $marker -Raw).Trim() -eq $Version)) {
         $shouldDownload = $false
-    } elseif (-not (Test-Path -LiteralPath $marker)) {
+    } elseif (-not (Test-Path -LiteralPath $marker) -and $channel -eq 'dev' -and (Test-Path -LiteralPath (Join-Path $installPath '.git'))) {
+        throw 'Use -InstallDir with a separate directory, or -Force to replace files in this checkout.'
+    } elseif (-not (Test-Path -LiteralPath $marker) -and $channel -ne 'dev') {
         Write-Host 'Install directory already contains compose files; use -Force to replace or set -Version.'
         $shouldDownload = $false
     }
@@ -111,6 +214,7 @@ if ($shouldDownload) {
     }
     Write-Host "Extracting to $installPath"
     tar -xzf $tmp -C $installPath
+    if ($LASTEXITCODE -ne 0) { throw "Could not extract the release to $installPath." }
     Set-Content -LiteralPath $marker -Value $Version -NoNewline
     Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
 }
@@ -120,15 +224,5 @@ if ($FetchOnly) {
     exit 0
 }
 
-Push-Location $installPath
-try {
-    $bat = Join-Path $installPath 'scripts\stack-up.bat'
-    if ($StackUpArgs.Count -gt 0) {
-        & $bat @StackUpArgs
-    } else {
-        & $bat
-    }
-    exit $LASTEXITCODE
-} finally {
-    Pop-Location
-}
+Start-InstallStack $installPath
+exit 0
