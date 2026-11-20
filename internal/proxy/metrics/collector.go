@@ -133,6 +133,18 @@ func ObserveInspect(ctx context.Context, spend time.Duration, parts InspectParts
 	collectorFromContext(ctx).observeInspect(spend, parts)
 }
 
+// ObserveInspectWithPolicy records both samples under one collector lock.
+func ObserveInspectWithPolicy(ctx context.Context, spend time.Duration, parts InspectParts, total time.Duration) {
+	c := collectorFromContext(ctx)
+	sample := inspectSample{ns: max(0, spend.Nanoseconds()), parts: parts.toNanos()}
+	now := time.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.inspectRecent.push(sample)
+	c.policyRecent.push(max(0, total.Nanoseconds()))
+	c.maybePruneLocked(now)
+}
+
 // ObserveInspectDeny — итоговый deny после ACL allow (правило инспекции или сбой Lua).
 func ObserveInspectDeny(ctx context.Context) {
 	collectorFromContext(ctx).reclassifyACLAllowAsDeny()

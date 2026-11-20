@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI: tarball for GitHub Release (compose + stack scripts + ClickHouse init).
+# CI: tarball for GitHub Release (compose + stack scripts + ClickHouse configuration).
 set -euo pipefail
 
 VERSION="${1:?usage: ci-release-bundle.sh <semver>}"
@@ -21,6 +21,6 @@ tar -czf "$OUT" \
   scripts/install.sh \
   scripts/install.ps1 \
   scripts/install.bat \
-  deploy/clickhouse/init
+  deploy/clickhouse
 
 echo "bundle=$OUT"

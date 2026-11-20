@@ -11,7 +11,7 @@ import (
 const dstResolveCacheTTL = 3 * time.Minute
 
 type dstResolveCache struct {
-	mu      sync.Mutex
+	mu      sync.RWMutex
 	entries map[string]dstResolveCacheEntry
 }
 
@@ -53,17 +53,19 @@ func lookupDstIPsCached(ctx context.Context, host string) ([]net.IP, error) {
 		return nil, nil
 	}
 	now := time.Now()
-	dstResolveCacheStore.mu.Lock()
-	dstResolveCacheStore.ensureEntries()
-	if e, ok := dstResolveCacheStore.entries[key]; ok {
+	dstResolveCacheStore.mu.RLock()
+	e, ok := dstResolveCacheStore.entries[key]
+	dstResolveCacheStore.mu.RUnlock()
+	if ok {
 		if now.Before(e.expires) {
-			ips := cloneIPs(e.ips)
-			dstResolveCacheStore.mu.Unlock()
-			return ips, nil
+			return cloneIPs(e.ips), nil
 		}
-		delete(dstResolveCacheStore.entries, key)
+		dstResolveCacheStore.mu.Lock()
+		if current, exists := dstResolveCacheStore.entries[key]; exists && !now.Before(current.expires) {
+			delete(dstResolveCacheStore.entries, key)
+		}
+		dstResolveCacheStore.mu.Unlock()
 	}
-	dstResolveCacheStore.mu.Unlock()
 
 	ips, err := dstLookup(ctx, host)
 	if err != nil || len(ips) == 0 {
@@ -71,6 +73,7 @@ func lookupDstIPsCached(ctx context.Context, host string) ([]net.IP, error) {
 	}
 	stored := cloneIPs(ips)
 	dstResolveCacheStore.mu.Lock()
+	dstResolveCacheStore.ensureEntries()
 	dstResolveCacheStore.entries[key] = dstResolveCacheEntry{
 		ips:     stored,
 		expires: now.Add(dstResolveCacheTTL),

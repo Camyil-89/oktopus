@@ -1,7 +1,6 @@
 package bytecount
 
 import (
-	"bytes"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -13,8 +12,8 @@ import (
 // clientConn считает байты на границе прокси↔клиент (как в CONNECT tunnel).
 type clientConn struct {
 	net.Conn
-	instanceID    uuid.UUID
-	sessionDenied bool
+	instanceID      uuid.UUID
+	sessionDenied   bool
 	nextWriteDenied atomic.Bool
 }
 
@@ -139,11 +138,19 @@ func ObserveRequestLineHeadersInstance(r *http.Request, instanceID uuid.UUID, de
 	if r == nil || r.URL == nil {
 		return
 	}
-	var b bytes.Buffer
-	b.WriteString(r.Method)
-	b.WriteByte(' ')
-	b.WriteString(r.URL.String())
-	b.WriteString("\r\n")
-	_ = r.Header.Write(&b)
-	observeUpInstance(instanceID, b.Len(), denied)
+	n := byteLength(len(r.Method) + len(r.URL.String()) + len(" \r\n"))
+	_ = r.Header.Write(&n)
+	observeUpInstance(instanceID, int(n), denied)
+}
+
+type byteLength int
+
+func (n *byteLength) Write(p []byte) (int, error) {
+	*n += byteLength(len(p))
+	return len(p), nil
+}
+
+func (n *byteLength) WriteString(s string) (int, error) {
+	*n += byteLength(len(s))
+	return len(s), nil
 }

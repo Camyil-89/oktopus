@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -17,7 +18,7 @@ func NewRegistry() *Registry {
 }
 
 type Registry struct {
-	mu   sync.Mutex
+	mu   sync.RWMutex
 	byID map[uuid.UUID]*Collector
 }
 
@@ -26,9 +27,15 @@ func DefaultRegistry() *Registry {
 }
 
 func (r *Registry) Collector(id uuid.UUID) *Collector {
+	r.mu.RLock()
+	c, ok := r.byID[id]
+	r.mu.RUnlock()
+	if ok {
+		return c
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	c, ok := r.byID[id]
+	c, ok = r.byID[id]
 	if !ok {
 		c = NewCollector()
 		r.byID[id] = c
@@ -40,6 +47,25 @@ func (r *Registry) Drop(id uuid.UUID) {
 	r.mu.Lock()
 	delete(r.byID, id)
 	r.mu.Unlock()
+}
+
+// RecentRequestsPerSec counts proxy decisions over five completed second buckets.
+func (r *Registry) RecentRequestsPerSec() float64 {
+	now := time.Now().Unix()
+	const window = 5
+	var requests int64
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, c := range r.byID {
+		c.mu.Lock()
+		for sec := now - window; sec < now; sec++ {
+			if b := c.bySec[sec]; b != nil {
+				requests += b.requests
+			}
+		}
+		c.mu.Unlock()
+	}
+	return float64(requests) / window
 }
 
 func collectorFromContext(ctx context.Context) *Collector {
