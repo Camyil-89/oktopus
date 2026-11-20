@@ -141,11 +141,25 @@
 
             <h2 id="qs-req">Requirements</h2>
             <ul>
-              <li>Git and <a href="https://docs.docker.com/compose/">Docker Compose</a> (<code>docker compose</code>).</li>
-              <li>Windows: Docker Desktop and <code>docker-compose.desktop.yml</code>. Linux: root <code>docker-compose.yml</code>.</li>
+              <li><a href="https://docs.docker.com/compose/">Docker Compose</a> (<code>docker compose</code>); Git is optional if you use the one-command installer.</li>
+              <li>Windows: Docker Desktop. Linux: <code>docker-compose.yml</code> from the release bundle or repository.</li>
             </ul>
 
-            <h2 id="qs-clone">Clone</h2>
+            <h2 id="qs-install">One-command install</h2>
+            <p>The minimal deploy set (compose, ClickHouse init, <code>stack-up</code>) is attached to each <a href="https://github.com/Camyil-89/oktopus/releases">GitHub Release</a> as <code>oktopus-&lt;version&gt;-deploy.tar.gz</code>. <code>scripts/install.sh</code> (or <code>install.ps1</code>) downloads that archive, extracts it (default <code>./oktopus</code>), and runs <code>stack-up</code> with a registry pull for GHCR images.</p>
+            <div class="code">
+              <div class="code-head"><span class="code-name">bash</span><button type="button" class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+              <pre><code>curl -fsSL https://raw.githubusercontent.com/Camyil-89/oktopus/main/scripts/install.sh | bash</code></pre>
+            </div>
+            <p>Pin a version: <code>curl -fsSL ... | bash -s -- --version 1.2.3</code>. Install dir: <code>OKTOPUS_INSTALL_DIR=/opt/oktopus</code> or <code>--dir /opt/oktopus</code>. Download only: <code>--fetch-only</code>. Non-interactive: set <code>OKTOPUS_API_HOST</code> and <code>OKTOPUS_API_PORT</code> before running.</p>
+            <p>Windows (PowerShell):</p>
+            <div class="code">
+              <div class="code-head"><span class="code-name">PowerShell</span><button type="button" class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+              <pre><code>irm https://raw.githubusercontent.com/Camyil-89/oktopus/main/scripts/install.ps1 | iex</code></pre>
+            </div>
+            <p>From a git checkout, <code>./scripts/install.sh</code> without <code>--fetch</code> delegates to <code>stack-up.sh</code> (handy when developing).</p>
+
+            <h2 id="qs-clone">Clone (optional)</h2>
             <div class="code">
               <div class="code-head"><span class="code-name">shell</span><button type="button" class="copy-btn" onclick="copyCode(this)">Copy</button></div>
               <pre><code>git clone https://github.com/Camyil-89/oktopus.git

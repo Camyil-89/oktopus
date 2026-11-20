@@ -14,11 +14,25 @@
 
             <h2 id="qs-req">Что нужно</h2>
             <ul>
-              <li>Git и <a href="https://docs.docker.com/compose/">Docker Compose</a> (команда <code>docker compose</code>).</li>
-              <li>На Windows — Docker Desktop; на Linux — обычный <code>docker-compose.yml</code> в корне репозитория.</li>
+              <li><a href="https://docs.docker.com/compose/">Docker Compose</a> (команда <code>docker compose</code>); для установки одной командой Git не обязателен.</li>
+              <li>На Windows — Docker Desktop; на Linux — <code>docker-compose.yml</code> из release-архива или репозитория.</li>
             </ul>
 
-            <h2 id="qs-clone">Клонирование</h2>
+            <h2 id="qs-install">Установка одной командой</h2>
+            <p>Минимальный набор (compose, init ClickHouse, <code>stack-up</code>) публикуется в <a href="https://github.com/Camyil-89/oktopus/releases">GitHub Release</a> как <code>oktopus-&lt;версия&gt;-deploy.tar.gz</code>. Скрипт <code>scripts/install.sh</code> (или <code>install.ps1</code>) скачивает архив, распаковывает в каталог (по умолчанию <code>./oktopus</code>) и запускает <code>stack-up</code> с pull образов из GHCR.</p>
+            <div class="code">
+              <div class="code-head"><span class="code-name">bash</span><button type="button" class="copy-btn" onclick="copyCode(this)">Копировать</button></div>
+              <pre><code>curl -fsSL https://raw.githubusercontent.com/Camyil-89/oktopus/main/scripts/install.sh | bash</code></pre>
+            </div>
+            <p>Конкретная версия: <code>curl -fsSL ... | bash -s -- --version 1.2.3</code>. Каталог: <code>OKTOPUS_INSTALL_DIR=/opt/oktopus</code> или <code>--dir /opt/oktopus</code>. Только скачать без запуска: <code>--fetch-only</code>. Без вопросов: задайте <code>OKTOPUS_API_HOST</code> и <code>OKTOPUS_API_PORT</code> в окружении до запуска.</p>
+            <p>Windows (PowerShell):</p>
+            <div class="code">
+              <div class="code-head"><span class="code-name">PowerShell</span><button type="button" class="copy-btn" onclick="copyCode(this)">Копировать</button></div>
+              <pre><code>irm https://raw.githubusercontent.com/Camyil-89/oktopus/main/scripts/install.ps1 | iex</code></pre>
+            </div>
+            <p>Локально из репозитория: <code>./scripts/install.sh</code> без <code>--fetch</code> сразу вызовет <code>stack-up.sh</code> (удобно при разработке).</p>
+
+            <h2 id="qs-clone">Клонирование (опционально)</h2>
             <div class="code">
               <div class="code-head"><span class="code-name">shell</span><button type="button" class="copy-btn" onclick="copyCode(this)">Копировать</button></div>
               <pre><code>git clone https://github.com/Camyil-89/oktopus.git

@@ -114,6 +114,7 @@ irm https://raw.githubusercontent.com/Camyil-89/oktopus/main/scripts/install.ps1
 ```bash
 git clone https://github.com/Camyil-89/oktopus.git
 cd oktopus
+bash ./scripts/install.sh
 ```
 
 Дальше — по инструкции для вашей ОС в документации.
