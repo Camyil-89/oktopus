@@ -1,6 +1,8 @@
 package squid_test
 
 import (
+	"bytes"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -8,6 +10,7 @@ import (
 	"oktopus/internal/proxy/acl"
 	"oktopus/internal/proxy/acl/squid"
 	"oktopus/internal/proxy/auth"
+	"oktopus/internal/proxy/ratelimit"
 )
 
 func TestCompileDelayPools(t *testing.T) {
@@ -66,6 +69,78 @@ http_access allow all
 	}
 	if d := time.Since(start); d < 800*time.Millisecond {
 		t.Fatalf("expected ~1s throttle for 20KiB at 10KiB/s, got %v", d)
+	}
+}
+
+func TestDelayACLListLimitsUploadAndDownload(t *testing.T) {
+	tests := []struct {
+		name     string
+		transfer func(t *testing.T, f *ratelimit.Flow) time.Duration
+	}{
+		{name: "download", transfer: func(t *testing.T, f *ratelimit.Flow) time.Duration {
+			payload := bytes.Repeat([]byte("d"), 4<<10)
+			start := time.Now()
+			got, err := io.ReadAll(f.Reader(bytes.NewReader(payload)))
+			if err != nil {
+				t.Fatalf("read limited download: %v", err)
+			}
+			if !bytes.Equal(got, payload) {
+				t.Fatalf("download body mismatch: got %d bytes, want %d", len(got), len(payload))
+			}
+			return time.Since(start)
+		}},
+		{name: "upload", transfer: func(t *testing.T, f *ratelimit.Flow) time.Duration {
+			payload := bytes.Repeat([]byte("u"), 4<<10)
+			var dst bytes.Buffer
+			start := time.Now()
+			n, err := f.Writer(&dst).Write(payload)
+			if err != nil {
+				t.Fatalf("write limited upload: %v", err)
+			}
+			if n != len(payload) || !bytes.Equal(dst.Bytes(), payload) {
+				t.Fatalf("upload body mismatch: wrote %d bytes, got %d, want %d", n, dst.Len(), len(payload))
+			}
+			return time.Since(start)
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := `
+acl all all
+acl throttled src 127.0.0.1
+delay_pools 1
+delay_class 1 1
+delay_parameters 1 65536/1024
+delay_access 1 allow throttled
+http_access allow all
+`
+			engine, err := squid.Compile(cfg, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			flow := engine.DelayFlow(auth.Identity{}, acl.RequestFields{
+				SNI: "transfer.test", DstPort: 443, SrcIP: net.ParseIP("127.0.0.1"),
+			}, acl.SquidPhaseHTTP)
+			if flow == nil {
+				t.Fatal("delay_access ACL list did not select a rate-limit pool")
+			}
+			if unmatched := engine.DelayFlow(auth.Identity{}, acl.RequestFields{
+				SNI: "transfer.test", DstPort: 443, SrcIP: net.ParseIP("192.0.2.1"),
+			}, acl.SquidPhaseHTTP); unmatched != nil {
+				t.Fatal("non-matching ACL list unexpectedly selected a rate-limit pool")
+			}
+
+			elapsed := tt.transfer(t, flow)
+			// delay_parameters gives a 512-byte initial burst; the remaining
+			// 3.5 KiB at 64 KiB/s should take about 55 ms.
+			if elapsed < 25*time.Millisecond {
+				t.Fatalf("ACL-selected rate limit did not delay transfer enough: %v", elapsed)
+			}
+			if elapsed > time.Second {
+				t.Fatalf("ACL-selected rate limit delayed 4 KiB unexpectedly long: %v", elapsed)
+			}
+		})
 	}
 }
 
