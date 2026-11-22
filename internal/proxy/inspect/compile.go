@@ -20,8 +20,9 @@ type CompiledRule struct {
 
 // Program — скомпилированный набор Lua-правил.
 type Program struct {
-	source string
-	rules  []CompiledRule
+	source        string
+	rules         []CompiledRule
+	functionNames []string
 }
 
 type ruleSource struct {
@@ -54,6 +55,7 @@ func CompileProgram(rules []ruleSource) (*Program, error) {
 		return &Program{}, nil
 	}
 	compiled := make([]CompiledRule, 0, len(rules))
+	functionNames := make([]string, len(rules))
 	var b strings.Builder
 	for i, r := range rules {
 		script := strings.TrimSpace(r.Script)
@@ -71,6 +73,7 @@ func CompileProgram(rules []ruleSource) (*Program, error) {
 			Name:   r.Name,
 			Action: r.Action,
 		})
+		functionNames[i] = fmtInspectFn(i)
 		fmt.Fprintf(&b, "-- rule %d: %s\n", i, r.Name)
 		fmt.Fprintf(&b, "inspect_%d = (function()\n", i)
 		b.WriteString(script)
@@ -80,7 +83,7 @@ func CompileProgram(rules []ruleSource) (*Program, error) {
 	if err := validateCombined(full); err != nil {
 		return nil, err
 	}
-	return &Program{source: full, rules: compiled}, nil
+	return &Program{source: full, rules: compiled, functionNames: functionNames}, nil
 }
 
 func validateScript(script string) error {

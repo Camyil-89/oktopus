@@ -2,7 +2,6 @@ package auth
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"sync"
 	"time"
 )
@@ -11,7 +10,7 @@ import (
 type AuthCache struct {
 	ttl     time.Duration
 	mu      sync.Mutex
-	entries map[string]cacheEntry
+	entries map[[sha256.Size]byte]cacheEntry
 }
 
 type cacheEntry struct {
@@ -26,7 +25,7 @@ func NewAuthCache(ttl time.Duration) *AuthCache {
 	}
 	return &AuthCache{
 		ttl:     ttl,
-		entries: make(map[string]cacheEntry),
+		entries: make(map[[sha256.Size]byte]cacheEntry),
 	}
 }
 
@@ -73,7 +72,7 @@ func (c *AuthCache) Clear() {
 		return
 	}
 	c.mu.Lock()
-	c.entries = make(map[string]cacheEntry)
+	c.entries = make(map[[sha256.Size]byte]cacheEntry)
 	c.mu.Unlock()
 }
 
@@ -87,11 +86,22 @@ func (c *AuthCache) Reconfigure(ttl time.Duration) {
 	}
 	c.mu.Lock()
 	c.ttl = ttl
-	c.entries = make(map[string]cacheEntry)
+	c.entries = make(map[[sha256.Size]byte]cacheEntry)
 	c.mu.Unlock()
 }
 
-func cacheKey(username, password string) string {
-	sum := sha256.Sum256([]byte(username + "\x00" + password))
-	return hex.EncodeToString(sum[:])
+func cacheKey(username, password string) [sha256.Size]byte {
+	const stackBufferSize = 256
+	var stack [stackBufferSize]byte
+	inputLen := len(username) + 1 + len(password)
+	var input []byte
+	if inputLen <= len(stack) {
+		input = stack[:0:inputLen]
+	} else {
+		input = make([]byte, 0, inputLen)
+	}
+	input = append(input, username...)
+	input = append(input, 0)
+	input = append(input, password...)
+	return sha256.Sum256(input)
 }

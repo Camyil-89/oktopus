@@ -4,7 +4,7 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-func mergeLogScratch(scratch map[string]any, L *lua.LState, idx int) {
+func mergeLogScratch(scratch *map[string]any, L *lua.LState, idx int) {
 	if scratch == nil {
 		return
 	}
@@ -15,15 +15,22 @@ func mergeLogScratch(scratch map[string]any, L *lua.LState, idx int) {
 			if !ok {
 				return
 			}
-			scratch[key] = luaValueToGo(v)
+			if *scratch == nil {
+				*scratch = make(map[string]any)
+			}
+			(*scratch)[key] = luaValueToGo(v)
 		})
 		return
 	}
-	key := L.CheckString(idx)
 	if L.GetTop() < idx+1 {
 		return
 	}
-	scratch[key] = luaValueToGo(L.Get(idx + 1))
+	key := L.CheckString(idx)
+	value := luaValueToGo(L.Get(idx + 1))
+	if *scratch == nil {
+		*scratch = make(map[string]any)
+	}
+	(*scratch)[key] = value
 }
 
 func luaKeyString(v lua.LValue) (string, bool) {

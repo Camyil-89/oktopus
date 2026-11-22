@@ -61,19 +61,24 @@ func (r *Runner) Eval(c RequestContext) (MatchResult, error) {
 		_ = L.DoString(r.program.source)
 	}
 	defer r.pool.Put(L)
+	c.Method = strings.ToUpper(c.Method)
+	ctxFuncs := newRequestContextFuncs(L, c)
 
 	var lastAllow MatchResult
-	ruleLogs := make(map[string]map[string]any)
+	var ruleLogs map[string]map[string]any
 
 	for i, rule := range r.program.rules {
-		fn := L.GetGlobal(fmtInspectFn(i))
+		fn := L.GetGlobal(r.program.functionNames[i])
 		if fn.Type() != lua.LTFunction {
 			continue
 		}
-		scratch := make(map[string]any)
+		var scratch map[string]any
 		L.Push(fn)
-		pushRequestContext(L, c, scratch)
+		pushRequestContext(L, c, &scratch, ctxFuncs)
 		if err := L.PCall(1, 1, nil); err != nil {
+			if ruleLogs == nil {
+				ruleLogs = make(map[string]map[string]any)
+			}
 			return MatchResult{RuleLogs: ruleLogs}, err
 		}
 		matched := false
@@ -82,12 +87,18 @@ func (r *Runner) Eval(c RequestContext) (MatchResult, error) {
 			L.Pop(1)
 		}
 		if len(scratch) > 0 {
+			if ruleLogs == nil {
+				ruleLogs = make(map[string]map[string]any)
+			}
 			ruleLogs[rule.ID.String()] = scratch
 		}
 		if !matched {
 			continue
 		}
 		if rule.Action == 0 {
+			if ruleLogs == nil {
+				ruleLogs = make(map[string]map[string]any)
+			}
 			return MatchResult{
 				Matched:  true,
 				Deny:     true,
@@ -105,6 +116,10 @@ func (r *Runner) Eval(c RequestContext) (MatchResult, error) {
 		}
 	}
 	if lastAllow.Matched {
+		if ruleLogs == nil {
+			ruleLogs = make(map[string]map[string]any)
+		}
+		lastAllow.RuleLogs = ruleLogs
 		return lastAllow, nil
 	}
 	if len(ruleLogs) > 0 {

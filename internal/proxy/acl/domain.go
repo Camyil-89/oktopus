@@ -85,16 +85,21 @@ func (idx *sniIndex) hasMatch(sniLower string) bool {
 	if _, ok := idx.exact[sniLower]; ok {
 		return true
 	}
-	labels := domainLabels(sniLower)
-	if len(labels) == 0 {
+	host := strings.Trim(sniLower, ".")
+	if host == "" {
 		return false
 	}
+	labelCount := strings.Count(host, ".") + 1
 	node := &idx.root
-	for i := len(labels) - 1; i >= 0; i-- {
+	end := len(host)
+	for i := end - 1; i >= 0; i-- {
+		if host[i] != '.' {
+			continue
+		}
 		if node.children == nil {
 			break
 		}
-		child := node.children[labels[i]]
+		child := node.children[host[i+1:end]]
 		if child == nil {
 			break
 		}
@@ -102,8 +107,16 @@ func (idx *sniIndex) hasMatch(sniLower string) bool {
 		if node.suffixRule >= 0 {
 			return true
 		}
-		if node.wildRule >= 0 && len(labels) > node.suffixDepth {
+		if node.wildRule >= 0 && labelCount > node.suffixDepth {
 			return true
+		}
+		end = i
+	}
+	if node.children != nil {
+		if child := node.children[host[:end]]; child != nil {
+			if child.suffixRule >= 0 || child.wildRule >= 0 && labelCount > child.suffixDepth {
+				return true
+			}
 		}
 	}
 	return false
