@@ -1,14 +1,36 @@
 package inspect
 
 import (
-	"strings"
-
 	lua "github.com/yuin/gopher-lua"
 )
 
-func pushRequestContext(L *lua.LState, c RequestContext, logScratch map[string]any) {
+type requestContextFuncs struct {
+	header   *lua.LFunction
+	hasGroup *lua.LFunction
+}
+
+func newRequestContextFuncs(L *lua.LState, c RequestContext) requestContextFuncs {
+	return requestContextFuncs{
+		header: L.NewFunction(func(L *lua.LState) int {
+			name := luaStringArg(L, 1)
+			L.Push(lua.LString(c.Header(name)))
+			return 1
+		}),
+		hasGroup: L.NewFunction(func(L *lua.LState) int {
+			name := luaStringArg(L, 1)
+			if c.HasGroup(name) {
+				L.Push(lua.LTrue)
+			} else {
+				L.Push(lua.LFalse)
+			}
+			return 1
+		}),
+	}
+}
+
+func pushRequestContext(L *lua.LState, c RequestContext, logScratch *map[string]any, funcs requestContextFuncs) {
 	t := L.NewTable()
-	L.SetField(t, "method", lua.LString(strings.ToUpper(c.Method)))
+	L.SetField(t, "method", lua.LString(c.Method))
 	L.SetField(t, "host", lua.LString(c.Host))
 	L.SetField(t, "path", lua.LString(c.Path))
 	L.SetField(t, "url", lua.LString(c.URL))
@@ -29,20 +51,8 @@ func pushRequestContext(L *lua.LState, c RequestContext, logScratch map[string]a
 	}
 	L.SetField(t, "upload_filenames", names)
 
-	L.SetField(t, "header", L.NewFunction(func(L *lua.LState) int {
-		name := luaStringArg(L, 1)
-		L.Push(lua.LString(c.Header(name)))
-		return 1
-	}))
-	L.SetField(t, "has_group", L.NewFunction(func(L *lua.LState) int {
-		name := luaStringArg(L, 1)
-		if c.HasGroup(name) {
-			L.Push(lua.LTrue)
-		} else {
-			L.Push(lua.LFalse)
-		}
-		return 1
-	}))
+	L.SetField(t, "header", funcs.header)
+	L.SetField(t, "has_group", funcs.hasGroup)
 	L.SetField(t, "log", L.NewFunction(func(L *lua.LState) int {
 		idx := 1
 		if L.Get(idx).Type() == lua.LTTable {
