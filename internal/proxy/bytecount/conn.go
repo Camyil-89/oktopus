@@ -2,6 +2,7 @@ package bytecount
 
 import (
 	"crypto/tls"
+	"io"
 	"net"
 	"net/http"
 	"sync/atomic"
@@ -108,6 +109,27 @@ func (w respWriter) Write(p []byte) (int, error) {
 	}
 	return n, err
 }
+
+// ReadFrom preserves the optimized response-writer copy path while accounting
+// for the bytes exactly once. Wrapping ResponseWriter otherwise hides its
+// io.ReaderFrom implementation, forcing io.CopyBuffer through an extra loop.
+func (w respWriter) ReadFrom(r io.Reader) (int64, error) {
+	var n int64
+	var err error
+	if rf, ok := w.ResponseWriter.(io.ReaderFrom); ok {
+		n, err = rf.ReadFrom(r)
+	} else {
+		// Keep the source's WriterTo fast path available without routing writes
+		// through respWriter.Write (which would count them a second time).
+		n, err = io.Copy(writerOnly{w.ResponseWriter}, r)
+	}
+	if n > 0 {
+		observeDownInstance(w.instanceID, int(n), w.denied)
+	}
+	return n, err
+}
+
+type writerOnly struct{ io.Writer }
 
 // ResponseWriterInstrumented — обёртка bytecount уже считает ответ.
 func ResponseWriterInstrumented(w http.ResponseWriter) bool {
